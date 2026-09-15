@@ -94,7 +94,15 @@ importers:
 
   apps/worker: {}
 
-  packages/analysis: {}
+  packages/analysis:
+    dependencies:
+      '@skyline/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@skyline/parsing':
+        specifier: workspace:*
+        version: link:../parsing
 
   packages/core:
     dependencies:

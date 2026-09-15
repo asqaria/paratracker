@@ -91,24 +91,48 @@ const hhmmss = (s) => {
    Детерминированная траектория. Без случайностей: один и тот же индекс
    всегда даёт одну и ту же точку, иначе эталон пришлось бы перегенерировать.
    ─────────────────────────────────────────────────────────────────────────── */
+/**
+ * Истинные параметры траектории trackPoint() на индекс (при шаге 1 с — на секунду).
+ * Пишутся в expected.json как `trajectory` — эталон для тестов packages/analysis.
+ * Метры здесь «генераторные»: градус широты = 111 320 м (сфера R ≈ 6 378 км).
+ */
+const TRAJECTORY = {
+  cyclePoints: 480,          // 240 с набора по спирали, затем 240 с перехода
+  climbPoints: 240,
+  climbRateMs: 1.75,
+  glideRateMs: -1.2,
+  circlePeriodS: 20,
+  circleRadiusM: 62,
+  // x = R·sin(a), y = R·cos(a), a растёт: с севера на восток — по часовой.
+  turnDirection: 'cw',
+  turnRateDegS: 360 / 20,
+  climbDriftEastMs: 1.4,
+  climbDriftNorthMs: 0.5,
+  glideEastMs: 10.6,
+  glideNorthMs: 1.8,
+  glideGroundSpeedMs: +Math.hypot(10.6, 1.8).toFixed(9),
+  glideTrackDeg: +(Math.atan2(10.6, 1.8) * 180 / Math.PI).toFixed(9),
+  metresPerDegreeLat: 111320
+};
+
 function trackPoint(i, origin) {
-  const M_LAT = 111320;
-  const M_LON = 111320 * Math.cos(origin.lat * Math.PI / 180);
-  // 240 с набора по спирали, затем 240 с перехода, и так по кругу
-  const cycle = i % 480;
-  const n = Math.floor(i / 480);
+  const T = TRAJECTORY;
+  const M_LAT = T.metresPerDegreeLat;
+  const M_LON = T.metresPerDegreeLat * Math.cos(origin.lat * Math.PI / 180);
+  const cycle = i % T.cyclePoints;
+  const n = Math.floor(i / T.cyclePoints);
   let dx = n * 5400, dy = n * 900, alt = origin.alt + n * 420;
 
-  if (cycle < 240) {
-    const a = (cycle / 20) * Math.PI * 2;        // круг за 20 с
-    dx += 62 * Math.sin(a) + cycle * 1.4;
-    dy += 62 * Math.cos(a) - 62 + cycle * 0.5;
-    alt += cycle * 1.75;
+  if (cycle < T.climbPoints) {
+    const a = (cycle / T.circlePeriodS) * Math.PI * 2;
+    dx += T.circleRadiusM * Math.sin(a) + cycle * T.climbDriftEastMs;
+    dy += T.circleRadiusM * Math.cos(a) - T.circleRadiusM + cycle * T.climbDriftNorthMs;
+    alt += cycle * T.climbRateMs;
   } else {
-    const g = cycle - 240;
-    dx += 62 * Math.sin(0) + 240 * 1.4 + g * 10.6;
-    dy += -62 + 240 * 0.5 + g * 1.8;
-    alt += 240 * 1.75 - g * 1.2;
+    const g = cycle - T.climbPoints;
+    dx += T.circleRadiusM * Math.sin(0) + T.climbPoints * T.climbDriftEastMs + g * T.glideEastMs;
+    dy += -T.circleRadiusM + T.climbPoints * T.climbDriftNorthMs + g * T.glideNorthMs;
+    alt += T.climbPoints * T.climbRateMs + g * T.glideRateMs;
   }
   return {
     lat: origin.lat + dy / M_LAT,
@@ -764,7 +788,8 @@ for (const [name, spec] of Object.entries(CASES)) {
       maxLon: +Math.max(...points.map(p => p.lon)).toFixed(9),
       minAlt: hasAltitude ? Math.min(...altitudes) : null,
       maxAlt: hasAltitude ? Math.max(...altitudes) : null
-    }
+    },
+    trajectory: TRAJECTORY
   };
 
   readme.push(`| \`${name}\` | ${spec.what} | ${spec.checks} |`);

@@ -48,6 +48,23 @@
       "maxLon": 77.056783333,
       "minAlt": 2398,
       "maxAlt": 3238
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "no-baro.igc": {
@@ -99,6 +116,23 @@
       "maxLon": 76.990316667,
       "minAlt": 2398,
       "maxAlt": 2818
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "midnight.igc": {
@@ -150,6 +184,23 @@
       "maxLon": 77.155933333,
       "minAlt": 2398,
       "maxAlt": 3761
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "gaps.igc": {
@@ -201,6 +252,23 @@
       "maxLon": 77.0261,
       "minAlt": 2398,
       "maxAlt": 3236
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "south-west.igc": {
@@ -252,6 +320,23 @@
       "maxLon": -69.95115,
       "minAlt": 2848,
       "maxAlt": 3476
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "date-modern.igc": {
@@ -303,6 +388,23 @@
       "maxLon": 76.990316667,
       "minAlt": 2398,
       "maxAlt": 2818
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "lad-lod.igc": {
@@ -354,6 +456,23 @@
       "maxLon": 76.990318167,
       "minAlt": 2398,
       "maxAlt": 2818
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "sparse-10s.igc": {
@@ -405,6 +524,23 @@
       "maxLon": 76.95895,
       "minAlt": 2398,
       "maxAlt": 2746
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "v-fixes.igc": {
@@ -456,6 +592,23 @@
       "maxLon": 76.990316667,
       "minAlt": 2398,
       "maxAlt": 2818
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "negative-alt.igc": {
@@ -507,6 +660,23 @@
       "maxLon": 35.489833333,
       "minAlt": -2832,
       "maxAlt": -2412
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "extensions-full.igc": {
@@ -558,6 +728,23 @@
       "maxLon": 76.990316667,
       "minAlt": 2398,
       "maxAlt": 2818
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "broken-lines.igc": {
@@ -609,6 +796,23 @@
       "maxLon": 76.990316667,
       "minAlt": 2398,
       "maxAlt": 2818
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "baseline.gpx": {
@@ -660,6 +864,23 @@
       "maxLon": 77.0240385,
       "minAlt": 2350,
       "maxAlt": 2978.3
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "no-ele.gpx": {
@@ -711,6 +932,23 @@
       "maxLon": 76.9668334,
       "minAlt": null,
       "maxAlt": null
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "time-offset.gpx": {
@@ -762,6 +1000,23 @@
       "maxLon": 76.9668334,
       "minAlt": 2350,
       "maxAlt": 2770
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "segments.gpx": {
@@ -813,6 +1068,23 @@
       "maxLon": 76.9903181,
       "minAlt": 2350,
       "maxAlt": 2770
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "fix-2d.gpx": {
@@ -864,6 +1136,23 @@
       "maxLon": 76.9903181,
       "minAlt": 2350,
       "maxAlt": 2770
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "broken.gpx": {
@@ -915,6 +1204,23 @@
       "maxLon": 76.97975,
       "minAlt": 2350,
       "maxAlt": 2770
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "gx-track.kml": {
@@ -966,6 +1272,23 @@
       "maxLon": 77.0240385,
       "minAlt": 2350,
       "maxAlt": 2978.3
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "multitrack.kml": {
@@ -1017,6 +1340,23 @@
       "maxLon": 76.9903181,
       "minAlt": 2350,
       "maxAlt": 2770
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "linestring-timespan.kml": {
@@ -1068,6 +1408,23 @@
       "maxLon": 76.9668334,
       "minAlt": 2350,
       "maxAlt": 2770
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   },
   "gx-track.kmz": {
@@ -1119,6 +1476,23 @@
       "maxLon": 76.9903181,
       "minAlt": 2350,
       "maxAlt": 2770
+    },
+    "trajectory": {
+      "cyclePoints": 480,
+      "climbPoints": 240,
+      "climbRateMs": 1.75,
+      "glideRateMs": -1.2,
+      "circlePeriodS": 20,
+      "circleRadiusM": 62,
+      "turnDirection": "cw",
+      "turnRateDegS": 18,
+      "climbDriftEastMs": 1.4,
+      "climbDriftNorthMs": 0.5,
+      "glideEastMs": 10.6,
+      "glideNorthMs": 1.8,
+      "glideGroundSpeedMs": 10.751744045,
+      "glideTrackDeg": 80.362461887,
+      "metresPerDegreeLat": 111320
     }
   }
 }
