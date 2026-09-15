@@ -146,7 +146,12 @@ export default defineConfig(
     ],
     rules: {
       // Тесты читают эталоны из /fixtures — им нужны файловая система и парсеры.
-      ...restrict(allowOnly('@skyline.core|@skyline.parsing|fflate|vitest|node:fs|node:path|node:url', PURE_MESSAGE)),
+      ...restrict(
+        allowOnly(
+          '@skyline.core|@skyline.parsing|@skyline.analysis|fflate|vitest|node:fs|node:path|node:url',
+          PURE_MESSAGE,
+        ),
+      ),
       'no-restricted-globals': ['error', ...IO_GLOBALS],
     },
   },

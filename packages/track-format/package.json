@@ -14,5 +14,12 @@
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run --config ../../vitest.config.ts --project @skyline/track-format"
+  },
+  "dependencies": {
+    "@skyline/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@skyline/analysis": "workspace:*",
+    "@skyline/parsing": "workspace:*"
   }
 }

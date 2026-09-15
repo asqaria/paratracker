@@ -138,7 +138,18 @@ importers:
         specifier: ^0.8.3
         version: 0.8.3
 
-  packages/track-format: {}
+  packages/track-format:
+    dependencies:
+      '@skyline/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@skyline/analysis':
+        specifier: workspace:*
+        version: link:../analysis
+      '@skyline/parsing':
+        specifier: workspace:*
+        version: link:../parsing
 
 packages:
 
