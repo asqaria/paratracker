@@ -1,65 +1,20 @@
-import { readFileSync } from 'node:fs';
-
 import { pointAt, type ParsedTrack, type ParseWarningCode } from '@skyline/core';
 import { describe, expect, it } from 'vitest';
 
-import { parseIgc, type IgcParseOptions } from './igc.js';
+import { parseIgc } from './igc.js';
+import {
+  defineFixtureChecks,
+  expectation,
+  expectDegrees,
+  fixtureCases,
+  NOW,
+  readFixture,
+  unwrap,
+} from './testing/fixtures.js';
+import type { ParseOptions } from './track-builder.js';
 
-const FIXTURES = new URL('../../../fixtures/', import.meta.url);
-
-/** Эталоны сверяются с допуском 1e-9, а не «примерно» (CLAUDE.md). */
-const TOLERANCE_DEG = 1e-9;
-
-/** Фикстуры датированы до 22.11.2026 (south-west.igc) — «сейчас» должно быть позже. */
-const NOW = Date.UTC(2027, 0, 1);
-
-interface Sample {
-  index: number;
-  timeUtcSeconds: number;
-  lat: number;
-  lon: number;
-  altBaro: number | null;
-  altGnss: number;
-  valid: boolean;
-}
-
-interface FixtureExpectation {
-  pointCount: number;
-  dateHeaderRaw: string;
-  altitudeSource: 'baro' | 'gnss';
-  iRecord: string | null;
-  medianFixIntervalSeconds: number;
-  maxFixIntervalSeconds: number;
-  invalidFixCount: number;
-  minWarnings: number;
-  samples: { first: Sample; middle: Sample; last: Sample };
-  bounds: { minLat: number; maxLat: number; minLon: number; maxLon: number; minAlt: number; maxAlt: number };
-}
-
-const expected = JSON.parse(readFileSync(new URL('expected.json', FIXTURES), 'utf8')) as Record<
-  string,
-  FixtureExpectation
->;
-
-/** Даты заголовков фикстур, записанные вручную по §3.3 (DDMMYY, YY < 80 → 20YY). */
-const HEADER_DATES: Record<string, string> = {
-  HFDTE150726: '2026-07-15',
-  'HFDTEDATE:150726,01': '2026-07-15',
-  HFDTE221126: '2026-11-22',
-  HFDTE030426: '2026-04-03',
-};
-
-const readFixture = (name: string): Uint8Array => readFileSync(new URL(name, FIXTURES));
-
-function parse(input: string | Uint8Array, options: Partial<IgcParseOptions> = {}): ParsedTrack {
-  const result = parseIgc(input, { now: NOW, ...options });
-  if (!result.ok) throw new Error(`parse failed: ${result.code}`);
-  return result.track;
-}
-
-function expectDeg(actual: number, wanted: number, label: string): void {
-  expect(Math.abs(actual - wanted), `${label}: ${actual} vs ${wanted}`).toBeLessThanOrEqual(TOLERANCE_DEG);
-}
+const parse = (input: string | Uint8Array, options: Partial<ParseOptions> = {}): ParsedTrack =>
+  unwrap(parseIgc(input, { now: NOW, ...options }));
 
 const igc = (...lines: string[]): string => lines.join('\r\n') + '\r\n';
 const HEADER = ['AXSKFIXTURE', 'HFDTE150726'];
@@ -68,54 +23,12 @@ const REFERENCE_FIX = 'B0940094646616N01308990EA0175201889';
 const fixAt = (hhmmss: string): string => `B${hhmmss}4646616N01308990EA0175201889`;
 const codes = (track: ParsedTrack): ParseWarningCode[] => track.warnings.map((w) => w.code);
 
-describe.each(Object.entries(expected))('%s', (name, exp) => {
+describe.each(fixtureCases('igc'))('%s', (name, exp) => {
   const track = parse(readFixture(name));
-  const { points } = track;
-  const count = points.t.length;
+  defineFixtureChecks(track, exp, 'header');
 
-  it('количество точек, источник высоты, 2D-фиксы', () => {
-    expect(count).toBe(exp.pointCount);
-    expect(track.altitudeSource).toBe(exp.altitudeSource);
-    expect(points.valid.filter((v) => v === 0).length).toBe(exp.invalidFixCount);
-    const { t, lat, lon, altBaro, altGnss, valid, fxa, siu } = points;
-    for (const column of [t, lat, lon, altBaro, altGnss, valid, fxa, siu]) expect(column.length).toBe(count);
-  });
-
-  it('дата из заголовка', () => {
-    expect(track.meta).toMatchObject({ date: HEADER_DATES[exp.dateHeaderRaw], dateSource: 'header' });
-  });
-
-  it.each(['first', 'middle', 'last'] as const)('контрольная точка %s', (key) => {
-    const sample = exp.samples[key];
-    const point = pointAt(points, sample.index);
-    const dayStart = Date.parse(`${HEADER_DATES[exp.dateHeaderRaw]}T00:00:00Z`);
-
-    expect(point.t).toBe(dayStart + sample.timeUtcSeconds * 1000);
-    expectDeg(point.lat, sample.lat, 'lat');
-    expectDeg(point.lon, sample.lon, 'lon');
-    expect(point.altBaro).toBe(sample.altBaro);
-    expect(point.altGnss).toBe(sample.altGnss);
-    expect(point.valid).toBe(sample.valid);
-  });
-
-  it('границы по всем точкам', () => {
-    expectDeg(Math.min(...points.lat), exp.bounds.minLat, 'minLat');
-    expectDeg(Math.max(...points.lat), exp.bounds.maxLat, 'maxLat');
-    expectDeg(Math.min(...points.lon), exp.bounds.minLon, 'minLon');
-    expectDeg(Math.max(...points.lon), exp.bounds.maxLon, 'maxLon');
-    expect(Math.min(...points.altGnss)).toBe(exp.bounds.minAlt);
-    expect(Math.max(...points.altGnss)).toBe(exp.bounds.maxAlt);
-  });
-
-  it('интервалы между фиксами', () => {
-    const steps = Array.from(points.t.subarray(1), (t, i) => (t - (points.t[i] ?? 0)) / 1000).sort((a, b) => a - b);
-    expect(steps.every((s) => s > 0)).toBe(true);
-    expect(steps[Math.floor(steps.length / 2)]).toBe(exp.medianFixIntervalSeconds);
-    expect(steps.at(-1)).toBe(exp.maxFixIntervalSeconds);
-  });
-
-  it('предупреждений не меньше эталона', () => {
-    expect(track.warnings.length).toBeGreaterThanOrEqual(exp.minWarnings);
+  it('заголовок даты из эталона', () => {
+    expect(exp.dateHeaderRaw).toMatch(/^HFDTE/);
   });
 });
 
@@ -124,8 +37,8 @@ describe('B-запись', () => {
     const point = pointAt(parse(igc(...HEADER, REFERENCE_FIX)).points, 0);
 
     expect(point.t).toBe(Date.UTC(2026, 6, 15, 9, 40, 9));
-    expectDeg(point.lat, 46.776933333, 'lat'); // 46° 46.616′
-    expectDeg(point.lon, 13.149833333, 'lon'); // 13° 08.990′
+    expectDegrees(point.lat, 46.776933333, 'lat'); // 46° 46.616′
+    expectDegrees(point.lon, 13.149833333, 'lon'); // 13° 08.990′
     expect(point).toMatchObject({ altBaro: 1752, altGnss: 1889, valid: true });
   });
 
@@ -254,7 +167,7 @@ describe('заголовки и высоты', () => {
 describe('устойчивость: парсер не бросает на кривых строках', () => {
   it('broken-lines.igc: мусор пропущен, у каждой непустой битой строки — предупреждение', () => {
     const track = parse(readFixture('broken-lines.igc'));
-    expect(track.points.t.length).toBe(expected['broken-lines.igc']?.pointCount);
+    expect(track.points.t.length).toBe(expectation('broken-lines.igc').pointCount);
     expect(track.warnings).toEqual([
       { code: 'malformed_fix', line: 21 }, // обрезанная B-запись
       { code: 'unknown_record', line: 61 }, // текст вместо записи

@@ -1,34 +1,21 @@
+import { IGC, TIME, type DateSource, type ParsedTrack, type ParseResult, type TrackMeta } from '@skyline/core';
+
+import { checkCalendarDate, isoDate, type DateCheck } from './dates.js';
+import { decodeLatin1, inputSize, stripBom } from './text.js';
 import {
-  IGC,
-  TIME,
-  type DateSource,
-  type ParsedTrack,
-  type ParseResult,
-  type ParseWarning,
-  type ParseWarningCode,
-  type TrackColumns,
-  type TrackMeta,
-} from '@skyline/core';
+  isValidCoordinate,
+  resolveLimits,
+  summarizeAltitudes,
+  TrackBuilder,
+  WarningLog,
+  type ParseOptions,
+} from './track-builder.js';
 
 /**
  * Парсер IGC по ТЗ §3.3. Чистая функция: на входе строка или байты, на выходе
  * ParsedTrack. Ни сети, ни файловой системы, ни текущего времени — «сейчас»
  * передаётся параметром. На кривой строке не бросает: пишет предупреждение и идёт дальше.
  */
-
-export interface ParseLimits {
-  maxFileBytes: number;
-  maxPoints: number;
-}
-
-export interface IgcParseOptions {
-  /** «Сейчас», UNIX мс — для санити-чека даты (не в будущем). Параметр, а не Date.now(): парсер детерминирован. */
-  now: number;
-  /** Имя загруженного файла — запасной источник даты (ТЗ §3.3). */
-  fileName?: string;
-  /** Переопределение лимитов ТЗ §3.3. */
-  limits?: Partial<ParseLimits>;
-}
 
 /** Раскладка B-записи, ТЗ §3.3. Позиции 1-based, границы включительно. */
 const B = {
@@ -80,8 +67,6 @@ const IGNORED_RECORDS = new Set(['C', 'D', 'E', 'F', 'J', 'K', 'L']);
 const MINUTE_THOUSANDTHS = 1000;
 const MINUTES_PER_DEGREE = 60;
 const MAX_MINUTE_THOUSANDTHS = MINUTES_PER_DEGREE * MINUTE_THOUSANDTHS;
-const MAX_LAT_DEGREES = 90;
-const MAX_LON_DEGREES = 180;
 const HOURS_PER_DAY = 24;
 const MINUTES_PER_HOUR = 60;
 const SECONDS_PER_MINUTE = 60;
@@ -92,12 +77,8 @@ const CENTURY_20 = 1900;
 const CENTURY_21 = 2000;
 /** Короткое имя IGC кодирует месяц и день одним символом base-36 (1–9, A–V). */
 const SHORT_NAME_RADIX = 36;
-/** String.fromCharCode принимает ограниченное число аргументов — декодируем кусками. */
-const DECODE_CHUNK_BYTES = 0x8000;
 
 const LINE_BREAK = /\r\n|\r|\n/;
-const UTF8_BOM_AS_LATIN1 = 'ï»¿';
-const BOM = '﻿';
 const DDMMYY = /^(\d{2})(\d{2})(\d{2})/;
 /** Длинное имя IGC: `YYYY-MM-DD-MMM-SSSSSS-FF.IGC`. */
 const LONG_FILE_NAME = /^(\d{4})-(\d{2})-(\d{2})-/;
@@ -125,23 +106,6 @@ interface Fix {
 interface ExtraDigits {
   value: number;
   digits: number;
-}
-
-class WarningLog {
-  private readonly items: ParseWarning[] = [];
-  private truncated = false;
-
-  add(code: ParseWarningCode, line?: number): void {
-    if (this.items.length >= IGC.maxWarnings) {
-      this.truncated = true;
-      return;
-    }
-    this.items.push(line === undefined ? { code } : { code, line });
-  }
-
-  list(): ParseWarning[] {
-    return this.truncated ? [...this.items, { code: 'warnings_truncated' }] : [...this.items];
-  }
 }
 
 /** Целое из цифр в позициях [from, to] (1-based); NaN, если не цифры или строка короче. */
@@ -228,7 +192,7 @@ function readFix(line: string, extensions: readonly Extension[]): Fix | null {
 
   const lat = coordinate(latDegrees, latMinutes, latExtra, latHemisphere === 'S');
   const lon = coordinate(lonDegrees, lonMinutes, lonExtra, lonHemisphere === 'W');
-  if (!(Math.abs(lat) <= MAX_LAT_DEGREES && Math.abs(lon) <= MAX_LON_DEGREES)) return null;
+  if (!isValidCoordinate(lat, lon)) return null;
 
   return {
     secondOfDay: hours * SECONDS_PER_HOUR + minutes * SECONDS_PER_MINUTE + seconds,
@@ -269,25 +233,6 @@ function isWgs84(datum: string): boolean {
   );
 }
 
-/** Полночь UTC календарной даты; null, если такой даты нет (32.07, 30.02). */
-function calendarDay(year: number, month: number, day: number): number | null {
-  const ms = Date.UTC(year, month - 1, day);
-  const date = new Date(ms);
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day ? ms : null;
-}
-
-type DateCheck = { kind: 'ok'; dayStart: number } | { kind: 'invalid' } | { kind: 'out_of_range' };
-
-/** ТЗ §3.3: не раньше 1990 и не в будущем (с допуском на локальную дату в заголовке). */
-function checkDate(year: number, month: number, day: number, now: number): DateCheck {
-  const dayStart = calendarDay(year, month, day);
-  if (dayStart === null) return { kind: 'invalid' };
-  if (year < IGC.minYear || dayStart > now + IGC.futureDateToleranceS * TIME.msPerSecond) {
-    return { kind: 'out_of_range' };
-  }
-  return { kind: 'ok', dayStart };
-}
-
 /** `HFDTE150726` и `HFDTEDATE:150726,01` → значение после ключа уже без префикса. */
 function dateFromHeader(value: string, now: number): DateCheck {
   const match = DDMMYY.exec(value.replace(/^DATE:?/i, ''));
@@ -295,7 +240,7 @@ function dateFromHeader(value: string, now: number): DateCheck {
   const [, dd, mm, yy] = match.map(Number);
   if (dd === undefined || mm === undefined || yy === undefined) return { kind: 'invalid' };
   const year = yy < IGC.twoDigitYearPivot ? CENTURY_21 + yy : CENTURY_20 + yy;
-  return checkDate(year, mm, dd, now);
+  return checkCalendarDate(year, mm, dd, now);
 }
 
 function dateFromFileName(fileName: string, now: number): DateCheck {
@@ -304,7 +249,9 @@ function dateFromFileName(fileName: string, now: number): DateCheck {
   const long = LONG_FILE_NAME.exec(baseName);
   if (long) {
     const [, year, month, day] = long.map(Number);
-    if (year !== undefined && month !== undefined && day !== undefined) return checkDate(year, month, day, now);
+    if (year !== undefined && month !== undefined && day !== undefined) {
+      return checkCalendarDate(year, month, day, now);
+    }
   }
 
   const short = SHORT_FILE_NAME.exec(baseName);
@@ -314,7 +261,7 @@ function dateFromFileName(fileName: string, now: number): DateCheck {
       // Последняя цифра года → ближайший такой год не позже «сейчас».
       const nowYear = new Date(now).getUTCFullYear();
       const year = nowYear - ((nowYear - Number(yearDigit) + DECIMAL_BASE) % DECIMAL_BASE);
-      return checkDate(year, parseInt(month, SHORT_NAME_RADIX), parseInt(day, SHORT_NAME_RADIX), now);
+      return checkCalendarDate(year, parseInt(month, SHORT_NAME_RADIX), parseInt(day, SHORT_NAME_RADIX), now);
     }
   }
 
@@ -329,18 +276,12 @@ interface ResolvedDate {
 
 function resolveDate(
   header: { value: string; line: number } | null,
-  options: IgcParseOptions,
+  options: ParseOptions,
   warnings: WarningLog,
 ): ResolvedDate {
-  const found = (dayStart: number, source: DateSource): ResolvedDate => ({
-    dayStart,
-    date: new Date(dayStart).toISOString().slice(0, 10),
-    source,
-  });
-
   if (header) {
     const check = dateFromHeader(header.value, options.now);
-    if (check.kind === 'ok') return found(check.dayStart, 'header');
+    if (check.kind === 'ok') return { dayStart: check.dayStart, date: isoDate(check.dayStart), source: 'header' };
     warnings.add(check.kind === 'invalid' ? 'date_header_invalid' : 'date_out_of_range', header.line);
   }
 
@@ -348,7 +289,7 @@ function resolveDate(
     const check = dateFromFileName(options.fileName, options.now);
     if (check.kind === 'ok') {
       warnings.add('date_from_filename');
-      return found(check.dayStart, 'filename');
+      return { dayStart: check.dayStart, date: isoDate(check.dayStart), source: 'filename' };
     }
   }
 
@@ -357,69 +298,24 @@ function resolveDate(
   return { dayStart: 0, date: null, source: null };
 }
 
-function decodeLatin1(bytes: Uint8Array): string {
-  let text = '';
-  for (let i = 0; i < bytes.length; i += DECODE_CHUNK_BYTES) {
-    text += String.fromCharCode(...bytes.subarray(i, i + DECODE_CHUNK_BYTES));
-  }
-  return text;
-}
-
-function stripBom(text: string): string {
-  if (text.startsWith(BOM)) return text.slice(BOM.length);
-  if (text.startsWith(UTF8_BOM_AS_LATIN1)) return text.slice(UTF8_BOM_AS_LATIN1.length);
-  return text;
-}
-
-function allocateColumns(capacity: number): TrackColumns {
-  return {
-    t: new Float64Array(capacity),
-    lat: new Float64Array(capacity),
-    lon: new Float64Array(capacity),
-    altBaro: new Float64Array(capacity),
-    altGnss: new Float64Array(capacity),
-    valid: new Uint8Array(capacity),
-    fxa: new Float64Array(capacity),
-    siu: new Float64Array(capacity),
-  };
-}
-
-/** Точные копии нужной длины: отдельные буферы можно передавать между потоками. */
-function truncateColumns(columns: TrackColumns, count: number): TrackColumns {
-  return {
-    t: columns.t.slice(0, count),
-    lat: columns.lat.slice(0, count),
-    lon: columns.lon.slice(0, count),
-    altBaro: columns.altBaro.slice(0, count),
-    altGnss: columns.altGnss.slice(0, count),
-    valid: columns.valid.slice(0, count),
-    fxa: columns.fxa.slice(0, count),
-    siu: columns.siu.slice(0, count),
-  };
-}
-
 function setOnce(meta: TrackMeta, key: TextMetaKey, value: string): void {
   if (value !== '' && meta[key] === undefined) meta[key] = value;
 }
 
-export function parseIgc(input: string | Uint8Array, options: IgcParseOptions): ParseResult {
-  const limits: ParseLimits = { maxFileBytes: IGC.maxFileBytes, maxPoints: IGC.maxPoints, ...options.limits };
-  const warnings = new WarningLog();
-
-  const size = typeof input === 'string' ? input.length : input.byteLength;
-  if (size > limits.maxFileBytes) return { ok: false, code: 'file_too_large', warnings: [] };
+export function parseIgc(input: string | Uint8Array, options: ParseOptions): ParseResult {
+  const limits = resolveLimits(options);
+  if (inputSize(input) > limits.maxFileBytes) return { ok: false, code: 'file_too_large', warnings: [] };
 
   const lines = stripBom(typeof input === 'string' ? input : decodeLatin1(input)).split(LINE_BREAK);
-  const columns = allocateColumns(Math.min(lines.length, limits.maxPoints));
+  const warnings = new WarningLog();
+  // Время в builder — секунды от полуночи первых суток; в мс переводится, когда известна дата.
+  const builder = new TrackBuilder({ maxPoints: limits.maxPoints, warnings, initialCapacity: lines.length });
   const meta: TrackMeta = { date: null, dateSource: null };
 
   let dateHeader: { value: string; line: number } | null = null;
   let extensions: Extension[] = [];
   let signature = '';
-  let count = 0;
   let dayOffset = 0;
-  /** Секунды от полуночи первых суток у последней принятой точки. */
-  let lastSecond = Number.NEGATIVE_INFINITY;
 
   for (let index = 0; index < lines.length; index++) {
     const line = (lines[index] ?? '').trimEnd();
@@ -435,30 +331,13 @@ export function parseIgc(input: string | Uint8Array, options: IgcParseOptions): 
       }
 
       let second = dayOffset * TIME.secondsPerDay + fix.secondOfDay;
-      if (lastSecond - second >= IGC.midnightRolloverMinBackstepS) {
+      if (builder.lastTime - second >= IGC.midnightRolloverMinBackstepS) {
         dayOffset += 1;
         second += TIME.secondsPerDay;
       }
-      if (second === lastSecond) {
-        warnings.add('duplicate_fix', lineNumber);
-        continue;
+      if (builder.push({ ...fix, t: second }, lineNumber) === 'limit') {
+        return { ok: false, code: 'too_many_points', warnings: warnings.list() };
       }
-      if (second < lastSecond) {
-        warnings.add('out_of_order_fix', lineNumber);
-        continue;
-      }
-      if (count === limits.maxPoints) return { ok: false, code: 'too_many_points', warnings: warnings.list() };
-
-      columns.t[count] = second;
-      columns.lat[count] = fix.lat;
-      columns.lon[count] = fix.lon;
-      columns.altBaro[count] = fix.altBaro;
-      columns.altGnss[count] = fix.altGnss;
-      columns.valid[count] = fix.valid;
-      columns.fxa[count] = fix.fxa;
-      columns.siu[count] = fix.siu;
-      count += 1;
-      lastSecond = second;
       continue;
     }
 
@@ -493,24 +372,16 @@ export function parseIgc(input: string | Uint8Array, options: IgcParseOptions): 
     }
   }
 
-  if (count === 0) return { ok: false, code: 'no_fixes', warnings: warnings.list() };
+  if (builder.count === 0) return { ok: false, code: 'no_fixes', warnings: warnings.list() };
 
-  const points = truncateColumns(columns, count);
-
+  const points = builder.finish();
   // ТЗ §3.3: все 00000 — прибор высоту не пишет; настоящий трек не лежит ровно на нуле.
-  const hasBaro = points.altBaro.some((alt) => alt !== 0);
-  const hasGnss = points.altGnss.some((alt) => alt !== 0);
-  if (!hasBaro) {
-    points.altBaro.fill(Number.NaN);
-    warnings.add('no_baro_altitude');
-  }
-  if (!hasGnss) {
-    points.altGnss.fill(Number.NaN);
-    warnings.add('no_gnss_altitude');
-  }
+  if (points.altBaro.every((alt) => alt === 0)) points.altBaro.fill(Number.NaN);
+  if (points.altGnss.every((alt) => alt === 0)) points.altGnss.fill(Number.NaN);
+  const altitudeSource = summarizeAltitudes(points, warnings);
 
   const date = resolveDate(dateHeader, options, warnings);
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < points.t.length; i++) {
     points.t[i] = date.dayStart + (points.t[i] ?? 0) * TIME.msPerSecond;
   }
 
@@ -518,11 +389,6 @@ export function parseIgc(input: string | Uint8Array, options: IgcParseOptions): 
   meta.dateSource = date.source;
   if (signature !== '') meta.signature = signature;
 
-  const track: ParsedTrack = {
-    points,
-    meta,
-    warnings: warnings.list(),
-    altitudeSource: hasBaro ? 'baro' : 'gnss',
-  };
+  const track: ParsedTrack = { points, meta, warnings: warnings.list(), altitudeSource };
   return { ok: true, track };
 }

@@ -7,7 +7,7 @@ import type { ParsedTrack } from './track.js';
 export const PARSE_WARNING_CODES = [
   /** Строка с неизвестным типом записи или мусор. Пустая строка предупреждения не заслуживает. */
   'unknown_record',
-  /** Точка не разобрана: короткая строка, не цифры, неверное полушарие или флаг валидности. */
+  /** Точка не разобрана: битые координаты, время или флаг валидности, нет времени. */
   'malformed_fix',
   /** Определение расширений (IGC I-запись) не разобрано. */
   'malformed_extensions',
@@ -29,6 +29,14 @@ export const PARSE_WARNING_CODES = [
   'no_baro_altitude',
   /** GNSS-высоты нет. */
   'no_gnss_altitude',
+  /** KML: высоты не абсолютные (relativeToGround, clampToGround…) — отброшены. */
+  'altitude_not_absolute',
+  /** KML LineString: времени у точек нет, оно равномерно распределено по TimeSpan метки. */
+  'timestamps_interpolated',
+  /** KML gx:Track: число <when> и <gx:coord> не совпадает — взят минимум. */
+  'track_length_mismatch',
+  /** Документ оборван (прибор выключился при записи) — взято всё до обрыва. */
+  'truncated_document',
   /** Предупреждений больше лимита, остальные отброшены. */
   'warnings_truncated',
 ] as const;
@@ -41,7 +49,15 @@ export interface ParseWarning {
 }
 
 /** Причины, по которым файл целиком отклоняется. */
-export const PARSE_FAILURE_CODES = ['file_too_large', 'too_many_points', 'no_fixes'] as const;
+export const PARSE_FAILURE_CODES = [
+  'file_too_large',
+  'too_many_points',
+  'no_fixes',
+  /** Точки есть, но ни у одной нет времени — трек нельзя проиграть и посчитать вариометр. */
+  'no_timestamps',
+  /** KMZ повреждён или внутри нет KML. */
+  'invalid_archive',
+] as const;
 export type ParseFailureCode = (typeof PARSE_FAILURE_CODES)[number];
 
 export type ParseResult =

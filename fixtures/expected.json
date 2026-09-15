@@ -2,7 +2,9 @@
   "baseline.igc": {
     "description": "Эталонный нормальный трек. Всё как надо: 1 Гц, баро и GNSS, старый HFDTE, все фиксы A.",
     "verifies": "Базовый разбор: количество точек, координаты, высоты, дата.",
+    "format": "igc",
     "pointCount": 960,
+    "date": "2026-07-15",
     "dateHeaderRaw": "HFDTE150726",
     "altitudeSource": "baro",
     "iRecord": null,
@@ -51,7 +53,9 @@
   "no-baro.igc": {
     "description": "Прибор не пишет барометрическую высоту — все поля 00000.",
     "verifies": "altitudeSource должен стать \"gnss\", в warnings — предупреждение. Вариометр считается по GNSS.",
+    "format": "igc",
     "pointCount": 480,
+    "date": "2026-07-15",
     "dateHeaderRaw": "HFDTE150726",
     "altitudeSource": "gnss",
     "iRecord": null,
@@ -100,7 +104,9 @@
   "midnight.igc": {
     "description": "Полёт через полночь UTC: старт 23:50, финиш после 00:10 следующих суток.",
     "verifies": "Время следующей B-записи МЕНЬШЕ предыдущей → +1 сутки. Без этого вся вторая половина трека уедет на день назад.",
+    "format": "igc",
     "pointCount": 1500,
+    "date": "2026-07-15",
     "dateHeaderRaw": "HFDTE150726",
     "altitudeSource": "baro",
     "iRecord": null,
@@ -149,7 +155,9 @@
   "gaps.igc": {
     "description": "Два разрыва связи: 90 секунд и 12 минут.",
     "verifies": "Разрыв 90 с НЕ влезает в Uint16 миллисекунд (потолок 65.5 с) — проверка таблицы разрывов из ТЗ §5.4. Оба помечаются флагом gap, интерполяция через них запрещена.",
+    "format": "igc",
     "pointCount": 720,
+    "date": "2026-07-15",
     "dateHeaderRaw": "HFDTE150726",
     "altitudeSource": "baro",
     "iRecord": null,
@@ -198,7 +206,9 @@
   "south-west.igc": {
     "description": "Аргентинские Анды: отрицательная широта И отрицательная долгота.",
     "verifies": "Знаки S и W. Классическая ошибка — потерять знак и отзеркалить трек в северное полушарие.",
+    "format": "igc",
     "pointCount": 600,
+    "date": "2026-11-22",
     "dateHeaderRaw": "HFDTE221126",
     "altitudeSource": "baro",
     "iRecord": null,
@@ -247,7 +257,9 @@
   "date-modern.igc": {
     "description": "Современный формат даты HFDTEDATE:DDMMYY,NN (с 2016 года).",
     "verifies": "Парсер обязан понимать ОБА формата. На этом файле старая реализация не найдёт дату и уйдёт в fallback по имени файла.",
+    "format": "igc",
     "pointCount": 480,
+    "date": "2026-07-15",
     "dateHeaderRaw": "HFDTEDATE:150726,01",
     "altitudeSource": "baro",
     "iRecord": null,
@@ -296,7 +308,9 @@
   "lad-lod.igc": {
     "description": "Расширения LAD и LOD — дополнительные знаки минут широты и долготы.",
     "verifies": "Без их учёта точность координат ограничена 0.001′ ≈ 1.85 м, и радиус виража в детекции кругов заметно шумит. Координаты в эталоне посчитаны С учётом расширений.",
+    "format": "igc",
     "pointCount": 480,
+    "date": "2026-07-15",
     "dateHeaderRaw": "HFDTE150726",
     "altitudeSource": "baro",
     "iRecord": "I023637LAD3839LOD",
@@ -345,7 +359,9 @@
   "sparse-10s.igc": {
     "description": "Шаг фиксов 10 секунд — типично для GPX с телефона и часов Garmin.",
     "verifies": "Медианный шаг > 4 с → analysis_level = \"basic\". Детекцию термиков и ветра НЕ запускать: интерполяция срежет виражи хордами и накопление курса не наберёт 360°.",
+    "format": "igc",
     "pointCount": 200,
+    "date": "2026-07-15",
     "dateHeaderRaw": "HFDTE150726",
     "altitudeSource": "baro",
     "iRecord": null,
@@ -394,7 +410,9 @@
   "v-fixes.igc": {
     "description": "Каждый десятый фикс — 2D (флаг V вместо A).",
     "verifies": "Точки с V помечаются и исключаются из расчёта вертикальной скорости, но остаются в треке.",
+    "format": "igc",
     "pointCount": 480,
+    "date": "2026-07-15",
     "dateHeaderRaw": "HFDTE150726",
     "altitudeSource": "baro",
     "iRecord": null,
@@ -443,7 +461,9 @@
   "negative-alt.igc": {
     "description": "Высоты ниже уровня моря — формат -NNNN. Мёртвое море.",
     "verifies": "Отрицательная высота не должна ломать парсер числа и не должна превращаться в 0.",
+    "format": "igc",
     "pointCount": 360,
+    "date": "2026-04-03",
     "dateHeaderRaw": "HFDTE030426",
     "altitudeSource": "baro",
     "iRecord": null,
@@ -492,7 +512,9 @@
   "extensions-full.igc": {
     "description": "Полный набор расширений B-записи: FXA, SIU, GSP, ENL.",
     "verifies": "I-запись разбирается по позициям байтов, значения читаются по своим смещениям. FXA и SIU потом используются для фильтрации шума.",
+    "format": "igc",
     "pointCount": 480,
+    "date": "2026-07-15",
     "dateHeaderRaw": "HFDTE150726",
     "altitudeSource": "baro",
     "iRecord": "I043638FXA3940SIU4144GSP4547ENL",
@@ -541,7 +563,9 @@
   "broken-lines.igc": {
     "description": "Битые строки посреди валидного трека: обрезанная B-запись, мусор, неизвестный тип записи, пустая строка.",
     "verifies": "ГЛАВНЫЙ тест устойчивости. Парсер обязан пропустить их, записать в warnings и продолжить — не бросить исключение. Количество валидных точек должно остаться прежним.",
+    "format": "igc",
     "pointCount": 480,
+    "date": "2026-07-15",
     "dateHeaderRaw": "HFDTE150726",
     "altitudeSource": "baro",
     "iRecord": null,
@@ -585,6 +609,516 @@
       "maxLon": 76.990316667,
       "minAlt": 2398,
       "maxAlt": 2818
+    }
+  },
+  "baseline.gpx": {
+    "description": "Нормальный GPX 1.1 как у Garmin: trkpt с ele и time, расширения TrackPointExtension, метаданные с автором по-русски.",
+    "verifies": "Базовый разбор GPX: точки, время ISO 8601, высота из ele. Баро нет → altitudeSource \"gnss\" и предупреждение. UTF-8 и сущности XML в метаданных.",
+    "format": "gpx",
+    "pointCount": 600,
+    "date": "2026-07-15",
+    "dateHeaderRaw": null,
+    "altitudeSource": "gnss",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 1,
+    "invalidFixCount": 0,
+    "minWarnings": 1,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 32400,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": null,
+        "altGnss": 2350,
+        "valid": true
+      },
+      "middle": {
+        "index": 300,
+        "timeUtcSeconds": 32700,
+        "lat": 43.1294912,
+        "lon": 76.9669639,
+        "altBaro": null,
+        "altGnss": 2698,
+        "valid": true
+      },
+      "last": {
+        "index": 599,
+        "timeUtcSeconds": 32999,
+        "lat": 43.136592,
+        "lon": 77.0232808,
+        "altBaro": null,
+        "altGnss": 2978.3,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126931,
+      "maxLat": 43.136592,
+      "minLon": 76.9544954,
+      "maxLon": 77.0240385,
+      "minAlt": 2350,
+      "maxAlt": 2978.3
+    }
+  },
+  "no-ele.gpx": {
+    "description": "Телефон не записал высоту: ни у одной точки нет <ele>.",
+    "verifies": "Парсер не падает: altGnss = null у всех точек и предупреждение no_gnss_altitude.",
+    "format": "gpx",
+    "pointCount": 300,
+    "date": "2026-07-15",
+    "dateHeaderRaw": null,
+    "altitudeSource": "gnss",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 1,
+    "invalidFixCount": 0,
+    "minWarnings": 2,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 36000,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": null,
+        "altGnss": null,
+        "valid": true
+      },
+      "middle": {
+        "index": 150,
+        "timeUtcSeconds": 36150,
+        "lat": 43.1275598,
+        "lon": 76.9575848,
+        "altBaro": null,
+        "altGnss": null,
+        "valid": true
+      },
+      "last": {
+        "index": 299,
+        "timeUtcSeconds": 36299,
+        "lat": 43.129475,
+        "lon": 76.9668334,
+        "altBaro": null,
+        "altGnss": null,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126931,
+      "maxLat": 43.129475,
+      "minLon": 76.9544954,
+      "maxLon": 76.9668334,
+      "minAlt": null,
+      "maxAlt": null
+    }
+  },
+  "time-offset.gpx": {
+    "description": "Время с часовым поясом (+05:00) и долями секунды (.500) — так пишут многие телефонные трекеры.",
+    "verifies": "Время приводится к UTC; доли секунды не теряются.",
+    "format": "gpx",
+    "pointCount": 300,
+    "date": "2026-07-15",
+    "dateHeaderRaw": null,
+    "altitudeSource": "gnss",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 1,
+    "invalidFixCount": 0,
+    "minWarnings": 1,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 39600.5,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": null,
+        "altGnss": 2350,
+        "valid": true
+      },
+      "middle": {
+        "index": 150,
+        "timeUtcSeconds": 39750.5,
+        "lat": 43.1275598,
+        "lon": 76.9575848,
+        "altBaro": null,
+        "altGnss": 2612.5,
+        "valid": true
+      },
+      "last": {
+        "index": 299,
+        "timeUtcSeconds": 39899.5,
+        "lat": 43.129475,
+        "lon": 76.9668334,
+        "altBaro": null,
+        "altGnss": 2699.2,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126931,
+      "maxLat": 43.129475,
+      "minLon": 76.9544954,
+      "maxLon": 76.9668334,
+      "minAlt": 2350,
+      "maxAlt": 2770
+    }
+  },
+  "segments.gpx": {
+    "description": "Два <trkseg> с разрывом 90 секунд между ними.",
+    "verifies": "Сегменты склеиваются в один трек по времени; разрыв остаётся разрывом.",
+    "format": "gpx",
+    "pointCount": 480,
+    "date": "2026-07-15",
+    "dateHeaderRaw": null,
+    "altitudeSource": "gnss",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 91,
+    "invalidFixCount": 0,
+    "minWarnings": 1,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 43200,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": null,
+        "altGnss": 2350,
+        "valid": true
+      },
+      "middle": {
+        "index": 240,
+        "timeUtcSeconds": 43530,
+        "lat": 43.128521,
+        "lon": 76.9591357,
+        "altBaro": null,
+        "altGnss": 2770,
+        "valid": true
+      },
+      "last": {
+        "index": 479,
+        "timeUtcSeconds": 43769,
+        "lat": 43.1323856,
+        "lon": 76.9903181,
+        "altBaro": null,
+        "altGnss": 2483.2,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126931,
+      "maxLat": 43.1323856,
+      "minLon": 76.9544954,
+      "maxLon": 76.9903181,
+      "minAlt": 2350,
+      "maxAlt": 2770
+    }
+  },
+  "fix-2d.gpx": {
+    "description": "Каждая десятая точка — <fix>2d</fix>; у всех точек <sat>7</sat>.",
+    "verifies": "2D-фиксы помечаются valid = false, число спутников читается в siu.",
+    "format": "gpx",
+    "pointCount": 480,
+    "date": "2026-07-15",
+    "dateHeaderRaw": null,
+    "altitudeSource": "gnss",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 1,
+    "invalidFixCount": 48,
+    "minWarnings": 1,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 46800,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": null,
+        "altGnss": 2350,
+        "valid": false
+      },
+      "middle": {
+        "index": 240,
+        "timeUtcSeconds": 47040,
+        "lat": 43.128521,
+        "lon": 76.9591357,
+        "altBaro": null,
+        "altGnss": 2770,
+        "valid": false
+      },
+      "last": {
+        "index": 479,
+        "timeUtcSeconds": 47279,
+        "lat": 43.1323856,
+        "lon": 76.9903181,
+        "altBaro": null,
+        "altGnss": 2483.2,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126931,
+      "maxLat": 43.1323856,
+      "minLon": 76.9544954,
+      "maxLon": 76.9903181,
+      "minAlt": 2350,
+      "maxAlt": 2770
+    }
+  },
+  "broken.gpx": {
+    "description": "Битые точки посреди трека (широта 95°, нет времени, время не ISO), текстовый мусор между точками и файл, оборванный посреди последней точки.",
+    "verifies": "Парсер не бросает: битые точки пропущены с предупреждением, мусор проигнорирован, обрыв — предупреждение truncated_document, всё до обрыва сохранено.",
+    "format": "gpx",
+    "pointCount": 399,
+    "date": "2026-07-15",
+    "dateHeaderRaw": null,
+    "altitudeSource": "gnss",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 1,
+    "invalidFixCount": 0,
+    "minWarnings": 5,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 50400,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": null,
+        "altGnss": 2350,
+        "valid": true
+      },
+      "middle": {
+        "index": 199,
+        "timeUtcSeconds": 50599,
+        "lat": 43.1288666,
+        "lon": 76.9581933,
+        "altBaro": null,
+        "altGnss": 2698.3,
+        "valid": true
+      },
+      "last": {
+        "index": 398,
+        "timeUtcSeconds": 50798,
+        "lat": 43.1310758,
+        "lon": 76.97975,
+        "altBaro": null,
+        "altGnss": 2580.4,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126931,
+      "maxLat": 43.1310758,
+      "minLon": 76.9544954,
+      "maxLon": 76.97975,
+      "minAlt": 2350,
+      "maxAlt": 2770
+    }
+  },
+  "gx-track.kml": {
+    "description": "Google Earth KML с <gx:Track>: списки <when> и <gx:coord>, altitudeMode absolute.",
+    "verifies": "Время из <when> сопоставляется с <gx:coord> по порядку; координаты в порядке «долгота широта высота».",
+    "format": "kml",
+    "pointCount": 600,
+    "date": "2026-07-15",
+    "dateHeaderRaw": null,
+    "altitudeSource": "gnss",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 1,
+    "invalidFixCount": 0,
+    "minWarnings": 1,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 54000,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": null,
+        "altGnss": 2350,
+        "valid": true
+      },
+      "middle": {
+        "index": 300,
+        "timeUtcSeconds": 54300,
+        "lat": 43.1294912,
+        "lon": 76.9669639,
+        "altBaro": null,
+        "altGnss": 2698,
+        "valid": true
+      },
+      "last": {
+        "index": 599,
+        "timeUtcSeconds": 54599,
+        "lat": 43.136592,
+        "lon": 77.0232808,
+        "altBaro": null,
+        "altGnss": 2978.3,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126931,
+      "maxLat": 43.136592,
+      "minLon": 76.9544954,
+      "maxLon": 77.0240385,
+      "minAlt": 2350,
+      "maxAlt": 2978.3
+    }
+  },
+  "multitrack.kml": {
+    "description": "<gx:MultiTrack> из двух сегментов с разрывом 90 с, записанных в документ в обратном порядке, и рядом метка с LineString того же пути без времени.",
+    "verifies": "Сегменты склеиваются по времени, а не по порядку в документе. LineString игнорируется, раз есть gx:Track со временем.",
+    "format": "kml",
+    "pointCount": 480,
+    "date": "2026-07-15",
+    "dateHeaderRaw": null,
+    "altitudeSource": "gnss",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 91,
+    "invalidFixCount": 0,
+    "minWarnings": 1,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 57600,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": null,
+        "altGnss": 2350,
+        "valid": true
+      },
+      "middle": {
+        "index": 240,
+        "timeUtcSeconds": 57930,
+        "lat": 43.128521,
+        "lon": 76.9591357,
+        "altBaro": null,
+        "altGnss": 2770,
+        "valid": true
+      },
+      "last": {
+        "index": 479,
+        "timeUtcSeconds": 58169,
+        "lat": 43.1323856,
+        "lon": 76.9903181,
+        "altBaro": null,
+        "altGnss": 2483.2,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126931,
+      "maxLat": 43.1323856,
+      "minLon": 76.9544954,
+      "maxLon": 76.9903181,
+      "minAlt": 2350,
+      "maxAlt": 2770
+    }
+  },
+  "linestring-timespan.kml": {
+    "description": "Старый прибор: только <LineString> без времени у точек, у метки <TimeSpan> (после геометрии).",
+    "verifies": "Время распределяется равномерно по TimeSpan, предупреждение timestamps_interpolated. Порядок элементов внутри метки не важен.",
+    "format": "kml",
+    "pointCount": 300,
+    "date": "2026-07-15",
+    "dateHeaderRaw": null,
+    "altitudeSource": "gnss",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 1,
+    "invalidFixCount": 0,
+    "minWarnings": 2,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 61200,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": null,
+        "altGnss": 2350,
+        "valid": true
+      },
+      "middle": {
+        "index": 150,
+        "timeUtcSeconds": 61350,
+        "lat": 43.1275598,
+        "lon": 76.9575848,
+        "altBaro": null,
+        "altGnss": 2612.5,
+        "valid": true
+      },
+      "last": {
+        "index": 299,
+        "timeUtcSeconds": 61499,
+        "lat": 43.129475,
+        "lon": 76.9668334,
+        "altBaro": null,
+        "altGnss": 2699.2,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126931,
+      "maxLat": 43.129475,
+      "minLon": 76.9544954,
+      "maxLon": 76.9668334,
+      "minAlt": 2350,
+      "maxAlt": 2770
+    }
+  },
+  "gx-track.kmz": {
+    "description": "KMZ — zip-архив (deflate) с doc.kml внутри; doc.kml лежит не первым файлом.",
+    "verifies": "Архив распаковывается, выбирается doc.kml, дальше — как gx-track.kml.",
+    "format": "kmz",
+    "pointCount": 480,
+    "date": "2026-07-15",
+    "dateHeaderRaw": null,
+    "altitudeSource": "gnss",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 1,
+    "invalidFixCount": 0,
+    "minWarnings": 1,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 64800,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": null,
+        "altGnss": 2350,
+        "valid": true
+      },
+      "middle": {
+        "index": 240,
+        "timeUtcSeconds": 65040,
+        "lat": 43.128521,
+        "lon": 76.9591357,
+        "altBaro": null,
+        "altGnss": 2770,
+        "valid": true
+      },
+      "last": {
+        "index": 479,
+        "timeUtcSeconds": 65279,
+        "lat": 43.1323856,
+        "lon": 76.9903181,
+        "altBaro": null,
+        "altGnss": 2483.2,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126931,
+      "maxLat": 43.1323856,
+      "minLon": 76.9544954,
+      "maxLon": 76.9903181,
+      "minAlt": 2350,
+      "maxAlt": 2770
     }
   }
 }

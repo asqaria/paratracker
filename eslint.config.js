@@ -131,10 +131,22 @@ export default defineConfig(
     },
   },
   {
-    files: PURE_PACKAGES.map((glob) => `${glob}/*.test.ts`),
+    // fflate — распаковка KMZ (zip): чистый JS без зависимостей, работает в worker и в браузере.
+    files: ['packages/parsing/**'],
+    rules: {
+      ...restrict(allowOnly('@skyline.core|fflate', PURE_MESSAGE)),
+      'no-restricted-globals': ['error', ...IO_GLOBALS],
+    },
+  },
+  {
+    files: [
+      ...PURE_PACKAGES.map((glob) => `${glob}/*.test.ts`),
+      // Общие помощники тестов; из сборки исключены.
+      ...PURE_PACKAGES.map((glob) => glob.replace('/**', '/src/testing/**')),
+    ],
     rules: {
       // Тесты читают эталоны из /fixtures — им файловая система нужна.
-      ...restrict(allowOnly('@skyline.core|vitest|node:fs|node:path|node:url', PURE_MESSAGE)),
+      ...restrict(allowOnly('@skyline.core|fflate|vitest|node:fs|node:path|node:url', PURE_MESSAGE)),
       'no-restricted-globals': ['error', ...IO_GLOBALS],
     },
   },

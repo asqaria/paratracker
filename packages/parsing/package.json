@@ -16,6 +16,7 @@
     "test": "vitest run --config ../../vitest.config.ts --project @skyline/parsing"
   },
   "dependencies": {
-    "@skyline/core": "workspace:*"
+    "@skyline/core": "workspace:*",
+    "fflate": "^0.8.3"
   }
 }

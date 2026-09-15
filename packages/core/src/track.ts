@@ -46,7 +46,8 @@ export interface TrackColumns {
   siu: Float64Array;
 }
 
-export const DATE_SOURCES = ['header', 'filename'] as const;
+/** Откуда дата: заголовок IGC, имя файла или время самих точек (GPX, KML). */
+export const DATE_SOURCES = ['header', 'filename', 'fix_time'] as const;
 export type DateSource = (typeof DATE_SOURCES)[number];
 
 export interface TrackMeta {
