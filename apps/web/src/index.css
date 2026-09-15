@@ -1,0 +1,25 @@
+@import 'tailwindcss';
+
+/* Дизайн-токены, ТЗ §8.4. Тёмная тема по умолчанию (§8.1). */
+@theme {
+  --color-void: #0a0e14;
+  --color-glass: rgb(16 22 32 / 0.72);
+  --color-subtle: rgb(255 255 255 / 0.08);
+  --color-primary: #e8edf5;
+  --color-secondary: #8b97a8;
+  --color-accent: #4da3ff;
+  /* Статус «недоступно». Не из палитры вариометра: она единственная «кричащая» (§8.1 п.5). */
+  --color-danger: #ff6b6b;
+
+  --font-ui: 'Inter Variable', system-ui, sans-serif;
+  --font-numeric: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    background-color: var(--color-void);
+    color: var(--color-primary);
+    font-family: var(--font-ui);
+  }
+}

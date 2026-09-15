@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: build · test · lint · typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TURBO_TELEMETRY_DISABLED: 1
+      # Совпадают со значениями по умолчанию infra/docker-compose.yml и .env.example.
+      DATABASE_URL: postgres://skyline:skyline@127.0.0.1:5432/skyline
+      S3_ENDPOINT: http://127.0.0.1:9000
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY_ID: skyline
+      S3_SECRET_ACCESS_KEY: skyline-dev-secret
+      S3_BUCKET: skyline
+      S3_FORCE_PATH_STYLE: "true"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Start postgres + postgis and minio
+        run: docker compose -f infra/docker-compose.yml up -d --wait postgres minio && docker compose -f infra/docker-compose.yml run --rm minio-init
+
+      - name: Migrate
+        run: pnpm --filter @skyline/db db:migrate
+
+      # Одна дорожка. Сборка web валится при превышении бюджета начальной загрузки (SPEC §7.7).
+      - run: pnpm turbo build test lint typecheck

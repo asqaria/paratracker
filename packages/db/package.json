@@ -13,9 +13,17 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
-    "test": "vitest run --config ../../vitest.config.ts --project @skyline/db"
+    "test": "vitest run --config ../../vitest.config.ts --project @skyline/db",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
-    "drizzle-orm": "^0.45.2"
+    "@skyline/core": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.10"
   }
 }

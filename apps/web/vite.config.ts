@@ -1,6 +1,26 @@
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 
-export default defineConfig({
-  plugins: [react()],
+import { initialLoadBudget } from './build/initial-load-budget.ts';
+
+/**
+ * ТЗ §7.7: начальный чанк ≤ 250 КБ gzip, без Cesium и MapLibre.
+ * КБ = 1000 байт — строже из двух прочтений.
+ */
+const INITIAL_LOAD_BUDGET_GZIP_BYTES = 250_000;
+
+const REPO_ROOT = '../..';
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, REPO_ROOT, '');
+  const apiPort = env.API_PORT ?? '3000';
+
+  return {
+    plugins: [react(), tailwindcss(), initialLoadBudget({ maxGzipBytes: INITIAL_LOAD_BUDGET_GZIP_BYTES })],
+    server: {
+      // В dev фронт и API на одном origin: без CORS, как за обратным прокси в проде.
+      proxy: { '/api': `http://127.0.0.1:${apiPort}` },
+    },
+  };
 });

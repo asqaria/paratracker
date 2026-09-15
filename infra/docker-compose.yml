@@ -1,6 +1,6 @@
 # Локальное окружение: PostgreSQL 17 + PostGIS 3.5 и MinIO (S3).
-# Запуск: docker compose -f infra/docker-compose.yml up
-# Значения по умолчанию — только для локальной разработки; переопределяются через .env.
+# Запуск из корня: docker compose --env-file .env -f infra/docker-compose.yml up -d --wait
+# Значения по умолчанию — только для локальной разработки и CI.
 
 name: skyline
 
@@ -38,6 +38,21 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+
+  # Одноразово создаёт бакет: /health проверяет именно его, а не только доступность MinIO.
+  minio-init:
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-skyline}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-skyline-dev-secret}
+      S3_BUCKET: ${S3_BUCKET:-skyline}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" && mc mb --ignore-existing "local/$$S3_BUCKET"
+    restart: "no"
 
 volumes:
   pgdata:

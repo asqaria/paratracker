@@ -1,0 +1,592 @@
+{
+  "id": "1df3d2ca-a7c0-4749-8fb5-16e8157daa4f",
+  "prevId": "00424ca6-31d5-4de3-99c1-316c4ad2f403",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.flights": {
+      "name": "flights",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "error_code": {
+          "name": "error_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_format": {
+          "name": "source_format",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "raw_object_key": {
+          "name": "raw_object_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "track_object_key": {
+          "name": "track_object_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "preview_object_key": {
+          "name": "preview_object_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "device": {
+          "name": "device",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pilot_name_raw": {
+          "name": "pilot_name_raw",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "glider_raw": {
+          "name": "glider_raw",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "glider_id": {
+          "name": "glider_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "takeoff_site_id": {
+          "name": "takeoff_site_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "landing_site_id": {
+          "name": "landing_site_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ended_at": {
+          "name": "ended_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "duration_s": {
+          "name": "duration_s",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "local_date": {
+          "name": "local_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "altitude_source": {
+          "name": "altitude_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_alt_m": {
+          "name": "max_alt_m",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "min_alt_m": {
+          "name": "min_alt_m",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "takeoff_alt_m": {
+          "name": "takeoff_alt_m",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "landing_alt_m": {
+          "name": "landing_alt_m",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_agl_m": {
+          "name": "max_agl_m",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_gain_m": {
+          "name": "total_gain_m",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "distance_track_m": {
+          "name": "distance_track_m",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "distance_straight_m": {
+          "name": "distance_straight_m",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_climb_ms": {
+          "name": "max_climb_ms",
+          "type": "numeric(4, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_sink_ms": {
+          "name": "max_sink_ms",
+          "type": "numeric(4, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_speed_ms": {
+          "name": "max_speed_ms",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avg_speed_ms": {
+          "name": "avg_speed_ms",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "thermal_count": {
+          "name": "thermal_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avg_climb_ms": {
+          "name": "avg_climb_ms",
+          "type": "numeric(4, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avg_glide_ratio": {
+          "name": "avg_glide_ratio",
+          "type": "numeric(6, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "analysis_level": {
+          "name": "analysis_level",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wind_dir_deg": {
+          "name": "wind_dir_deg",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wind_speed_ms": {
+          "name": "wind_speed_ms",
+          "type": "numeric(4, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "xc_type": {
+          "name": "xc_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "xc_distance_m": {
+          "name": "xc_distance_m",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "xc_score": {
+          "name": "xc_score",
+          "type": "numeric(7, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "xc_rules": {
+          "name": "xc_rules",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "xc_is_optimal": {
+          "name": "xc_is_optimal",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "xc_turnpoints": {
+          "name": "xc_turnpoints",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "track_simplified": {
+          "name": "track_simplified",
+          "type": "geography(LineStringZM,4326)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bbox": {
+          "name": "bbox",
+          "type": "geography(Polygon,4326)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "privacy": {
+          "name": "privacy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unlisted'"
+        },
+        "share_token": {
+          "name": "share_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "view_count": {
+          "name": "view_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "like_count": {
+          "name": "like_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "flights_track_simplified_gist": {
+          "name": "flights_track_simplified_gist",
+          "columns": [
+            {
+              "expression": "track_simplified",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gist",
+          "with": {}
+        },
+        "flights_user_started_idx": {
+          "name": "flights_user_started_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "started_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "flights_takeoff_site_local_date_idx": {
+          "name": "flights_takeoff_site_local_date_idx",
+          "columns": [
+            {
+              "expression": "takeoff_site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "local_date",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "flights_public_started_idx": {
+          "name": "flights_public_started_idx",
+          "columns": [
+            {
+              "expression": "privacy",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "started_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"flights\".\"privacy\" = 'public'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "flights_user_id_users_id_fk": {
+          "name": "flights_user_id_users_id_fk",
+          "tableFrom": "flights",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "flights_share_token_unique": {
+          "name": "flights_share_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "share_token"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "flights_status_check": {
+          "name": "flights_status_check",
+          "value": "\"flights\".\"status\" IN ('pending', 'parsing', 'analyzing', 'ready', 'failed')"
+        },
+        "flights_source_format_check": {
+          "name": "flights_source_format_check",
+          "value": "\"flights\".\"source_format\" IN ('igc', 'gpx', 'kml', 'fit', 'csv')"
+        },
+        "flights_altitude_source_check": {
+          "name": "flights_altitude_source_check",
+          "value": "\"flights\".\"altitude_source\" IN ('baro', 'gnss')"
+        },
+        "flights_analysis_level_check": {
+          "name": "flights_analysis_level_check",
+          "value": "\"flights\".\"analysis_level\" IN ('full', 'basic')"
+        },
+        "flights_privacy_check": {
+          "name": "flights_privacy_check",
+          "value": "\"flights\".\"privacy\" IN ('public', 'unlisted', 'private')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "email": {
+          "name": "email",
+          "type": "citext",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "username": {
+          "name": "username",
+          "type": "citext",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avatar_url": {
+          "name": "avatar_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "home_site_id": {
+          "name": "home_site_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "units": {
+          "name": "units",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'metric'"
+        },
+        "locale": {
+          "name": "locale",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ru'"
+        },
+        "default_privacy": {
+          "name": "default_privacy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unlisted'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        },
+        "users_username_unique": {
+          "name": "users_username_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "username"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "users_units_check": {
+          "name": "users_units_check",
+          "value": "\"users\".\"units\" IN ('metric', 'imperial')"
+        },
+        "users_locale_check": {
+          "name": "users_locale_check",
+          "value": "\"users\".\"locale\" IN ('ru', 'en')"
+        },
+        "users_default_privacy_check": {
+          "name": "users_default_privacy_check",
+          "value": "\"users\".\"default_privacy\" IN ('public', 'unlisted', 'private')"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
