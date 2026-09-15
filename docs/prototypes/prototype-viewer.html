@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skyline — прототип просмотрщика полёта</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1/Build/Cesium/Widgets/widgets.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg-void:#0A0E14; --surface-glass:rgba(16,22,32,.80);
+    --border-subtle:rgba(255,255,255,.09);
+    --text-primary:#E8EDF5; --text-secondary:#8B97A8; --accent:#4DA3FF;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg-void);
+    color:var(--text-primary);font:14px/1.5 'Inter',system-ui,sans-serif}
+  #cesium{position:absolute;inset:0}
+  .cesium-widget-credits{display:none!important}
+  .mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+
+  .glass{position:absolute;background:var(--surface-glass);
+    -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
+    border:1px solid var(--border-subtle);border-radius:12px;
+    box-shadow:0 8px 32px rgba(0,0,0,.45)}
+  .cap{font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:var(--text-secondary)}
+
+  #top{top:14px;left:14px;right:14px;height:52px;display:flex;align-items:center;
+    justify-content:space-between;padding:0 16px}
+  #left{top:80px;left:14px;width:186px;padding:13px}
+  #legend{left:14px;bottom:218px;width:186px;padding:11px 13px}
+  #right{top:80px;right:14px;bottom:218px;width:296px;padding:14px;
+    display:flex;flex-direction:column;gap:13px;overflow:hidden}
+  #bottom{left:14px;right:14px;bottom:14px;height:190px;padding:14px 18px;
+    display:flex;flex-direction:column;gap:10px}
+
+  button{background:rgba(255,255,255,.05);color:var(--text-primary);
+    border:1px solid var(--border-subtle);border-radius:7px;padding:6px 10px;
+    font:inherit;font-size:12px;cursor:pointer;transition:background .15s,border-color .15s}
+  button:hover{background:rgba(255,255,255,.12)}
+  button.on{background:rgba(77,163,255,.20);border-color:var(--accent);color:#BDDCFF}
+  .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+  .row{display:flex;gap:5px}
+  label.chk{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12.5px;cursor:pointer}
+  label.chk input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
+
+  .stat{padding:9px 11px;background:rgba(255,255,255,.04);border-radius:9px}
+  .stat .v{font-size:20px;margin-top:2px}
+
+  #thermals{display:flex;flex-direction:column;gap:5px;overflow-y:auto;flex-grow:1;
+    scrollbar-width:thin;padding-right:2px}
+  #thermals::-webkit-scrollbar{width:5px}
+  #thermals::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:3px}
+  .th{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;
+    background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);cursor:pointer}
+  .th:hover{background:rgba(255,255,255,.08)}
+  .th.live{background:rgba(77,163,255,.13);border-color:rgba(77,163,255,.40)}
+  .th .bar{width:3px;height:26px;border-radius:2px;flex-shrink:0}
+
+  #play{width:40px;height:40px;display:flex;align-items:center;justify-content:center;
+    background:var(--accent);border:none;border-radius:50%;cursor:pointer;flex-shrink:0}
+  #chart{position:relative;flex-grow:1;cursor:crosshair}
+  #chart canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  #cursor{position:absolute;top:0;bottom:0;width:2px;background:#E8EDF5;
+    box-shadow:0 0 10px rgba(232,237,245,.7);pointer-events:none}
+
+  #attr{position:absolute;right:320px;bottom:212px;font-size:9.5px;
+    color:rgba(200,210,225,.5);text-align:right;max-width:420px}
+  #attr a{color:rgba(200,210,225,.7)}
+
+  #boot{position:absolute;inset:0;z-index:60;background:var(--bg-void);display:flex;
+    flex-direction:column;align-items:center;justify-content:center;gap:12px;
+    text-align:center;padding:24px}
+  #boot .s{font-size:12px;color:var(--text-secondary);max-width:450px}
+  #boot code{background:rgba(255,255,255,.08);padding:1px 5px;border-radius:4px}
+  .err{color:#FF8A8A}
+  #hint{position:absolute;left:50%;transform:translateX(-50%);bottom:214px;
+    padding:5px 12px;font-size:11px;color:var(--text-secondary);border-radius:20px}
+</style>
+</head>
+<body>
+
+<div id="cesium"></div>
+
+<div id="boot">
+  <div>Загрузка сцены…</div>
+  <div class="s">Первый заход тянет рельеф и подложку с внешних сервисов.</div>
+</div>
+
+<div class="glass" id="top">
+  <div style="display:flex;align-items:center;gap:13px">
+    <span style="font-size:14px;font-weight:600">Тургень</span>
+    <span style="color:var(--text-secondary);font-size:13px">синтетический трек · прототип</span>
+  </div>
+  <div class="row">
+    <button id="b-imagery">Подложка: Sentinel-2</button>
+  </div>
+</div>
+
+<div class="glass" id="left">
+  <div class="cap" style="margin-bottom:8px">Камера</div>
+  <div class="grid2" id="g-cam" style="margin-bottom:14px">
+    <button data-v="chase" class="on">За пилотом</button>
+    <button data-v="free">Свободно</button>
+    <button data-v="cockpit">Кокпит</button>
+    <button data-v="top">Сверху</button>
+  </div>
+  <div class="cap" style="margin-bottom:7px">Слои</div>
+  <label class="chk"><input type="checkbox" id="l-shadow" checked> Тень на рельефе</label>
+  <label class="chk"><input type="checkbox" id="l-wall"> Занавес</label>
+  <label class="chk"><input type="checkbox" id="l-glider" checked> Модель пилота</label>
+</div>
+
+<div class="glass" id="legend">
+  <div class="cap" style="margin-bottom:6px">Вариометр, м/с</div>
+  <div style="height:9px;border-radius:5px;background:linear-gradient(90deg,#3A1C71,#4A6FDC,#7E8BA3,#6B7280,#C9A227,#E8590C,#C92A2A)"></div>
+  <div class="mono" style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-secondary);margin-top:5px">
+    <span>−5</span><span>−2</span><span>0</span><span>+2</span><span>+5</span></div>
+</div>
+
+<div class="glass" id="right">
+  <div class="grid2" style="gap:9px">
+    <div class="stat"><div class="cap">Термиков</div><div class="v mono" id="s-nth">—</div></div>
+    <div class="stat"><div class="cap">Лучший</div><div class="v mono" id="s-best" style="color:#C92A2A">—</div></div>
+    <div class="stat"><div class="cap">Макс. высота</div><div class="v mono" id="s-max">—</div></div>
+    <div class="stat"><div class="cap">Набор всего</div><div class="v mono" id="s-gain">—</div></div>
+  </div>
+  <div class="cap" style="display:flex;justify-content:space-between">
+    <span>Термики</span><span style="text-transform:none;letter-spacing:0">клик → перелёт</span>
+  </div>
+  <div id="thermals"></div>
+</div>
+
+<div class="glass" id="hint">Space — пуск · ← → — ±1 с · Shift+← → — ±1 мин · 1–4 — камера</div>
+
+<div class="glass" id="bottom">
+  <div style="display:flex;align-items:center;gap:16px">
+    <button id="play"><svg width="18" height="18" viewBox="0 0 24 24" fill="#0A0E14"><path d="M8 5.5v13l11-6.5z"/></svg></button>
+    <div class="row" id="g-speed">
+      <button data-v="1">×1</button><button data-v="4" class="on">×4</button>
+      <button data-v="16">×16</button><button data-v="60">×60</button>
+    </div>
+    <div style="flex-grow:1"></div>
+    <div style="display:flex;align-items:baseline;gap:20px">
+      <span class="mono" id="t-time" style="font-size:18px">—</span>
+      <span class="mono" id="t-vario" style="font-size:18px">—</span>
+      <span class="mono" id="t-alt" style="font-size:18px">—</span>
+      <span class="mono" id="t-agl" style="font-size:18px;color:var(--text-secondary)">—</span>
+      <span class="mono" id="t-spd" style="font-size:18px;color:var(--text-secondary)">—</span>
+    </div>
+  </div>
+  <div id="chart"><canvas id="cv"></canvas><div id="cursor" style="left:0"></div></div>
+</div>
+
+<div id="attr"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/cesium@1/Build/Cesium/Cesium.js"></script>
+<script>
+window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1/Build/Cesium/';
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ТРЕК. Синтетический — прототип проверяет взаимодействие, а не парсинг.
+   В продукте сюда придёт декодированный .track из Web Worker.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const LAUNCH = { lat: 43.128, lon: 76.955, alt: 2350 };
+const T0 = Date.UTC(2026, 6, 15, 8, 32, 0);   // 13:32 по Алматы
+
+function buildTrack() {
+  const pts = [], thermals = [];
+  let lat = LAUNCH.lat, lon = LAUNCH.lon, alt = LAUNCH.alt, t = 0;
+  const MLAT = 111320, MLON = 111320 * Math.cos(LAUNCH.lat * Math.PI / 180);
+  const push = (vz, spd) => pts.push({ lat, lon, alt, t, vz, spd });
+
+  for (let i = 0; i < 90; i++) { lon += 12 / MLON; alt -= .9; t++; push(-.9, 43); }
+
+  const legs = [
+    { climb: 2.8, gain: 1150, glide: 260, crs:  75 },
+    { climb: 3.6, gain: 1250, glide: 300, crs:  95 },
+    { climb: 1.9, gain:  700, glide: 230, crs:  70 },
+    { climb: 4.2, gain: 1400, glide: 340, crs: 105 },
+    { climb: 2.3, gain:  850, glide: 280, crs:  85 },
+  ];
+
+  for (const leg of legs) {
+    const dur = Math.round(leg.gain / leg.climb), R = 65, period = 19;
+    const cLat = lat, cLon = lon, i0 = pts.length, a0 = alt, t0 = t;
+    for (let i = 0; i < dur; i++) {
+      const a = (i / period) * Math.PI * 2, drift = i * 1.6;
+      lat = cLat + (R * Math.cos(a) + drift * .35) / MLAT;
+      lon = cLon + (R * Math.sin(a) + drift * .94) / MLON;
+      const vz = leg.climb * (.55 + .45 * Math.sin(a * 1.7 + .9));
+      alt += vz; t++; push(vz, 24);
+    }
+    thermals.push({
+      i0, i1: pts.length - 1, tStart: t0, tEnd: t,
+      lat: (cLat + lat) / 2, lon: (cLon + lon) / 2,
+      base: a0, top: alt, gain: Math.round(alt - a0),
+      climb: leg.climb, turns: Math.round(dur / period), dur: t - t0
+    });
+    const rad = leg.crs * Math.PI / 180;
+    for (let i = 0; i < leg.glide; i++) {
+      const vz = -1.15 - .45 * Math.sin(i / 37);
+      lat += (11.5 * Math.cos(rad)) / MLAT;
+      lon += (11.5 * Math.sin(rad)) / MLON;
+      alt += vz; t++; push(vz, 41 + 4 * Math.sin(i / 23));
+    }
+  }
+  // курс — для камеры за пилотом
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[Math.max(0, i - 2)], b = pts[Math.min(pts.length - 1, i + 2)];
+    pts[i].hdg = Math.atan2(b.lon - a.lon, b.lat - a.lat) * 180 / Math.PI;
+  }
+  return { pts, thermals };
+}
+
+const STOPS = [[-5,[58,28,113]],[-2,[74,111,220]],[-.5,[126,139,163]],[0,[107,114,128]],
+               [.5,[201,162,39]],[2,[232,89,12]],[5,[201,42,42]]];
+function varioRgb(v) {
+  v = Math.max(-5, Math.min(5, v));
+  for (let i = 0; i < STOPS.length - 1; i++) {
+    const [a, ca] = STOPS[i], [b, cb] = STOPS[i + 1];
+    if (v >= a && v <= b) {
+      const k = b === a ? 0 : (v - a) / (b - a);
+      return [ca[0] + (cb[0] - ca[0]) * k, ca[1] + (cb[1] - ca[1]) * k, ca[2] + (cb[2] - ca[2]) * k];
+    }
+  }
+  return [107, 114, 128];
+}
+const varioCss = v => 'rgb(' + varioRgb(v).map(Math.round).join(',') + ')';
+const varioCesium = v => { const c = varioRgb(v); return new Cesium.Color(c[0]/255, c[1]/255, c[2]/255, 1); };
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   СЦЕНА
+   ═══════════════════════════════════════════════════════════════════════════ */
+let viewer, T, posProp, gliderEnt, shadowEnt, wallEnt, trackPrim;
+let camMode = 'chase', smoothHdg = null, imagery = 's2';
+const CHASE_TAU = 2.0;   // ТЗ §7.4: без сглаживания курса в спирали укачивает
+
+const eox = l => new Cesium.WebMapTileServiceImageryProvider({
+  url: 'https://tiles.maps.eox.at/wmts/1.0.0/' + l + '/default/WGS84/{TileMatrix}/{TileRow}/{TileCol}.jpg',
+  layer: l, style: 'default', format: 'image/jpeg',
+  tileMatrixSetID: 'WGS84', tilingScheme: new Cesium.GeographicTilingScheme(), maximumLevel: 14
+});
+const esri = () => new Cesium.UrlTemplateImageryProvider({
+  url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  maximumLevel: 18
+});
+const ATTR = {
+  s2: 'Рельеф: <a href="https://terrain.reearth.land/" target="_blank" rel="noopener">Re:Earth Terrain</a> (Mapterhorn, CC BY 4.0) · Подложка: <a href="https://s2maps.eu" target="_blank" rel="noopener">Sentinel-2 cloudless</a> by EOX IT Services GmbH (Contains modified Copernicus Sentinel data), CC BY 4.0',
+  esri: 'Рельеф: <a href="https://terrain.reearth.land/" target="_blank" rel="noopener">Re:Earth Terrain</a> (Mapterhorn, CC BY 4.0) · Подложка: Esri World Imagery — Esri, Maxar, Earthstar Geographics · Powered by Esri'
+};
+
+async function boot() {
+  const bootEl = document.getElementById('boot');
+  try {
+    const terrain = await Cesium.CesiumTerrainProvider.fromUrl(
+      'https://terrain.reearth.land/cesium-mesh/ellipsoid', { requestVertexNormals: true });
+
+    viewer = new Cesium.Viewer('cesium', {
+      terrainProvider: terrain,
+      baseLayer: new Cesium.ImageryLayer(eox('s2cloudless-2025')),
+      baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false,
+      navigationHelpButton: false, timeline: false, animation: false,
+      fullscreenButton: false, infoBox: false, selectionIndicator: false
+    });
+    const s = viewer.scene;
+    s.globe.enableLighting = true;
+    s.globe.depthTestAgainstTerrain = true;
+    s.fog.enabled = true;
+    s.skyAtmosphere.show = true;
+    s.highDynamicRange = true;
+
+    T = buildTrack();
+    buildGeometry();
+    setupClock();
+    buildThermalList();
+    fillStats();
+    document.getElementById('attr').innerHTML = ATTR.s2;
+
+    viewer.scene.preRender.addEventListener(onFrame);
+    bootEl.remove();
+    wireUi();
+    drawChart();
+  } catch (e) {
+    bootEl.innerHTML = '<div class="err">Сцена не запустилась</div>' +
+      '<div class="s">' + String(e && e.message || e) + '</div>' +
+      '<div class="s">Почти всегда причина одна: файл открыт как file://. ' +
+      'Подними локальный сервер — <code>npx serve .</code> или ' +
+      '<code>python3 -m http.server</code> — и открой через http://localhost.</div>';
+    console.error(e);
+  }
+}
+
+function buildGeometry() {
+  const positions = T.pts.map(p => Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.alt));
+
+  trackPrim = viewer.scene.primitives.add(new Cesium.Primitive({
+    geometryInstances: new Cesium.GeometryInstance({
+      geometry: new Cesium.PolylineGeometry({
+        positions, width: 4,
+        colors: T.pts.map(p => varioCesium(p.vz)), colorsPerVertex: true,
+        arcType: Cesium.ArcType.NONE,
+        vertexFormat: Cesium.PolylineColorAppearance.VERTEX_FORMAT
+      })
+    }),
+    appearance: new Cesium.PolylineColorAppearance({ translucent: false }),
+    asynchronous: false
+  }));
+
+  const flat = [];
+  T.pts.forEach(p => { flat.push(p.lon, p.lat); });
+  shadowEnt = viewer.entities.add({
+    polyline: { positions: Cesium.Cartesian3.fromDegreesArray(flat),
+      width: 2, clampToGround: true, material: new Cesium.Color(0, 0, 0, .42) }
+  });
+
+  wallEnt = viewer.entities.add({ show: false,
+    wall: { positions, material: new Cesium.Color(.30, .64, 1, .14), outline: false } });
+
+  // Цилиндры термиков
+  for (const th of T.thermals) {
+    const h = th.top - th.base, c = varioCesium(th.climb);
+    viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(th.lon, th.lat, th.base + h / 2),
+      cylinder: { length: h, topRadius: 105, bottomRadius: 55,
+        material: c.withAlpha(.13), outline: true, outlineColor: c.withAlpha(.38),
+        numberOfVerticalLines: 0 }
+    });
+  }
+
+  viewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(T.pts[0].lon, T.pts[0].lat, T.pts[0].alt),
+    point: { pixelSize: 8, color: Cesium.Color.WHITE,
+      outlineColor: new Cesium.Color(0,0,0,.7), outlineWidth: 2, disableDepthTestDistance: 9000 },
+    label: { text: 'Старт', font: "600 12px Inter, sans-serif", fillColor: Cesium.Color.WHITE,
+      showBackground: true, backgroundColor: new Cesium.Color(.04,.06,.08,.8),
+      pixelOffset: new Cesium.Cartesian2(0, -18), disableDepthTestDistance: 9000 }
+  });
+}
+
+function setupClock() {
+  // ТЗ §7.4: SampledPositionProperty + Лагранж степени 2 —
+  // это то, что даёт гладкое движение между фиксами, а не рывки.
+  posProp = new Cesium.SampledPositionProperty();
+  posProp.setInterpolationOptions({
+    interpolationDegree: 2,
+    interpolationAlgorithm: Cesium.LagrangePolynomialApproximation
+  });
+  for (const p of T.pts) {
+    posProp.addSample(
+      Cesium.JulianDate.fromDate(new Date(T0 + p.t * 1000)),
+      Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.alt)
+    );
+  }
+
+  const start = Cesium.JulianDate.fromDate(new Date(T0));
+  const stop = Cesium.JulianDate.fromDate(new Date(T0 + T.pts[T.pts.length - 1].t * 1000));
+  const c = viewer.clock;
+  c.startTime = start.clone(); c.stopTime = stop.clone();
+  c.currentTime = start.clone();
+  c.clockRange = Cesium.ClockRange.CLAMPED;
+  c.multiplier = 4;
+  c.shouldAnimate = false;
+
+  gliderEnt = viewer.entities.add({
+    position: posProp,
+    orientation: new Cesium.VelocityOrientationProperty(posProp),
+    point: { pixelSize: 13, color: Cesium.Color.WHITE,
+      outlineColor: new Cesium.Color(.04,.06,.08,.9), outlineWidth: 3,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY }
+  });
+}
+
+/* ── кадр: HUD, камера, курсор графика ────────────────────────────────────── */
+function indexNow() {
+  const sec = Cesium.JulianDate.secondsDifference(
+    viewer.clock.currentTime, Cesium.JulianDate.fromDate(new Date(T0)));
+  return Math.max(0, Math.min(T.pts.length - 1, Math.round(sec)));
+}
+
+function onFrame() {
+  const i = indexNow(), p = T.pts[i];
+  const pos = posProp.getValue(viewer.clock.currentTime);
+
+  // HUD
+  const local = new Date(T0 + p.t * 1000 + 5 * 3600 * 1000);  // Алматы, UTC+5
+  document.getElementById('t-time').textContent =
+    local.toISOString().slice(11, 19);
+  const vEl = document.getElementById('t-vario');
+  vEl.textContent = (p.vz >= 0 ? '+' : '') + p.vz.toFixed(1) + ' м/с';
+  vEl.style.color = varioCss(p.vz);
+  document.getElementById('t-alt').textContent = Math.round(p.alt).toLocaleString('ru') + ' м';
+  document.getElementById('t-spd').textContent = Math.round(p.spd) + ' км/ч';
+
+  if (pos) {
+    const carto = Cesium.Cartographic.fromCartesian(pos);
+    const ground = viewer.scene.globe.getHeight(carto);
+    document.getElementById('t-agl').textContent =
+      ground === undefined ? '—' : Math.round(carto.height - ground) + ' AGL';
+  }
+
+  // курсор на графике
+  const frac = i / (T.pts.length - 1);
+  document.getElementById('cursor').style.left = (frac * 100) + '%';
+
+  // подсветка активного термика
+  const active = T.thermals.findIndex(th => p.t >= th.tStart && p.t <= th.tEnd);
+  document.querySelectorAll('.th').forEach((el, k) => el.classList.toggle('live', k === active));
+
+  updateCamera(pos, p);
+}
+
+function updateCamera(pos, p) {
+  if (!pos || camMode === 'free') return;
+
+  // экспоненциальное сглаживание курса — ТЗ §7.4, τ ≈ 2 с
+  if (smoothHdg === null) smoothHdg = p.hdg;
+  let d = p.hdg - smoothHdg;
+  while (d > 180) d -= 360;
+  while (d < -180) d += 360;
+  const dt = Math.abs(viewer.clock.multiplier) / 60;
+  smoothHdg += d * Math.min(1, dt / CHASE_TAU);
+
+  const hpr = {
+    chase:   [smoothHdg, -14, 90],
+    cockpit: [smoothHdg,  -6, 12],
+    top:     [0,         -89, 1400]
+  }[camMode];
+
+  viewer.camera.lookAt(pos, new Cesium.HeadingPitchRange(
+    Cesium.Math.toRadians(hpr[0]), Cesium.Math.toRadians(hpr[1]), hpr[2]));
+}
+
+/* ── график высоты ────────────────────────────────────────────────────────── */
+function drawChart() {
+  const wrap = document.getElementById('chart');
+  const cv = document.getElementById('cv');
+  const dpr = window.devicePixelRatio || 1;
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+
+  const alts = T.pts.map(p => p.alt);
+  const lo = Math.min(...alts), hi = Math.max(...alts);
+  const x = i => (i / (T.pts.length - 1)) * W;
+  const y = a => H - 6 - ((a - lo) / (hi - lo)) * (H - 14);
+
+  // полосы термиков
+  for (const th of T.thermals) {
+    g.fillStyle = 'rgba(' + varioRgb(th.climb).map(Math.round).join(',') + ',0.13)';
+    g.fillRect(x(th.i0), 0, x(th.i1) - x(th.i0), H);
+  }
+
+  // заливка
+  g.beginPath(); g.moveTo(0, H);
+  for (let i = 0; i < T.pts.length; i++) g.lineTo(x(i), y(T.pts[i].alt));
+  g.lineTo(W, H); g.closePath();
+  const grad = g.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, 'rgba(77,163,255,.26)');
+  grad.addColorStop(1, 'rgba(77,163,255,0)');
+  g.fillStyle = grad; g.fill();
+
+  // линия, раскрашенная по вариометру — посегментно
+  g.lineWidth = 2.2; g.lineJoin = 'round'; g.lineCap = 'round';
+  const step = Math.max(1, Math.floor(T.pts.length / W));
+  for (let i = 0; i + step < T.pts.length; i += step) {
+    g.beginPath();
+    g.moveTo(x(i), y(T.pts[i].alt));
+    g.lineTo(x(i + step), y(T.pts[i + step].alt));
+    g.strokeStyle = varioCss(T.pts[i].vz);
+    g.stroke();
+  }
+}
+
+/* ── UI ───────────────────────────────────────────────────────────────────── */
+function buildThermalList() {
+  const box = document.getElementById('thermals');
+  T.thermals.forEach((th, k) => {
+    const el = document.createElement('div');
+    el.className = 'th';
+    const local = new Date(T0 + th.tStart * 1000 + 5 * 3600 * 1000);
+    el.innerHTML =
+      '<span class="mono" style="color:var(--text-secondary);font-size:11px;width:16px">#' + (k + 1) + '</span>' +
+      '<span class="bar" style="background:' + varioCss(th.climb) + '"></span>' +
+      '<div style="flex-grow:1">' +
+        '<div class="mono" style="font-size:13.5px">+' + th.climb.toFixed(1) + ' м/с · ' +
+          th.gain.toLocaleString('ru') + ' м</div>' +
+        '<div style="color:var(--text-secondary);font-size:11px">' +
+          local.toISOString().slice(11, 16) + ' · ' +
+          Math.floor(th.dur / 60) + ' мин ' + (th.dur % 60) + ' с · ' + th.turns + ' кругов</div>' +
+      '</div>';
+    // клик → перематываем время на вход в термик. Камера доедет сама,
+    // потому что она следует за часами, а не за кликом.
+    el.onclick = () => {
+      viewer.clock.currentTime = Cesium.JulianDate.fromDate(new Date(T0 + th.tStart * 1000));
+      smoothHdg = null;
+    };
+    box.appendChild(el);
+  });
+}
+
+function fillStats() {
+  const best = T.thermals.reduce((a, b) => b.climb > a.climb ? b : a);
+  document.getElementById('s-nth').textContent = T.thermals.length;
+  document.getElementById('s-best').textContent = '+' + best.climb.toFixed(1);
+  document.getElementById('s-max').textContent =
+    Math.round(Math.max(...T.pts.map(p => p.alt))).toLocaleString('ru');
+  document.getElementById('s-gain').textContent =
+    T.thermals.reduce((s, t) => s + t.gain, 0).toLocaleString('ru');
+}
+
+function setCam(v) {
+  camMode = v;
+  smoothHdg = null;
+  // при выходе из режима слежения обязательно снять трансформацию камеры,
+  // иначе свободное вращение будет вокруг старой точки
+  if (v === 'free') viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+  document.querySelectorAll('#g-cam button').forEach(b =>
+    b.classList.toggle('on', b.dataset.v === v));
+}
+
+function togglePlay() {
+  const c = viewer.clock;
+  if (Cesium.JulianDate.greaterThanOrEquals(c.currentTime, c.stopTime)) {
+    c.currentTime = c.startTime.clone();
+  }
+  c.shouldAnimate = !c.shouldAnimate;
+  document.getElementById('play').innerHTML = c.shouldAnimate
+    ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="#0A0E14"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>'
+    : '<svg width="18" height="18" viewBox="0 0 24 24" fill="#0A0E14"><path d="M8 5.5v13l11-6.5z"/></svg>';
+}
+
+function seekSeconds(d) {
+  const c = viewer.clock;
+  let t = Cesium.JulianDate.addSeconds(c.currentTime, d, new Cesium.JulianDate());
+  if (Cesium.JulianDate.lessThan(t, c.startTime)) t = c.startTime.clone();
+  if (Cesium.JulianDate.greaterThan(t, c.stopTime)) t = c.stopTime.clone();
+  c.currentTime = t;
+}
+
+function wireUi() {
+  document.getElementById('play').onclick = togglePlay;
+
+  document.querySelectorAll('#g-cam button').forEach(b =>
+    b.onclick = () => setCam(b.dataset.v));
+
+  document.querySelectorAll('#g-speed button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('#g-speed button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    viewer.clock.multiplier = +b.dataset.v;
+  });
+
+  document.getElementById('l-shadow').onchange = e => shadowEnt.show = e.target.checked;
+  document.getElementById('l-wall').onchange   = e => wallEnt.show = e.target.checked;
+  document.getElementById('l-glider').onchange = e => gliderEnt.show = e.target.checked;
+
+  document.getElementById('b-imagery').onclick = (e) => {
+    imagery = imagery === 's2' ? 'esri' : 's2';
+    viewer.imageryLayers.removeAll();
+    viewer.imageryLayers.add(new Cesium.ImageryLayer(imagery === 's2' ? eox('s2cloudless-2025') : esri()));
+    e.target.textContent = 'Подложка: ' + (imagery === 's2' ? 'Sentinel-2' : 'Esri');
+    document.getElementById('attr').innerHTML = ATTR[imagery];
+  };
+
+  // скраббер: клик и перетаскивание по графику
+  const chart = document.getElementById('chart');
+  const seekTo = (ev) => {
+    const r = chart.getBoundingClientRect();
+    const f = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+    const sec = f * T.pts[T.pts.length - 1].t;
+    viewer.clock.currentTime = Cesium.JulianDate.fromDate(new Date(T0 + sec * 1000));
+    smoothHdg = null;
+  };
+  let dragging = false;
+  chart.onpointerdown = e => { dragging = true; chart.setPointerCapture(e.pointerId); seekTo(e); };
+  chart.onpointermove = e => { if (dragging) seekTo(e); };
+  chart.onpointerup = e => { dragging = false; chart.releasePointerCapture(e.pointerId); };
+
+  window.addEventListener('keydown', e => {
+    if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+    else if (e.code === 'ArrowLeft')  { e.preventDefault(); seekSeconds(e.shiftKey ? -60 : -1); }
+    else if (e.code === 'ArrowRight') { e.preventDefault(); seekSeconds(e.shiftKey ?  60 :  1); }
+    else if (e.key >= '1' && e.key <= '4') {
+      setCam(['chase', 'free', 'cockpit', 'top'][+e.key - 1]);
+    }
+  });
+
+  window.addEventListener('resize', drawChart);
+}
+
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skyline — спайк: бесплатный рельеф и подложка над Заилийским Алатау</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1/Build/Cesium/Widgets/widgets.css">
+<style>
+  :root{
+    --bg-void:#0A0E14;
+    --surface-glass:rgba(16,22,32,.78);
+    --border-subtle:rgba(255,255,255,.10);
+    --text-primary:#E8EDF5;
+    --text-secondary:#8B97A8;
+    --accent:#4DA3FF;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg-void);color:var(--text-primary);
+    font:14px/1.5 'Inter',system-ui,-apple-system,sans-serif;overflow:hidden}
+  #cesium{position:absolute;inset:0}
+  .cesium-widget-credits{display:none!important}
+
+  .panel{position:absolute;background:var(--surface-glass);
+    -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
+    border:1px solid var(--border-subtle);border-radius:12px;padding:14px 16px;
+    box-shadow:0 8px 32px rgba(0,0,0,.4)}
+
+  #controls{top:16px;left:16px;width:232px}
+  #controls h1{margin:0 0 4px;font-size:13px;font-weight:600;letter-spacing:.2px}
+  #controls .sub{margin:0 0 14px;font-size:11px;color:var(--text-secondary)}
+  .group{margin-bottom:14px}
+  .group:last-child{margin-bottom:0}
+  .label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;
+    color:var(--text-secondary);margin-bottom:7px}
+  .btns{display:flex;flex-wrap:wrap;gap:6px}
+  button{background:rgba(255,255,255,.06);color:var(--text-primary);
+    border:1px solid var(--border-subtle);border-radius:7px;padding:6px 11px;
+    font:inherit;font-size:12px;cursor:pointer;transition:background .15s,border-color .15s}
+  button:hover{background:rgba(255,255,255,.12)}
+  button.on{background:rgba(77,163,255,.20);border-color:var(--accent);color:#BDDCFF}
+  label.chk{display:flex;align-items:center;gap:8px;font-size:12px;
+    padding:4px 0;cursor:pointer;color:var(--text-primary)}
+  label.chk input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
+
+  #hud{top:16px;right:16px;width:196px}
+  .row{display:flex;justify-content:space-between;align-items:baseline;
+    padding:4px 0;font-size:12px}
+  .row span:first-child{color:var(--text-secondary)}
+  .row span:last-child{font-family:'JetBrains Mono',ui-monospace,monospace;
+    font-variant-numeric:tabular-nums;font-size:13px}
+
+  #legend{bottom:16px;left:16px;width:232px}
+  .bar{height:9px;border-radius:5px;margin:8px 0 5px;
+    background:linear-gradient(90deg,#3A1C71,#4A6FDC,#6B7280,#C9A227,#E8590C,#C92A2A)}
+  .ticks{display:flex;justify-content:space-between;font-size:10px;
+    color:var(--text-secondary);font-family:ui-monospace,monospace}
+
+  #attr{position:absolute;bottom:10px;right:16px;max-width:520px;text-align:right;
+    font-size:10px;line-height:1.5;color:rgba(200,210,225,.65);
+    text-shadow:0 1px 3px rgba(0,0,0,.9)}
+  #attr a{color:rgba(200,210,225,.85)}
+
+  #checklist{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+    max-width:640px;width:calc(100% - 300px);min-width:320px}
+  #checklist .label{margin-bottom:8px}
+  #checklist ol{margin:0;padding-left:18px;font-size:12px;color:var(--text-primary)}
+  #checklist li{margin-bottom:4px}
+  #checklist li:last-child{margin-bottom:0}
+  #checklist b{color:var(--accent);font-weight:600}
+  .hide-cl #checklist{display:none}
+
+  #boot{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:12px;background:var(--bg-void);z-index:50;text-align:center;padding:24px}
+  #boot .t{font-size:15px}
+  #boot .s{font-size:12px;color:var(--text-secondary);max-width:440px}
+  .err{color:#FF8A8A}
+
+  @media (max-width:900px){
+    #checklist{display:none}
+    #controls,#hud,#legend{width:180px;padding:11px 13px}
+  }
+</style>
+</head>
+<body>
+
+<div id="cesium"></div>
+
+<div id="boot">
+  <div class="t">Загрузка рельефа и подложки…</div>
+  <div class="s">Первый заход тянет тайлы с двух бесплатных сервисов — это может занять
+    10–20 секунд. Если висит дольше минуты, смотри консоль браузера.</div>
+</div>
+
+<div class="panel" id="controls">
+  <h1>Спайк: бесплатные тайлы</h1>
+  <p class="sub">Заилийский Алатау, синтетический трек</p>
+
+  <div class="group">
+    <div class="label">Камера</div>
+    <div class="btns">
+      <button data-cam="overview" class="on">Обзор</button>
+      <button data-cam="ridge">Хребет</button>
+      <button data-cam="close">Вплотную</button>
+      <button data-cam="launch">Старт</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="label">Подложка</div>
+    <div class="btns">
+      <button data-img="s2" class="on">Sentinel-2</button>
+      <button data-img="osm">OSM</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="label">Слои</div>
+    <label class="chk"><input type="checkbox" id="l-track" checked> Трек по вариометру</label>
+    <label class="chk"><input type="checkbox" id="l-shadow" checked> Тень на рельефе</label>
+    <label class="chk"><input type="checkbox" id="l-wall"> Занавес до земли</label>
+    <label class="chk"><input type="checkbox" id="l-light" checked> Освещение солнцем</label>
+  </div>
+</div>
+
+<div class="panel" id="hud">
+  <div class="label">Телеметрия</div>
+  <div class="row"><span>FPS</span><span id="fps">—</span></div>
+  <div class="row"><span>Точек в треке</span><span id="pts">—</span></div>
+  <div class="row"><span>Высота камеры</span><span id="camalt">—</span></div>
+  <div class="row"><span>Рельеф под курсором</span><span id="terr">—</span></div>
+</div>
+
+<div class="panel" id="legend">
+  <div class="label">Вариометр</div>
+  <div class="bar"></div>
+  <div class="ticks"><span>−5</span><span>−2</span><span>0</span><span>+2</span><span>+5 м/с</span></div>
+</div>
+
+<div class="panel" id="checklist">
+  <div class="label">Что проверяем</div>
+  <ol>
+    <li><b>Рельеф.</b> Хребты и ущелья читаются? Нет ли ступенек и артефактов?</li>
+    <li><b>Подложка.</b> На «Обзоре» и «Хребте» — нормально. На «Вплотную» станет мыльно:
+      это и есть цена 10 м/пиксель. Решай, терпимо ли.</li>
+    <li><b>Высоты рельефа.</b> Наведи курсор на гребень и на дно ущелья — цифры справа
+      должны сходиться с картой. Полноценная проверка геоид→эллипсоид возможна только
+      на реальном IGC: стартовая высота здесь задана мной вручную.</li>
+    <li><b>FPS.</b> Держится выше 50 при вращении?</li>
+  </ol>
+</div>
+
+<div id="attr">
+  Рельеф: <a href="https://terrain.reearth.land/" target="_blank" rel="noopener">Re:Earth Terrain</a>
+  (Mapterhorn DEM, CC BY 4.0) ·
+  Подложка: <a href="https://s2maps.eu" target="_blank" rel="noopener">Sentinel-2 cloudless</a>
+  by EOX IT Services GmbH (Contains modified Copernicus Sentinel data), CC BY 4.0
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/cesium@1/Build/Cesium/Cesium.js"></script>
+<script>
+window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1/Build/Cesium/';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Синтетический трек над Заилийским Алатау.
+// Это НЕ реальный полёт — он нужен только чтобы проверить рельеф, подложку,
+// привязку высот и раскраску. Реальные IGC подставишь в Фазе 1.
+// ─────────────────────────────────────────────────────────────────────────────
+const LAUNCH = { lat: 43.128, lon: 76.955, alt: 2350 };  // условный старт
+
+function buildTrack() {
+  const pts = [];
+  let lat = LAUNCH.lat, lon = LAUNCH.lon, alt = LAUNCH.alt, t = 0;
+  const M_PER_DEG_LAT = 111320;
+  const M_PER_DEG_LON = 111320 * Math.cos(LAUNCH.lat * Math.PI / 180);
+
+  const push = (vz) => { pts.push({ lat, lon, alt, t, vz }); };
+
+  // Стартовый пролёт вдоль склона
+  for (let i = 0; i < 90; i++) {
+    lon += 12 / M_PER_DEG_LON; alt -= 0.9; t++; push(-0.9);
+  }
+
+  // Чередование: термик → переход. Пять циклов на восток вдоль хребта.
+  const legs = [
+    { climb: 2.8, gain: 1150, glideS: 260, course:  75 },
+    { climb: 3.6, gain: 1250, glideS: 300, course:  95 },
+    { climb: 1.9, gain:  700, glideS: 230, course:  70 },
+    { climb: 4.2, gain: 1400, glideS: 340, course: 105 },
+    { climb: 2.3, gain:  850, glideS: 280, course:  85 },
+  ];
+
+  for (const leg of legs) {
+    // Термик: круги радиусом ~65 м, период ~19 с, со сносом ветром
+    const dur = Math.round(leg.gain / leg.climb);
+    const R = 65, period = 19;
+    const cLat = lat, cLon = lon;
+    for (let i = 0; i < dur; i++) {
+      const a = (i / period) * Math.PI * 2;
+      const drift = i * 1.6;                       // снос ветром, м
+      lat = cLat + (R * Math.cos(a) + drift * 0.35) / M_PER_DEG_LAT;
+      lon = cLon + (R * Math.sin(a) + drift * 0.94) / M_PER_DEG_LON;
+      // пульсация подъёма — как в реальном термике
+      const vz = leg.climb * (0.55 + 0.45 * Math.sin(a * 1.7 + 0.9));
+      alt += vz; t++; push(vz);
+    }
+    // Переход: прямой глайд со снижением
+    const rad = leg.course * Math.PI / 180;
+    for (let i = 0; i < leg.glideS; i++) {
+      const v = 11.5;                              // ~41 км/ч путевая
+      const vz = -1.15 - 0.45 * Math.sin(i / 37);  // рабочая скорость + болтанка
+      lat += (v * Math.cos(rad)) / M_PER_DEG_LAT;
+      lon += (v * Math.sin(rad)) / M_PER_DEG_LON;
+      alt += vz; t++; push(vz);
+    }
+  }
+  return pts;
+}
+
+// Палитра вариометра из ТЗ §8.4 — дивергентная, центр на нуле
+const STOPS = [
+  [-5.0, [0x3A,0x1C,0x71]], [-2.0, [0x4A,0x6F,0xDC]], [-0.5, [0x7E,0x8B,0xA3]],
+  [ 0.0, [0x6B,0x72,0x80]],
+  [ 0.5, [0xC9,0xA2,0x27]], [ 2.0, [0xE8,0x59,0x0C]], [ 5.0, [0xC9,0x2A,0x2A]],
+];
+function varioColor(vz) {
+  const v = Math.max(-5, Math.min(5, vz));
+  for (let i = 0; i < STOPS.length - 1; i++) {
+    const [a, ca] = STOPS[i], [b, cb] = STOPS[i + 1];
+    if (v >= a && v <= b) {
+      const k = (v - a) / (b - a);
+      return new Cesium.Color(
+        (ca[0] + (cb[0] - ca[0]) * k) / 255,
+        (ca[1] + (cb[1] - ca[1]) * k) / 255,
+        (ca[2] + (cb[2] - ca[2]) * k) / 255, 1);
+    }
+  }
+  return Cesium.Color.GRAY;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Сцена
+// ─────────────────────────────────────────────────────────────────────────────
+const EOX = (layer) => new Cesium.WebMapTileServiceImageryProvider({
+  url: 'https://tiles.maps.eox.at/wmts/1.0.0/' + layer +
+       '/default/WGS84/{TileMatrix}/{TileRow}/{TileCol}.jpg',
+  layer, style: 'default', format: 'image/jpeg',
+  tileMatrixSetID: 'WGS84',
+  tilingScheme: new Cesium.GeographicTilingScheme(),
+  maximumLevel: 14,
+  credit: 'Sentinel-2 cloudless by EOX IT Services GmbH'
+});
+
+let viewer, trackPrim, shadowEnt, wallEnt, track;
+
+async function boot() {
+  const bootEl = document.getElementById('boot');
+  try {
+    // КЛЮЧЕВОЕ: /ellipsoid — высоты уже пересчитаны из геоида в эллипсоидальные,
+    // именно то, чего ждёт Cesium. Без этого трек уехал бы на ~45 м.
+    const terrain = await Cesium.CesiumTerrainProvider.fromUrl(
+      'https://terrain.reearth.land/cesium-mesh/ellipsoid',
+      { requestVertexNormals: true }
+    );
+
+    viewer = new Cesium.Viewer('cesium', {
+      terrainProvider: terrain,
+      baseLayer: new Cesium.ImageryLayer(EOX('s2cloudless-2025')),
+      baseLayerPicker: false, geocoder: false, homeButton: false,
+      sceneModePicker: false, navigationHelpButton: false, timeline: false,
+      animation: false, fullscreenButton: false, infoBox: false,
+      selectionIndicator: false, requestRenderMode: false
+    });
+
+    const s = viewer.scene;
+    s.globe.enableLighting = true;
+    s.globe.depthTestAgainstTerrain = true;
+    s.fog.enabled = true;
+    s.skyAtmosphere.show = true;
+    s.highDynamicRange = true;
+    // Свет как в лётный день, около полудня
+    viewer.clock.currentTime = Cesium.JulianDate.fromIso8601('2026-07-15T07:30:00Z');
+
+    track = buildTrack();
+    document.getElementById('pts').textContent = track.length.toLocaleString('ru');
+
+    drawTrack();
+    setCam('overview');
+    bootEl.remove();
+    wireUi();
+    startHud();
+  } catch (e) {
+    bootEl.innerHTML =
+      '<div class="t err">Не удалось запустить сцену</div>' +
+      '<div class="s">' + String(e && e.message || e) + '</div>' +
+      '<div class="s">Чаще всего причина одна: файл открыт как file://. ' +
+      'Запусти из папки локальный сервер — <code>npx serve .</code> или ' +
+      '<code>python3 -m http.server</code> — и открой через http://localhost.</div>';
+    console.error(e);
+  }
+}
+
+function drawTrack() {
+  const positions = track.map(p => Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.alt));
+  const colors = track.map(p => varioColor(p.vz));
+
+  // Вершинные цвета — ровно как предписано в ТЗ §7.3:
+  // PolylineGeometry({colors, colorsPerVertex:true}) + PolylineColorAppearance.
+  // ArcType.NONE обязателен: иначе сегменты пойдут по геодезической, а не по прямой.
+  trackPrim = viewer.scene.primitives.add(new Cesium.Primitive({
+    geometryInstances: new Cesium.GeometryInstance({
+      geometry: new Cesium.PolylineGeometry({
+        positions, width: 4, colors, colorsPerVertex: true,
+        arcType: Cesium.ArcType.NONE,
+        vertexFormat: Cesium.PolylineColorAppearance.VERTEX_FORMAT
+      })
+    }),
+    appearance: new Cesium.PolylineColorAppearance({ translucent: false }),
+    asynchronous: false
+  }));
+
+  const flat = [];
+  track.forEach(p => { flat.push(p.lon, p.lat); });
+
+  shadowEnt = viewer.entities.add({
+    polyline: {
+      positions: Cesium.Cartesian3.fromDegreesArray(flat),
+      width: 2, clampToGround: true,
+      material: new Cesium.Color(0, 0, 0, 0.42)
+    }
+  });
+
+  wallEnt = viewer.entities.add({
+    show: false,
+    wall: {
+      positions,
+      material: new Cesium.Color(0.30, 0.64, 1.0, 0.16),
+      outline: false
+    }
+  });
+
+  viewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(track[0].lon, track[0].lat, track[0].alt),
+    point: { pixelSize: 9, color: Cesium.Color.WHITE,
+             outlineColor: new Cesium.Color(0,0,0,.7), outlineWidth: 2,
+             disableDepthTestDistance: 8000 },
+    label: { text: 'Старт', font: '600 12px Inter, sans-serif',
+             fillColor: Cesium.Color.WHITE,
+             showBackground: true,
+             backgroundColor: new Cesium.Color(0.04,0.06,0.08,0.8),
+             pixelOffset: new Cesium.Cartesian2(0, -20),
+             disableDepthTestDistance: 8000 }
+  });
+}
+
+const CAMS = {
+  overview: { lon: 76.99, lat: 42.98, h: 14000, heading: 12,  pitch: -32 },
+  ridge:    { lon: 77.02, lat: 43.06, h:  5200, heading: 25,  pitch: -14 },
+  close:    { lon: 76.963, lat: 43.118, h: 2950, heading: 55, pitch: -11 },
+  launch:   { lon: 76.951, lat: 43.122, h: 2520, heading: 40, pitch: -6  },
+};
+function setCam(k) {
+  const c = CAMS[k];
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(c.lon, c.lat, c.h),
+    orientation: {
+      heading: Cesium.Math.toRadians(c.heading),
+      pitch: Cesium.Math.toRadians(c.pitch),
+      roll: 0
+    },
+    duration: 1.6
+  });
+}
+
+function wireUi() {
+  document.querySelectorAll('[data-cam]').forEach(b => b.onclick = () => {
+    document.querySelectorAll('[data-cam]').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    setCam(b.dataset.cam);
+  });
+
+  document.querySelectorAll('[data-img]').forEach(b => b.onclick = () => {
+    document.querySelectorAll('[data-img]').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    const layers = viewer.imageryLayers;
+    layers.removeAll();
+    layers.addImageryProvider(
+      b.dataset.img === 's2' ? EOX('s2cloudless-2025') : EOX('osm')
+    );
+  });
+
+  document.getElementById('l-track').onchange  = e => trackPrim.show = e.target.checked;
+  document.getElementById('l-shadow').onchange = e => shadowEnt.show = e.target.checked;
+  document.getElementById('l-wall').onchange   = e => wallEnt.show  = e.target.checked;
+  document.getElementById('l-light').onchange  = e =>
+    viewer.scene.globe.enableLighting = e.target.checked;
+}
+
+function startHud() {
+  let frames = 0, last = performance.now();
+  viewer.scene.postRender.addEventListener(() => {
+    frames++;
+    const now = performance.now();
+    if (now - last >= 1000) {
+      document.getElementById('fps').textContent = frames;
+      frames = 0; last = now;
+    }
+    const carto = viewer.camera.positionCartographic;
+    document.getElementById('camalt').textContent =
+      Math.round(carto.height).toLocaleString('ru') + ' м';
+  });
+
+  const h = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+  h.setInputAction((m) => {
+    const c = viewer.scene.pickPosition(m.endPosition);
+    const el = document.getElementById('terr');
+    if (Cesium.defined(c)) {
+      const g = Cesium.Cartographic.fromCartesian(c);
+      el.textContent = Math.round(g.height).toLocaleString('ru') + ' м';
+    } else { el.textContent = '—'; }
+  }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+}
+
+boot();
+</script>
+</body>
+</html>

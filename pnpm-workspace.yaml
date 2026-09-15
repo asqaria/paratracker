@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+  - packages/*
+
+# postinstall у unrs-resolver (резолвер eslint-import-x) не нужен:
+# нативный бинарник приходит через optionalDependencies.
+ignoredBuiltDependencies:
+  - unrs-resolver

@@ -1,0 +1,590 @@
+{
+  "baseline.igc": {
+    "description": "Эталонный нормальный трек. Всё как надо: 1 Гц, баро и GNSS, старый HFDTE, все фиксы A.",
+    "verifies": "Базовый разбор: количество точек, координаты, высоты, дата.",
+    "pointCount": 960,
+    "dateHeaderRaw": "HFDTE150726",
+    "altitudeSource": "baro",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 1,
+    "invalidFixCount": 0,
+    "minWarnings": 0,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 32400,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": 2350,
+        "altGnss": 2398,
+        "valid": true
+      },
+      "middle": {
+        "index": 480,
+        "timeUtcSeconds": 32880,
+        "lat": 43.136083333,
+        "lon": 77.021466667,
+        "altBaro": 2770,
+        "altGnss": 2818,
+        "valid": true
+      },
+      "last": {
+        "index": 959,
+        "timeUtcSeconds": 33359,
+        "lat": 43.140466667,
+        "lon": 77.056783333,
+        "altBaro": 2903,
+        "altGnss": 2951,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126933333,
+      "maxLat": 43.140466667,
+      "minLon": 76.9545,
+      "maxLon": 77.056783333,
+      "minAlt": 2398,
+      "maxAlt": 3238
+    }
+  },
+  "no-baro.igc": {
+    "description": "Прибор не пишет барометрическую высоту — все поля 00000.",
+    "verifies": "altitudeSource должен стать \"gnss\", в warnings — предупреждение. Вариометр считается по GNSS.",
+    "pointCount": 480,
+    "dateHeaderRaw": "HFDTE150726",
+    "altitudeSource": "gnss",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 1,
+    "invalidFixCount": 0,
+    "minWarnings": 0,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 36000,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": null,
+        "altGnss": 2398,
+        "valid": true
+      },
+      "middle": {
+        "index": 240,
+        "timeUtcSeconds": 36240,
+        "lat": 43.128516667,
+        "lon": 76.959133333,
+        "altBaro": null,
+        "altGnss": 2818,
+        "valid": true
+      },
+      "last": {
+        "index": 479,
+        "timeUtcSeconds": 36479,
+        "lat": 43.132383333,
+        "lon": 76.990316667,
+        "altBaro": null,
+        "altGnss": 2531,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126933333,
+      "maxLat": 43.132383333,
+      "minLon": 76.9545,
+      "maxLon": 76.990316667,
+      "minAlt": 2398,
+      "maxAlt": 2818
+    }
+  },
+  "midnight.igc": {
+    "description": "Полёт через полночь UTC: старт 23:50, финиш после 00:10 следующих суток.",
+    "verifies": "Время следующей B-записи МЕНЬШЕ предыдущей → +1 сутки. Без этого вся вторая половина трека уедет на день назад.",
+    "pointCount": 1500,
+    "dateHeaderRaw": "HFDTE150726",
+    "altitudeSource": "baro",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 1,
+    "invalidFixCount": 0,
+    "minWarnings": 0,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 85800,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": 2350,
+        "altGnss": 2398,
+        "valid": true
+      },
+      "middle": {
+        "index": 750,
+        "timeUtcSeconds": 86550,
+        "lat": 43.137083333,
+        "lon": 77.029516667,
+        "altBaro": 3154,
+        "altGnss": 3202,
+        "valid": true
+      },
+      "last": {
+        "index": 1499,
+        "timeUtcSeconds": 87299,
+        "lat": 43.1525,
+        "lon": 77.155183333,
+        "altBaro": 3713,
+        "altGnss": 3761,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126933333,
+      "maxLat": 43.1525,
+      "minLon": 76.9545,
+      "maxLon": 77.155933333,
+      "minAlt": 2398,
+      "maxAlt": 3761
+    }
+  },
+  "gaps.igc": {
+    "description": "Два разрыва связи: 90 секунд и 12 минут.",
+    "verifies": "Разрыв 90 с НЕ влезает в Uint16 миллисекунд (потолок 65.5 с) — проверка таблицы разрывов из ТЗ §5.4. Оба помечаются флагом gap, интерполяция через них запрещена.",
+    "pointCount": 720,
+    "dateHeaderRaw": "HFDTE150726",
+    "altitudeSource": "baro",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 721,
+    "invalidFixCount": 0,
+    "minWarnings": 0,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 39600,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": 2350,
+        "altGnss": 2398,
+        "valid": true
+      },
+      "middle": {
+        "index": 360,
+        "timeUtcSeconds": 40050,
+        "lat": 43.130466667,
+        "lon": 76.9748,
+        "altBaro": 2626,
+        "altGnss": 2674,
+        "valid": true
+      },
+      "last": {
+        "index": 719,
+        "timeUtcSeconds": 41129,
+        "lat": 43.137133333,
+        "lon": 77.02535,
+        "altBaro": 3188,
+        "altGnss": 3236,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126933333,
+      "maxLat": 43.137133333,
+      "minLon": 76.9545,
+      "maxLon": 77.0261,
+      "minAlt": 2398,
+      "maxAlt": 3236
+    }
+  },
+  "south-west.igc": {
+    "description": "Аргентинские Анды: отрицательная широта И отрицательная долгота.",
+    "verifies": "Знаки S и W. Классическая ошибка — потерять знак и отзеркалить трек в северное полушарие.",
+    "pointCount": 600,
+    "dateHeaderRaw": "HFDTE221126",
+    "altitudeSource": "baro",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 1,
+    "invalidFixCount": 0,
+    "minWarnings": 0,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 50400,
+        "lat": -32.653,
+        "lon": -70.011,
+        "altBaro": 2800,
+        "altGnss": 2848,
+        "valid": true
+      },
+      "middle": {
+        "index": 300,
+        "timeUtcSeconds": 50700,
+        "lat": -32.651516667,
+        "lon": -70.000633333,
+        "altBaro": 3148,
+        "altGnss": 3196,
+        "valid": true
+      },
+      "last": {
+        "index": 599,
+        "timeUtcSeconds": 50999,
+        "lat": -32.6444,
+        "lon": -69.951816667,
+        "altBaro": 3428,
+        "altGnss": 3476,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": -32.654066667,
+      "maxLat": -32.6444,
+      "minLon": -70.011433333,
+      "maxLon": -69.95115,
+      "minAlt": 2848,
+      "maxAlt": 3476
+    }
+  },
+  "date-modern.igc": {
+    "description": "Современный формат даты HFDTEDATE:DDMMYY,NN (с 2016 года).",
+    "verifies": "Парсер обязан понимать ОБА формата. На этом файле старая реализация не найдёт дату и уйдёт в fallback по имени файла.",
+    "pointCount": 480,
+    "dateHeaderRaw": "HFDTEDATE:150726,01",
+    "altitudeSource": "baro",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 1,
+    "invalidFixCount": 0,
+    "minWarnings": 0,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 30600,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": 2350,
+        "altGnss": 2398,
+        "valid": true
+      },
+      "middle": {
+        "index": 240,
+        "timeUtcSeconds": 30840,
+        "lat": 43.128516667,
+        "lon": 76.959133333,
+        "altBaro": 2770,
+        "altGnss": 2818,
+        "valid": true
+      },
+      "last": {
+        "index": 479,
+        "timeUtcSeconds": 31079,
+        "lat": 43.132383333,
+        "lon": 76.990316667,
+        "altBaro": 2483,
+        "altGnss": 2531,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126933333,
+      "maxLat": 43.132383333,
+      "minLon": 76.9545,
+      "maxLon": 76.990316667,
+      "minAlt": 2398,
+      "maxAlt": 2818
+    }
+  },
+  "lad-lod.igc": {
+    "description": "Расширения LAD и LOD — дополнительные знаки минут широты и долготы.",
+    "verifies": "Без их учёта точность координат ограничена 0.001′ ≈ 1.85 м, и радиус виража в детекции кругов заметно шумит. Координаты в эталоне посчитаны С учётом расширений.",
+    "pointCount": 480,
+    "dateHeaderRaw": "HFDTE150726",
+    "altitudeSource": "baro",
+    "iRecord": "I023637LAD3839LOD",
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 1,
+    "invalidFixCount": 0,
+    "minWarnings": 0,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 43200,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": 2350,
+        "altGnss": 2398,
+        "valid": true
+      },
+      "middle": {
+        "index": 240,
+        "timeUtcSeconds": 43440,
+        "lat": 43.128521,
+        "lon": 76.959135667,
+        "altBaro": 2770,
+        "altGnss": 2818,
+        "valid": true
+      },
+      "last": {
+        "index": 479,
+        "timeUtcSeconds": 43679,
+        "lat": 43.1323855,
+        "lon": 76.990318167,
+        "altBaro": 2483,
+        "altGnss": 2531,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126931,
+      "maxLat": 43.1323855,
+      "minLon": 76.954495333,
+      "maxLon": 76.990318167,
+      "minAlt": 2398,
+      "maxAlt": 2818
+    }
+  },
+  "sparse-10s.igc": {
+    "description": "Шаг фиксов 10 секунд — типично для GPX с телефона и часов Garmin.",
+    "verifies": "Медианный шаг > 4 с → analysis_level = \"basic\". Детекцию термиков и ветра НЕ запускать: интерполяция срежет виражи хордами и накопление курса не наберёт 360°.",
+    "pointCount": 200,
+    "dateHeaderRaw": "HFDTE150726",
+    "altitudeSource": "baro",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 10,
+    "maxFixIntervalSeconds": 10,
+    "invalidFixCount": 0,
+    "minWarnings": 0,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 46800,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": 2350,
+        "altGnss": 2398,
+        "valid": true
+      },
+      "middle": {
+        "index": 100,
+        "timeUtcSeconds": 47800,
+        "lat": 43.12845,
+        "lon": 76.956716667,
+        "altBaro": 2525,
+        "altGnss": 2573,
+        "valid": true
+      },
+      "last": {
+        "index": 199,
+        "timeUtcSeconds": 48790,
+        "lat": 43.128866667,
+        "lon": 76.9582,
+        "altBaro": 2698,
+        "altGnss": 2746,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126933333,
+      "maxLat": 43.128866667,
+      "minLon": 76.9545,
+      "maxLon": 76.95895,
+      "minAlt": 2398,
+      "maxAlt": 2746
+    }
+  },
+  "v-fixes.igc": {
+    "description": "Каждый десятый фикс — 2D (флаг V вместо A).",
+    "verifies": "Точки с V помечаются и исключаются из расчёта вертикальной скорости, но остаются в треке.",
+    "pointCount": 480,
+    "dateHeaderRaw": "HFDTE150726",
+    "altitudeSource": "baro",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 1,
+    "invalidFixCount": 48,
+    "minWarnings": 0,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 54000,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": 2350,
+        "altGnss": 2398,
+        "valid": false
+      },
+      "middle": {
+        "index": 240,
+        "timeUtcSeconds": 54240,
+        "lat": 43.128516667,
+        "lon": 76.959133333,
+        "altBaro": 2770,
+        "altGnss": 2818,
+        "valid": false
+      },
+      "last": {
+        "index": 479,
+        "timeUtcSeconds": 54479,
+        "lat": 43.132383333,
+        "lon": 76.990316667,
+        "altBaro": 2483,
+        "altGnss": 2531,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126933333,
+      "maxLat": 43.132383333,
+      "minLon": 76.9545,
+      "maxLon": 76.990316667,
+      "minAlt": 2398,
+      "maxAlt": 2818
+    }
+  },
+  "negative-alt.igc": {
+    "description": "Высоты ниже уровня моря — формат -NNNN. Мёртвое море.",
+    "verifies": "Отрицательная высота не должна ломать парсер числа и не должна превращаться в 0.",
+    "pointCount": 360,
+    "dateHeaderRaw": "HFDTE030426",
+    "altitudeSource": "baro",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 1,
+    "invalidFixCount": 0,
+    "minWarnings": 0,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 25200,
+        "lat": 31.558,
+        "lon": 35.473,
+        "altBaro": -2880,
+        "altGnss": -2832,
+        "valid": true
+      },
+      "middle": {
+        "index": 180,
+        "timeUtcSeconds": 25380,
+        "lat": 31.558816667,
+        "lon": 35.47565,
+        "altBaro": -2565,
+        "altGnss": -2517,
+        "valid": true
+      },
+      "last": {
+        "index": 359,
+        "timeUtcSeconds": 25559,
+        "lat": 31.56045,
+        "lon": 35.489833333,
+        "altBaro": -2603,
+        "altGnss": -2555,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 31.556933333,
+      "maxLat": 31.56045,
+      "minLon": 35.472566667,
+      "maxLon": 35.489833333,
+      "minAlt": -2832,
+      "maxAlt": -2412
+    }
+  },
+  "extensions-full.igc": {
+    "description": "Полный набор расширений B-записи: FXA, SIU, GSP, ENL.",
+    "verifies": "I-запись разбирается по позициям байтов, значения читаются по своим смещениям. FXA и SIU потом используются для фильтрации шума.",
+    "pointCount": 480,
+    "dateHeaderRaw": "HFDTE150726",
+    "altitudeSource": "baro",
+    "iRecord": "I043638FXA3940SIU4144GSP4547ENL",
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 1,
+    "invalidFixCount": 0,
+    "minWarnings": 0,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 57600,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": 2350,
+        "altGnss": 2398,
+        "valid": true
+      },
+      "middle": {
+        "index": 240,
+        "timeUtcSeconds": 57840,
+        "lat": 43.128516667,
+        "lon": 76.959133333,
+        "altBaro": 2770,
+        "altGnss": 2818,
+        "valid": true
+      },
+      "last": {
+        "index": 479,
+        "timeUtcSeconds": 58079,
+        "lat": 43.132383333,
+        "lon": 76.990316667,
+        "altBaro": 2483,
+        "altGnss": 2531,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126933333,
+      "maxLat": 43.132383333,
+      "minLon": 76.9545,
+      "maxLon": 76.990316667,
+      "minAlt": 2398,
+      "maxAlt": 2818
+    }
+  },
+  "broken-lines.igc": {
+    "description": "Битые строки посреди валидного трека: обрезанная B-запись, мусор, неизвестный тип записи, пустая строка.",
+    "verifies": "ГЛАВНЫЙ тест устойчивости. Парсер обязан пропустить их, записать в warnings и продолжить — не бросить исключение. Количество валидных точек должно остаться прежним.",
+    "pointCount": 480,
+    "dateHeaderRaw": "HFDTE150726",
+    "altitudeSource": "baro",
+    "iRecord": null,
+    "medianFixIntervalSeconds": 1,
+    "maxFixIntervalSeconds": 1,
+    "invalidFixCount": 0,
+    "minWarnings": 4,
+    "samples": {
+      "first": {
+        "index": 0,
+        "timeUtcSeconds": 61200,
+        "lat": 43.128,
+        "lon": 76.955,
+        "altBaro": 2350,
+        "altGnss": 2398,
+        "valid": true
+      },
+      "middle": {
+        "index": 240,
+        "timeUtcSeconds": 61440,
+        "lat": 43.128516667,
+        "lon": 76.959133333,
+        "altBaro": 2770,
+        "altGnss": 2818,
+        "valid": true
+      },
+      "last": {
+        "index": 479,
+        "timeUtcSeconds": 61679,
+        "lat": 43.132383333,
+        "lon": 76.990316667,
+        "altBaro": 2483,
+        "altGnss": 2531,
+        "valid": true
+      }
+    },
+    "bounds": {
+      "minLat": 43.126933333,
+      "maxLat": 43.132383333,
+      "minLon": 76.9545,
+      "maxLon": 76.990316667,
+      "minAlt": 2398,
+      "maxAlt": 2818
+    }
+  }
+}

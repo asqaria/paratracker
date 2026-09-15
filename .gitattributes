@@ -1,0 +1,7 @@
+* text=auto eol=lf
+
+# Эталонные треки хранятся побайтно: expected.json сверяется с тем, что реально записано в файле.
+*.igc -text
+*.gpx -text
+*.kml -text
+*.fit binary
