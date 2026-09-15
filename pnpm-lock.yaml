@@ -121,7 +121,11 @@ importers:
         specifier: ^0.31.10
         version: 0.31.10
 
-  packages/parsing: {}
+  packages/parsing:
+    dependencies:
+      '@skyline/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/track-format: {}
 

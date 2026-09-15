@@ -1,1 +1,1 @@
-export const PACKAGE_NAME = '@skyline/parsing';
+export { parseIgc, type IgcParseOptions, type ParseLimits } from './igc.js';

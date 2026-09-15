@@ -14,7 +14,7 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.env"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.env", "$TURBO_ROOT$/fixtures/**"],
       "env": ["DATABASE_URL", "S3_*"]
     }
   }
