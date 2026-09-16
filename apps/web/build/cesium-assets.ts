@@ -1,6 +1,7 @@
-import { cp, mkdir } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { cp, mkdir, stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { dirname, join, posix } from 'node:path';
+import { dirname, extname, join, normalize, relative, resolve } from 'node:path';
 
 import type { Plugin } from 'vite';
 
@@ -19,12 +20,55 @@ export const CESIUM_BASE_PATH = '/cesium/';
 /** Каталоги из Build/Cesium, без которых сцена не поднимется. */
 export const CESIUM_ASSET_DIRS = ['Assets', 'ThirdParty', 'Widgets', 'Workers'] as const;
 
+/**
+ * Типы отдаём сами: воркеры Cesium браузер не выполнит с text/html,
+ * а именно так выглядел ответ, когда запрос доезжал до SPA-фолбэка.
+ */
+const ASSET_MIME: Record<string, string> = {
+  '.js': 'text/javascript',
+  '.mjs': 'text/javascript',
+  '.json': 'application/json',
+  '.css': 'text/css',
+  '.wasm': 'application/wasm',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.xml': 'application/xml',
+  '.glb': 'model/gltf-binary',
+  '.gltf': 'model/gltf+json',
+  '.ktx2': 'image/ktx2',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+};
+
 /** Путь к Build/Cesium установленного пакета. */
 export function resolveCesiumBuildDir(fromUrl: string): string {
   const require = createRequire(fromUrl);
   // Резолвим сам package.json: точка входа пакета — ESM в Source/.
   return join(dirname(require.resolve('cesium/package.json')), 'Build', 'Cesium');
 }
+
+/**
+ * Файл ассета по URL запроса (префикс /cesium/ уже снят) либо null, если это
+ * не ассет Cesium или попытка выйти за пределы Build/Cesium.
+ */
+export function resolveCesiumAssetPath(url: string, buildDir: string): string | null {
+  const path = decodeURIComponent((url.split('?')[0] ?? '').split('#')[0] ?? '').replace(/^\/+/, '');
+  if (!CESIUM_ASSET_DIRS.some((name) => path === name || path.startsWith(`${name}/`))) return null;
+
+  const root = resolve(buildDir);
+  const target = resolve(root, normalize(path));
+  const within = relative(root, target);
+  // '..' в начале — выход наружу, пустая строка — сам каталог, не файл.
+  if (within === '' || within.startsWith('..')) return null;
+  return target;
+}
+
+export const cesiumAssetMime = (file: string): string =>
+  ASSET_MIME[extname(file).toLowerCase()] ?? 'application/octet-stream';
 
 export function cesiumAssets(): Plugin {
   const buildDir = resolveCesiumBuildDir(import.meta.url);
@@ -37,15 +81,26 @@ export function cesiumAssets(): Plugin {
     }),
 
     configureServer: (server) => {
+      // Файл отдаётся здесь же: возвращать запрос в общий стек нельзя —
+      // статики с корнем Build/Cesium в нём нет, и ответом будет index.html.
       server.middlewares.use(CESIUM_BASE_PATH, (request, response, next) => {
-        const url = request.url ?? '/';
-        const dir = CESIUM_ASSET_DIRS.find((name) => url.startsWith(`/${name}/`));
-        if (!dir) {
+        const file = resolveCesiumAssetPath(request.url ?? '/', buildDir);
+        if (file === null) {
           next();
           return;
         }
-        // sirv настроен на корень Build/Cesium: путь из запроса уже относительный.
-        server.middlewares.handle(Object.assign(request, { url: posix.join('/', url) }), response, next);
+        void stat(file).then(
+          (info) => {
+            if (!info.isFile()) {
+              next();
+              return;
+            }
+            response.setHeader('content-type', cesiumAssetMime(file));
+            response.setHeader('content-length', String(info.size));
+            createReadStream(file).pipe(response);
+          },
+          () => next(),
+        );
       });
     },
 
