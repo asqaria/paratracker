@@ -19,6 +19,36 @@ export const SOURCE_FORMATS = ['igc', 'gpx', 'kml', 'fit', 'csv'] as const;
 export const SourceFormat = z.enum(SOURCE_FORMATS);
 export type SourceFormat = z.infer<typeof SourceFormat>;
 
+/**
+ * Расширение файла → формат разбора (ТЗ §3.1). Список общий для API и фронта:
+ * сервер по нему выбирает парсер, фронт — что писать в accept и что отклонить
+ * ещё до отправки. Два таких списка в двух приложениях неизбежно разъедутся.
+ */
+export const SOURCE_FORMAT_BY_EXTENSION = {
+  igc: 'igc',
+  gpx: 'gpx',
+  kml: 'kml',
+  // KMZ — zip с doc.kml внутри, разбирает тот же парсер (ТЗ §3.1).
+  kmz: 'kml',
+} as const satisfies Record<string, SourceFormat>;
+
+export type TrackFileExtension = keyof typeof SOURCE_FORMAT_BY_EXTENSION;
+
+/** Поддерживаемые расширения — для accept и сообщений об ошибке. */
+export const TRACK_FILE_EXTENSIONS = Object.keys(SOURCE_FORMAT_BY_EXTENSION) as TrackFileExtension[];
+
+/** Расширение в нижнем регистре без точки. Нет точки — пустая строка. */
+export function fileExtension(filename: string): string {
+  const dot = filename.lastIndexOf('.');
+  return dot < 0 ? '' : filename.slice(dot + 1).toLowerCase();
+}
+
+/** Формат по имени файла или null, если расширение не поддерживается. */
+export function sourceFormatForFilename(filename: string): SourceFormat | null {
+  const formats: Record<string, SourceFormat | undefined> = SOURCE_FORMAT_BY_EXTENSION;
+  return formats[fileExtension(filename)] ?? null;
+}
+
 /** Откуда взята высота трека (ТЗ §9): барометр или GNSS, если баро нет. */
 export const ALTITUDE_SOURCES = ['baro', 'gnss'] as const;
 export const AltitudeSource = z.enum(ALTITUDE_SOURCES);

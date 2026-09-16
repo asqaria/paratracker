@@ -4,9 +4,12 @@ import { gzip } from 'node:zlib';
 
 import multipart from '@fastify/multipart';
 import {
+  fileExtension,
   FlightErrorCode,
   FlightStatusResponse,
   PARSER,
+  sourceFormatForFilename,
+  TRACK_FILE_EXTENSIONS,
   UploadResponse,
   type FlightStatus,
   type SourceFormat,
@@ -54,14 +57,6 @@ const OK = 200;
 /** Пауза между heartbeat-комментариями SSE: прокси рвут простаивающие соединения. */
 const SSE_HEARTBEAT_S = 15;
 
-const FORMAT_BY_EXTENSION: Record<string, SourceFormat> = {
-  igc: 'igc',
-  gpx: 'gpx',
-  kml: 'kml',
-  // KMZ — zip с doc.kml внутри, разбирает тот же парсер (ТЗ §3.1).
-  kmz: 'kml',
-};
-
 const TERMINAL_STATUSES: readonly FlightStatus[] = ['ready', 'failed'];
 const FlightIdParams = z.object({ id: z.uuid() });
 const gzipAsync = promisify(gzip);
@@ -76,8 +71,6 @@ function toStatusResponse(flight: FlightRecord, progress?: number): FlightStatus
     ...(errorCode.success ? { errorCode: errorCode.data } : {}),
   });
 }
-
-const extensionOf = (filename: string): string => filename.slice(filename.lastIndexOf('.') + 1).toLowerCase();
 
 export function registerFlightRoutes(app: FastifyInstance, deps: FlightRoutesDeps): void {
   const maxFileBytes = deps.maxFileBytes ?? PARSER.maxFileBytes;
@@ -113,12 +106,14 @@ export function registerFlightRoutes(app: FastifyInstance, deps: FlightRoutesDep
       return sendProblem(reply, problem(HTTP.badRequest, { detail: 'File part is required' }));
     }
 
-    const format = FORMAT_BY_EXTENSION[extensionOf(file.filename)];
-    if (!format) {
+    // Сопоставление расширений — общее с фронтом, лежит в core (ТЗ §3.1).
+    const format = sourceFormatForFilename(file.filename);
+    if (format === null) {
+      const supported = TRACK_FILE_EXTENSIONS.map((extension) => `.${extension}`).join(', ');
       return sendProblem(
         reply,
         problem(HTTP.unsupportedMediaType, {
-          detail: `Unsupported track format: ${file.filename}. Supported: .igc, .gpx, .kml, .kmz`,
+          detail: `Unsupported track format: ${file.filename}. Supported: ${supported}`,
         }),
       );
     }
@@ -133,7 +128,7 @@ export function registerFlightRoutes(app: FastifyInstance, deps: FlightRoutesDep
 
     const flightId = newFlightId();
     // Анонимная загрузка (ТЗ §7.1, §11.2): пользователя ещё нет, TTL 30 дней.
-    const rawObjectKey = `raw/anonymous/${flightId}.${extensionOf(file.filename)}.gz`;
+    const rawObjectKey = `raw/anonymous/${flightId}.${fileExtension(file.filename)}.gz`;
     await deps.storage.put(rawObjectKey, await gzipAsync(bytes), 'application/gzip');
 
     const flight = await deps.repository.insert({ id: flightId, userId: null, sourceFormat: format, rawObjectKey });
