@@ -1,13 +1,19 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 
 import { API_V1_PREFIX } from './constants.js';
+import { registerFlightRoutes, type FlightRoutesDeps } from './flights.js';
 import { registerHealthRoutes, type HealthRouteOptions } from './health.js';
 import { registerProblemHandlers } from './problem.js';
+import { registerTileRoutes, type TileRoutesDeps } from './tiles.js';
 
 export interface AppOptions {
   /** Fastify пишет структурные JSON-логи через pino. */
   logger: Exclude<FastifyServerOptions['logger'], undefined>;
-  health: HealthRouteOptions;
+  health?: HealthRouteOptions;
+  /** Маршруты полётов; без них поднимается только health. */
+  flights?: FlightRoutesDeps;
+  /** Прокси тайлов подложки; ключ провайдера остаётся на сервере. */
+  tiles?: TileRoutesDeps;
 }
 
 export function buildApp(options: AppOptions): FastifyInstance {
@@ -16,7 +22,9 @@ export function buildApp(options: AppOptions): FastifyInstance {
   registerProblemHandlers(app);
   void app.register(
     (v1, _opts, done) => {
-      registerHealthRoutes(v1, options.health);
+      if (options.health) registerHealthRoutes(v1, options.health);
+      if (options.flights) registerFlightRoutes(v1, options.flights);
+      if (options.tiles) registerTileRoutes(v1, options.tiles);
       done();
     },
     { prefix: API_V1_PREFIX },

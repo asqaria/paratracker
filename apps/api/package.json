@@ -3,6 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env src/server.ts",
     "start": "node --env-file-if-exists=../../.env dist/server.js",
@@ -12,13 +18,17 @@
     "test": "vitest run --config ../../vitest.config.ts --project @skyline/api"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1132.0",
+    "@aws-sdk/client-s3": "^3.1133.0",
+    "@fastify/multipart": "^10.1.1",
     "@skyline/core": "workspace:*",
     "@skyline/db": "workspace:*",
     "fastify": "^5.12.4",
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@skyline/parsing": "workspace:*",
+    "@skyline/track-format": "workspace:*",
+    "@skyline/worker": "workspace:*",
     "tsx": "^4.23.13"
   }
 }

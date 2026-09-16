@@ -5,3 +5,4 @@
 *.gpx -text
 *.kml -text
 *.fit binary
+*.kmz binary

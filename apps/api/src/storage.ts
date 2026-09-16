@@ -1,6 +1,7 @@
-import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 import type { Config } from './config.js';
+import type { FlightRoutesDeps } from './flights.js';
 
 type StorageConfig = Pick<
   Config,
@@ -23,4 +24,18 @@ export function createStorageClient(config: StorageConfig): S3Client {
 /** Бросает, если бакет недоступен: нет сети, неверные ключи или бакета нет. */
 export async function checkBucket(client: S3Client, bucket: string, signal: AbortSignal): Promise<void> {
   await client.send(new HeadBucketCommand({ Bucket: bucket }), { abortSignal: signal });
+}
+
+/** Чтение и запись объектов для маршрутов полётов. */
+export function createObjectStorage(client: S3Client, bucket: string): FlightRoutesDeps['storage'] {
+  return {
+    put: async (key, bytes, contentType) => {
+      await client.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: bytes, ContentType: contentType }));
+    },
+    get: async (key) => {
+      const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+      if (!response.Body) throw new Error(`empty object body: ${key}`);
+      return response.Body.transformToByteArray();
+    },
+  };
 }

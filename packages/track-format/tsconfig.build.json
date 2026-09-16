@@ -3,9 +3,9 @@
   "compilerOptions": {
     "noEmit": false,
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    // Без типов Node: формат читается и пишется одинаково в воркере и в браузере.
+    "types": []
   },
-  "exclude": [
-    "src/**/*.test.ts"
-  ]
+  "exclude": ["src/**/*.test.ts", "src/testing/**"]
 }

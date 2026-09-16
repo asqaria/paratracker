@@ -8,6 +8,12 @@ export const FLIGHT_STATUSES = ['pending', 'parsing', 'analyzing', 'ready', 'fai
 export const FlightStatus = z.enum(FLIGHT_STATUSES);
 export type FlightStatus = z.infer<typeof FlightStatus>;
 
+/**
+ * Незавершённые статусы. При старте воркер переставляет их в очередь заново
+ * (ТЗ §4.2, §5.2): иначе файл, загруженный перед перезапуском, зависнет навсегда.
+ */
+export const UNFINISHED_FLIGHT_STATUSES = ['pending', 'parsing', 'analyzing'] as const satisfies readonly FlightStatus[];
+
 /** Форматы исходных файлов (ТЗ §3.1, §3.2, §9). */
 export const SOURCE_FORMATS = ['igc', 'gpx', 'kml', 'fit', 'csv'] as const;
 export const SourceFormat = z.enum(SOURCE_FORMATS);
