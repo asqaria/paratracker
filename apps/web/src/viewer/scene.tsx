@@ -44,6 +44,13 @@ export interface SceneProps {
   track: DecodedTrack;
   /** Подпись слоёв и заголовки — из i18n вызывающей страницы. */
   labels: { imagery: string; points: string; sentinel2: string; esri: string };
+  /**
+   * Свечение под треком (ТЗ §7.3). По умолчанию выключено: прозрачный примитив
+   * рисуется в проходе после непрозрачного, то есть ложится ПОВЕРХ цветной линии
+   * и размывает раскраску по вариометру. Включать только вместе с решением,
+   * как развести проходы (свой Appearance или порядок с translucent у обоих).
+   */
+  showGlow?: boolean;
 }
 
 /** ТЗ §7.2: основная линия 3–5 px, свечение — шире и приглушённее. */
@@ -70,7 +77,7 @@ function createImageryProvider(source: ImagerySource): ImageryLayer {
   return new ImageryLayer(new UrlTemplateImageryProvider({ url: source.url, maximumLevel: source.maximumLevel }));
 }
 
-export function Scene({ track, labels }: SceneProps) {
+export function Scene({ track, labels, showGlow = false }: SceneProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Viewer | null>(null);
   // Конфиг читается один раз и не роняет рендер: без переменных окружения
@@ -121,6 +128,10 @@ export function Scene({ track, labels }: SceneProps) {
         const scene = viewer.scene;
         scene.globe.depthTestAgainstTerrain = true;
         scene.globe.enableLighting = true;
+        // Штатный блок кредитов Cesium скрыт: все обязательные строки лицензий
+        // (Re:Earth, EOX, Esri) выводит наш блок атрибуции, иначе они наложатся.
+        const credits = viewer.cesiumWidget.creditContainer;
+        if (credits instanceof HTMLElement) credits.style.display = 'none';
         // Счётчик кадров только в dev: по нему проверяется FPS из ТЗ §7.7.
         scene.debugShowFramesPerSecond = import.meta.env.DEV;
 
@@ -139,26 +150,28 @@ export function Scene({ track, labels }: SceneProps) {
           );
         }
 
-        // Слой 1: свечение одним приглушённым цветом.
-        scene.primitives.add(
-          new Primitive({
-            geometryInstances: new GeometryInstance({
-              geometry: new PolylineGeometry({
-                positions,
-                width: GLOW_WIDTH_PX,
-                arcType: ArcType.NONE,
-                vertexFormat: PolylineMaterialAppearance.VERTEX_FORMAT,
+        // Слой 1: свечение одним приглушённым цветом — по умолчанию выключено (см. showGlow).
+        if (showGlow) {
+          scene.primitives.add(
+            new Primitive({
+              geometryInstances: new GeometryInstance({
+                geometry: new PolylineGeometry({
+                  positions,
+                  width: GLOW_WIDTH_PX,
+                  arcType: ArcType.NONE,
+                  vertexFormat: PolylineMaterialAppearance.VERTEX_FORMAT,
+                }),
               }),
-            }),
-            appearance: new PolylineMaterialAppearance({
-              material: Material.fromType('PolylineGlow', {
-                color: Color.fromCssColorString('#4DA3FF').withAlpha(GLOW_INTENSITY),
-                glowPower: 0.2,
+              appearance: new PolylineMaterialAppearance({
+                material: Material.fromType('PolylineGlow', {
+                  color: Color.fromCssColorString('#4DA3FF').withAlpha(GLOW_INTENSITY),
+                  glowPower: 0.2,
+                }),
               }),
+              asynchronous: false,
             }),
-            asynchronous: false,
-          }),
-        );
+          );
+        }
 
         // Слой 2: сам трек с вершинными цветами по вариометру.
         scene.primitives.add(
@@ -202,7 +215,7 @@ export function Scene({ track, labels }: SceneProps) {
       viewerRef.current = null;
       viewer?.destroy();
     };
-  }, [track, config, imagery, sources]);
+  }, [track, config, imagery, sources, showGlow]);
 
   /** Переключение подложки: слой пересоздаётся, атрибуция меняется вместе с ним. */
   const switchImagery = (id: ImageryId): void => {
