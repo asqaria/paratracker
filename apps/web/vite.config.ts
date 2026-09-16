@@ -2,6 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv } from 'vite';
 
+import { cesiumAssets } from './build/cesium-assets.ts';
 import { initialLoadBudget } from './build/initial-load-budget.ts';
 
 /**
@@ -17,7 +18,16 @@ export default defineConfig(({ mode }) => {
   const apiPort = env.API_PORT ?? '3000';
 
   return {
-    plugins: [react(), tailwindcss(), initialLoadBudget({ maxGzipBytes: INITIAL_LOAD_BUDGET_GZIP_BYTES })],
+    plugins: [
+      react(),
+      tailwindcss(),
+      cesiumAssets(),
+      initialLoadBudget({ maxGzipBytes: INITIAL_LOAD_BUDGET_GZIP_BYTES }),
+    ],
+    // Конфиг сцены приходит только из окружения: хардкод адресов тайлов запрещён.
+    // .env лежит в корне монорепозитория — Vite по умолчанию искал бы его в apps/web.
+    envDir: REPO_ROOT,
+    envPrefix: ['VITE_'],
     server: {
       // В dev фронт и API на одном origin: без CORS, как за обратным прокси в проде.
       proxy: { '/api': `http://127.0.0.1:${apiPort}` },

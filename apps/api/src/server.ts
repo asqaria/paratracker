@@ -40,6 +40,11 @@ const app = buildApp({
     events,
     onQueued: (flightId) => notifyFlightQueued(database.db, flightId),
   },
+  // Ключ ArcGIS остаётся на сервере; без него подложка Esri просто недоступна.
+  tiles: {
+    tileUrlTemplate: config.ARCGIS_TILE_URL ?? null,
+    apiKey: config.ARCGIS_API_KEY ?? null,
+  },
 });
 
 const statusListener = createChannelListener({

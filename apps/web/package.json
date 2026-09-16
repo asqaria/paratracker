@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@skyline/core": "workspace:*",
+    "@skyline/track-format": "workspace:*",
     "@tanstack/react-query": "^5.102.8",
+    "cesium": "^1.145.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zustand": "^5.0.15"
