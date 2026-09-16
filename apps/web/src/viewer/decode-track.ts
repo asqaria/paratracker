@@ -13,6 +13,10 @@ export interface DecodedTrack {
   lon: Float64Array;
   alt: Float64Array;
   vSpeed: Float64Array;
+  /** Путевая скорость, м/с — для телеметрии. */
+  gSpeed: Float64Array;
+  /** Курс, градусы — по нему ведётся камера Chase (ТЗ §7.4). */
+  heading: Float64Array;
   flags: Uint8Array;
 }
 
@@ -26,13 +30,15 @@ export function decodeTrack(buffer: ArrayBuffer): DecodedTrack {
     lon: file.lon,
     alt: file.alt ?? new Float64Array(count).fill(Number.NaN),
     vSpeed: file.vSpeed ?? new Float64Array(count).fill(Number.NaN),
+    gSpeed: file.gSpeed ?? new Float64Array(count).fill(Number.NaN),
+    heading: file.heading ?? new Float64Array(count).fill(Number.NaN),
     flags: file.flags ?? new Uint8Array(count),
   };
 }
 
 /** Буферы всех колонок — для postMessage(..., transfer). */
 export function transferables(track: DecodedTrack): ArrayBuffer[] {
-  return [track.t, track.lat, track.lon, track.alt, track.vSpeed, track.flags].map(
+  return [track.t, track.lat, track.lon, track.alt, track.vSpeed, track.gSpeed, track.heading, track.flags].map(
     (column) => column.buffer as ArrayBuffer,
   );
 }

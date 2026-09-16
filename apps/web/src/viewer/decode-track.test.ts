@@ -11,6 +11,8 @@ const track = (pointCount: number): ArrayBuffer => {
     lon: Float64Array.from(index, (i) => 76.955 + i * 1e-4),
     alt: Float64Array.from(index, (i) => 2350 + i),
     vSpeed: Float64Array.from(index, (i) => (i % 2 === 0 ? 1.5 : -1.5)),
+    gSpeed: Float64Array.from(index, () => 11.5),
+    heading: Float64Array.from(index, (i) => (i * 7) % 360),
     flags: new Uint8Array(pointCount),
   });
 };
@@ -24,6 +26,8 @@ describe('decodeTrack', () => {
     expect(decoded.lat.length).toBe(5);
     expect(decoded.alt[0]).toBeCloseTo(2350, 6);
     expect(decoded.vSpeed[1]).toBeCloseTo(-1.5, 2);
+    expect(decoded.gSpeed[0]).toBeCloseTo(11.5, 2);
+    expect(decoded.heading[1]).toBeCloseTo(7, 2);
   });
 
   it('каналов нет в файле — колонки из NaN, длина сохраняется', () => {
@@ -36,6 +40,8 @@ describe('decodeTrack', () => {
     const decoded = decodeTrack(minimal);
     expect(decoded.alt.every(Number.isNaN)).toBe(true);
     expect(decoded.vSpeed.every(Number.isNaN)).toBe(true);
+    expect(decoded.heading.every(Number.isNaN)).toBe(true);
+    expect(decoded.gSpeed.every(Number.isNaN)).toBe(true);
     expect(Array.from(decoded.flags)).toEqual([0, 0]);
   });
 
@@ -43,8 +49,8 @@ describe('decodeTrack', () => {
     const decoded = decodeTrack(track(3));
     const buffers = transferables(decoded);
 
-    expect(buffers).toHaveLength(6);
-    expect(new Set(buffers).size).toBe(6);
+    expect(buffers).toHaveLength(8);
+    expect(new Set(buffers).size).toBe(8);
     for (const buffer of buffers) expect(buffer.byteLength).toBeGreaterThan(0);
   });
 });

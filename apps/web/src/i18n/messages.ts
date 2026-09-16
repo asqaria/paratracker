@@ -22,6 +22,19 @@ const ru = {
   'viewer.imagery.sentinel2': 'Sentinel-2',
   'viewer.imagery.esri': 'Esri',
   'viewer.points': 'Точек',
+  'viewer.play': 'Проиграть',
+  'viewer.pause': 'Пауза',
+  'viewer.speed': 'Скорость',
+  'viewer.camera': 'Камера',
+  'viewer.camera.chase': 'Chase',
+  'viewer.camera.free': 'Free',
+  'viewer.camera.cockpit': 'Cockpit',
+  'viewer.camera.top': 'Top',
+  'viewer.scrubber': 'Время полёта',
+  'viewer.time': 'Время',
+  'viewer.altitude': 'Высота',
+  'viewer.vario': 'Варио',
+  'viewer.groundSpeed': 'Скорость',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -49,6 +62,19 @@ const en: Messages = {
   'viewer.imagery.sentinel2': 'Sentinel-2',
   'viewer.imagery.esri': 'Esri',
   'viewer.points': 'Points',
+  'viewer.play': 'Play',
+  'viewer.pause': 'Pause',
+  'viewer.speed': 'Speed',
+  'viewer.camera': 'Camera',
+  'viewer.camera.chase': 'Chase',
+  'viewer.camera.free': 'Free',
+  'viewer.camera.cockpit': 'Cockpit',
+  'viewer.camera.top': 'Top',
+  'viewer.scrubber': 'Flight time',
+  'viewer.time': 'Time',
+  'viewer.altitude': 'Altitude',
+  'viewer.vario': 'Vario',
+  'viewer.groundSpeed': 'Speed',
 };
 
 export const messages: Record<Locale, Messages> = { ru, en };
