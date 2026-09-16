@@ -110,8 +110,10 @@ if (parentPort) {
     try {
       const outcome = runPipeline(message, (value) => port.postMessage({ type: 'progress', value }));
       port.postMessage(outcome, outcome.type === 'result' && outcome.result.ok ? [outcome.result.track] : []);
-    } catch {
-      // Подробности останутся в логах основного потока; наружу — только код.
+    } catch (cause) {
+      // Наружу уходит только код, но причина обязана попасть в логи: пустой
+      // catch делал «поток не загрузился» неотличимым от отказа парсера.
+      console.error('pipeline task failed', cause);
       port.postMessage({ type: 'result', result: { ok: false, errorCode: 'internal_error' } });
     }
   });
