@@ -1,3 +1,4 @@
+import { PARSER } from '@skyline/core';
 import { readTrack } from '@skyline/track-format';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -7,6 +8,16 @@ import { fourHourIgc, measureEventLoopLag, NOW, readFixture, repeatedIgc } from 
 const OPTIONS = { size: 1, timeoutS: 30, memoryLimitMb: 512 };
 /** ТЗ §5.2: основной поток обязан отвечать быстрее 200 мс во время обработки. */
 const MAX_MAIN_THREAD_LAG_MS = 200;
+/**
+ * Таймаут теста про отказ по времени. Зажат с двух сторон, и запас нужен с обеих:
+ * трек предельного размера (PARSER.maxPoints) считается ≈1 с, то есть порог
+ * пробивается втрое, а на более медленной машине — с ещё большим запасом;
+ * baseline на восстановленном потоке — это ≈10 мс счёта, и остальное окно уходит
+ * в запас на вытеснение потока. Прежние 50 мс запаса не давали: на общем раннере
+ * CI baseline не получал процессор вовремя и тест падал вторым таймаутом.
+ * Старт потока в окно не входит — таймер заводится после ready.
+ */
+const TIMEOUT_TEST_S = 0.3;
 
 let pool: PipelinePool | undefined;
 afterEach(async () => {
@@ -81,11 +92,9 @@ describe('пул worker_threads', () => {
   });
 
   it('превышение таймаута — код timeout, пул продолжает работать', async () => {
-    // Таймаут выбран так, чтобы огромный трек его гарантированно пробил
-    // (300 000 точек — это доли секунды счёта), а baseline на том же пуле прошёл.
-    pool = createPipelinePool({ ...OPTIONS, timeoutS: 0.05 });
+    pool = createPipelinePool({ ...OPTIONS, timeoutS: TIMEOUT_TEST_S });
 
-    const timedOut = await pool.run({ sourceFormat: 'igc', bytes: repeatedIgc(300_000), now: NOW });
+    const timedOut = await pool.run({ sourceFormat: 'igc', bytes: repeatedIgc(PARSER.maxPoints), now: NOW });
     expect(timedOut).toMatchObject({ ok: false, errorCode: 'timeout' });
 
     const next = await pool.run({ sourceFormat: 'igc', bytes: readFixture('baseline.igc'), now: NOW });
