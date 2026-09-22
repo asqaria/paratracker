@@ -45,15 +45,7 @@ export function FlightViewerPage({ trackUrl }: FlightViewerPageProps) {
         </p>
       }
     >
-      <Scene
-        track={track.track}
-        labels={{
-          imagery: t('viewer.imagery'),
-          points: t('viewer.points'),
-          sentinel2: t('viewer.imagery.sentinel2'),
-          esri: t('viewer.imagery.esri'),
-        }}
-      />
+      <Scene track={track.track} />
     </Suspense>
   );
 }

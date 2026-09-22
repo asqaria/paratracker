@@ -127,7 +127,11 @@ export function createPipelinePool(options: PipelinePoolOptions): PipelinePool {
 
     try {
       await pooled.ready;
-    } catch {
+    } catch (cause) {
+      // Поток не поднялся: чаще всего это несовместимая версия Node (пул грузит
+      // .ts, типы снимает сам Node ≥ 22). Без этой строки наружу шёл голый
+      // internal_error, одинаковый для любой задачи и любого входа.
+      console.error('pipeline worker failed to start', cause);
       job.settle({ ok: false, errorCode: 'internal_error' });
       discard(pooled);
       return;

@@ -1,6 +1,6 @@
-import { LOCALES } from '@skyline/core';
 import { useQuery } from '@tanstack/react-query';
 
+import { LocaleSwitch } from '../i18n/LocaleSwitch';
 import { useLocaleStore, useT } from '../i18n/locale';
 import { fetchHealth, type HealthState } from './fetch-health';
 
@@ -16,26 +16,6 @@ function CheckRow({ label, up, detail }: { label: string; up: boolean; detail?: 
         <span className={up ? 'text-accent' : 'text-danger'}>{t(up ? 'health.up' : 'health.down')}</span>
       </span>
     </li>
-  );
-}
-
-function LocaleSwitch() {
-  const t = useT();
-  const { locale, setLocale } = useLocaleStore();
-  return (
-    <div role="group" aria-label={t('locale.label')} className="flex gap-1 text-sm">
-      {LOCALES.map((option) => (
-        <button
-          key={option}
-          type="button"
-          aria-pressed={option === locale}
-          onClick={() => setLocale(option)}
-          className="rounded px-2 py-1 text-secondary aria-pressed:bg-subtle aria-pressed:text-primary"
-        >
-          {t(`locale.${option}`)}
-        </button>
-      ))}
-    </div>
   );
 }
 
