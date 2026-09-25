@@ -40,6 +40,14 @@ describe('geoidHeightM — EGM96', () => {
     expect(geoidHeightM(10, 180)).toBeCloseTo(geoidHeightM(10, -180), 9);
   });
 
+  it('широта вне [−90, 90] или NaN — NaN, а не исключение (парсер не бросает)', () => {
+    // egm96-universal на 90.0001 падает с RangeError: читает за пределами сетки.
+    expect(geoidHeightM(90.0001, 0)).toBeNaN();
+    expect(geoidHeightM(-91, 0)).toBeNaN();
+    expect(geoidHeightM(Number.NaN, 0)).toBeNaN();
+    expect(geoidHeightM(43, Number.NaN)).toBeNaN();
+  });
+
   it('детерминирован: одна точка — одно значение', () => {
     expect(geoidHeightM(43.1274, 76.4648)).toBe(geoidHeightM(43.1274, 76.4648));
   });

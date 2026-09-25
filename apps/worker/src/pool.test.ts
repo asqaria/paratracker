@@ -39,6 +39,8 @@ describe('пул worker_threads', () => {
     expect(result.pointCount).toBe(960);
     expect(result.analysisLevel).toBe('full');
     expect(result.altitudeSource).toBe('baro');
+    // Датум GNSS-высоты доходит до основного потока — для логов (спек высот).
+    expect(result.gnssAltitudeDatum).toBe('assumed-geoid');
     expect(readTrack(result.track).pointCount).toBe(960);
     expect(result.startedAt).toBe(Date.UTC(2026, 6, 15, 9));
     expect(result.durationS).toBe(959);

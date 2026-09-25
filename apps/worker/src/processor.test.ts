@@ -87,6 +87,7 @@ describe('обработка одного полёта', () => {
     ]);
     const { repository, statuses, ready } = fakeRepository(record());
     const events: FlightStatusResponse[] = [];
+    const processed: Array<{ flightId: string; gnssAltitudeDatum: string }> = [];
 
     const processor = createFlightProcessor({
       pool,
@@ -97,10 +98,13 @@ describe('обработка одного полёта', () => {
         return Promise.resolve();
       },
       now: () => NOW,
+      onReady: (flightId, summary) => processed.push({ flightId, gnssAltitudeDatum: summary.gnssAltitudeDatum }),
     });
     await processor.process(FLIGHT_ID);
 
     expect(statuses).toEqual(['parsing', 'ready']);
+    // Датум — в лог воркера с flightId: так видно треки с датумом по умолчанию (спек высот).
+    expect(processed).toEqual([{ flightId: FLIGHT_ID, gnssAltitudeDatum: 'assumed-geoid' }]);
     const trackKey = ready[0]?.trackObjectKey ?? '';
     expect(trackKey).toMatch(/^tracks\/.*\.track$/);
     expect(readTrack(objects.get(trackKey) ?? new Uint8Array()).pointCount).toBe(960);

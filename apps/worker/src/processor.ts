@@ -1,7 +1,13 @@
 import { gunzip } from 'node:zlib';
 import { promisify } from 'node:util';
 
-import { UNFINISHED_FLIGHT_STATUSES, type FlightErrorCode, type FlightStatusResponse } from '@skyline/core';
+import {
+  UNFINISHED_FLIGHT_STATUSES,
+  type AltitudeSource,
+  type FlightErrorCode,
+  type FlightStatusResponse,
+  type GnssAltitudeDatum,
+} from '@skyline/core';
 import type { FlightRecord, ProcessedFlight } from '@skyline/db';
 
 import { trackObjectKey as defaultTrackObjectKey } from './constants.js';
@@ -33,6 +39,14 @@ export interface FlightProcessorDeps {
   now?: () => number;
   trackObjectKey?: (flightId: string) => string;
   onError?: (error: unknown, flightId: string) => void;
+  /** Полёт обработан — для структурного лога с flightId (датум высоты, источник, точки). */
+  onReady?: (flightId: string, summary: ReadySummary) => void;
+}
+
+export interface ReadySummary {
+  pointCount: number;
+  altitudeSource: AltitudeSource;
+  gnssAltitudeDatum: GnssAltitudeDatum;
 }
 
 export interface FlightProcessor {
@@ -99,6 +113,11 @@ export function createFlightProcessor(deps: FlightProcessorDeps): FlightProcesso
           durationS: Math.round((result.endedAt - result.startedAt) / MS_PER_SECOND),
         });
         await announce(flightId, 'ready', { progress: 1, trackReady: true });
+        deps.onReady?.(flightId, {
+          pointCount: result.pointCount,
+          altitudeSource: result.altitudeSource,
+          gnssAltitudeDatum: result.gnssAltitudeDatum,
+        });
       } catch (error) {
         deps.onError?.(error, flightId);
         await fail(flightId, 'internal_error');

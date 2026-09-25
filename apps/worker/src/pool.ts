@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { Worker } from 'node:worker_threads';
 
-import type { AltitudeSource, AnalysisLevel, FlightErrorCode, SourceFormat } from '@skyline/core';
+import type { AltitudeSource, AnalysisLevel, FlightErrorCode, GnssAltitudeDatum, SourceFormat } from '@skyline/core';
 
 import type { PipelineMessage, PipelineTaskMessage } from './pipeline.worker.js';
 
@@ -23,6 +23,7 @@ export type PipelineResult =
       pointCount: number;
       analysisLevel: AnalysisLevel;
       altitudeSource: AltitudeSource;
+      gnssAltitudeDatum: GnssAltitudeDatum;
       startedAt: number;
       endedAt: number;
       durationS: number;
