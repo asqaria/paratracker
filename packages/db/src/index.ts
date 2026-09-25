@@ -1,5 +1,6 @@
 export { createDatabase, type Database, type DatabaseConnection } from './client.js';
 export { citext, geography, type GeographyKind } from './columns.js';
+export { MIGRATIONS_FOLDER, runMigrations } from './migrate.js';
 export {
   createChannelListener,
   FLIGHT_QUEUED_CHANNEL,

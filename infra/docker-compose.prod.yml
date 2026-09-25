@@ -1,0 +1,122 @@
+# Прод Skyline на одном VPS (ТЗ §11.4, Фаза 0–1). Запуск — infra/DEPLOY.md.
+#
+# Сервер делится с другим проектом: 1 vCPU, 2 ГБ RAM + swap. Поэтому у каждого
+# сервиса жёсткий лимит памяти — при нехватке страдает Skyline, а не соседи, —
+# и воркер обрабатывает по одному полёту. HTTPS и домен — на внешнем Caddy
+# (HTTPS_NETWORK): web подключён к его сети под именем skyline-web.
+# Наружу не открыт ни один порт.
+
+name: skyline
+
+x-server: &server
+  image: ${SKYLINE_SERVER_IMAGE:-skyline-server:latest}
+  env_file: .env
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgis/postgis:17-3.5
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    # Маленький буфер и мало соединений: API, воркер и слушатель NOTIFY — это
+    # десяток соединений, а память сервера общая.
+    command: ["postgres", "-c", "shared_buffers=64MB", "-c", "max_connections=40", "-c", "work_mem=4MB"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 256m
+
+  minio:
+    # Файлы полётов остаются на этом сервере (в РК): в IGC имена пилотов,
+    # закон РК о персданных — ТЗ §11.4. Образ и user — как в infra/docker-compose.yml.
+    image: cgr.dev/chainguard/minio:latest
+    user: "0:0"
+    restart: unless-stopped
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 256m
+
+  minio-init:
+    image: cgr.dev/chainguard/minio-client:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MC_HOST_local: http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000
+    command: ["mb", "--ignore-existing", "local/${S3_BUCKET}"]
+    restart: "no"
+
+  migrate:
+    <<: *server
+    command: ["node", "apps/api/dist/migrate.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    mem_limit: 192m
+
+  api:
+    <<: *server
+    command: ["node", "--max-old-space-size=160", "apps/api/dist/server.js"]
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: 3000
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+    mem_limit: 256m
+
+  worker:
+    <<: *server
+    command: ["node", "--max-old-space-size=160", "apps/worker/dist/main.js"]
+    environment:
+      # Один полёт за раз: поток разбора держит до сотен МБ на большом треке.
+      WORKER_CONCURRENCY: 1
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+    # Поток конвейера ограничен 512 МБ старого поколения (PIPELINE_MEMORY_LIMIT_MB),
+    # плюс основной поток — лимит контейнера с запасом над этим.
+    mem_limit: 768m
+
+  web:
+    image: ${SKYLINE_WEB_IMAGE:-skyline-web:latest}
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      default: {}
+      https:
+        aliases:
+          - skyline-web
+    mem_limit: 64m
+
+volumes:
+  pgdata:
+  miniodata:
+
+networks:
+  https:
+    # Сеть внешнего прокси с HTTPS. На сервере — gateapp_default (Caddy GateApp).
+    external: true
+    name: ${HTTPS_NETWORK:-gateapp_default}

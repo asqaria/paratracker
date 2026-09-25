@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/.turbo
+**/*.tsbuildinfo
+.git
+.github
+.superpowers
+.env
+.env.*
+!.env.example
+# Реальные треки пилотов — личные данные, в образ не попадают.
+tracks
+fixtures
+docs
