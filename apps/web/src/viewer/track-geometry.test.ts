@@ -45,4 +45,24 @@ describe('buildTrackGeometry', () => {
     expect(geometry).toMatchObject({ pointCount: 0 });
     expect(geometry.positions.length).toBe(0);
   });
+
+  it('ходьба до взлёта и после посадки — серым, полёт — по вариометру', () => {
+    const ground: [number, number, number, number] = [139, 151, 168, 255];
+    const geometry = buildTrackGeometry(
+      columns([43.1, 43.2, 43.3, 43.4], [76.9, 77.0, 77.1, 77.2], [2350, 2400, 2450, 2500], [5, 5, -5, -5]),
+      { flight: { takeoff: 1, landing: 2 }, groundRgba: ground },
+    );
+
+    expect(Array.from(geometry.colors)).toEqual([...ground, ...varioRgba(5), ...varioRgba(-5), ...ground]);
+  });
+
+  it('индексы полёта — по исходным точкам, даже если часть точек пропущена', () => {
+    const ground: [number, number, number, number] = [139, 151, 168, 255];
+    const geometry = buildTrackGeometry(
+      columns([Number.NaN, 43.2, 43.3], [76.9, 77.0, 77.1], [2350, 2400, 2450], [5, 5, 5]),
+      { flight: { takeoff: 2, landing: 2 }, groundRgba: ground },
+    );
+
+    expect(Array.from(geometry.colors)).toEqual([...ground, ...varioRgba(5)]);
+  });
 });

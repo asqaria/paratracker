@@ -3,6 +3,7 @@ import {
   BoundingSphere,
   CameraEventType,
   Cartesian3,
+  Cartographic,
   CesiumTerrainProvider,
   Color,
   GeographicTilingScheme,
@@ -17,6 +18,8 @@ import {
   PolylineGeometry,
   PolylineMaterialAppearance,
   Primitive,
+  sampleTerrainMostDetailed,
+  type TerrainProvider,
   Transforms,
   UrlTemplateImageryProvider,
   Viewer,
@@ -42,12 +45,16 @@ import { CAMERA_POSES, DEFAULT_CAMERA_MODE, nearestHeading, smoothHeading, type 
 import type { DecodedTrack } from './decode-track';
 import { setupFlightClock, type FlightClock } from './flight-clock';
 import {
-  DEFAULT_PLAYBACK_SPEED,
-  indexAt,
-  seekBy,
-  timelineOf,
-  type PlaybackSpeed,
-} from './playback';
+  calibrateAltitudes,
+  flightRange,
+  GROUND_CALIBRATION,
+  groundAnchor,
+  groundOffset,
+  groundSegment,
+  settleOnGround,
+  type FlightRange,
+} from './ground-calibration';
+import { DEFAULT_PLAYBACK_SPEED, indexAt, MS_PER_SECOND, type PlaybackSpeed, seekBy, timelineOf } from './playback';
 import {
   imagerySourceById,
   imagerySources,
@@ -91,6 +98,57 @@ const SHADOW_WIDTH_PX = 2;
 const ASSUMED_FPS = 60;
 /** Основная кнопка мыши (PointerEvent.button): ею облетают пилота. */
 const PRIMARY_BUTTON = 0;
+
+/** Высоты рельефа для калибровки ждём не дольше 4 с: медленный Re:Earth не должен задерживать сцену. */
+const CALIBRATION_TIMEOUT_MS = 4000;
+
+/**
+ * Трек для сцены, откалиброванный по земле (ground-calibration.ts): полёт
+ * сдвигается поправками старта и посадки, ходьба до взлёта и после посадки
+ * ложится ровно на рельеф — тот, который сцена рисует. Нет ответа рельефа —
+ * трек как есть. Данные трека не меняются.
+ */
+async function calibratedForScene(
+  terrain: TerrainProvider,
+  track: DecodedTrack,
+  range: FlightRange,
+): Promise<DecodedTrack> {
+  const n = track.pointCount;
+  const onGround: number[] = [];
+  // Рельеф нужен для ходьбы и для плавного перехода в первые/последние секунды полёта.
+  const transitionMs = GROUND_CALIBRATION.transitionS * MS_PER_SECOND;
+  const takeoffMs = track.t[range.takeoff] ?? Number.NaN;
+  const landingMs = track.t[range.landing] ?? Number.NaN;
+  for (let i = 0; i < n; i++) {
+    const tMs = track.t[i] ?? Number.NaN;
+    if (tMs <= takeoffMs + transitionMs || tMs >= landingMs - transitionMs) onGround.push(i);
+  }
+  if (onGround.length === 0) return track;
+
+  const places = onGround.map((i) => Cartographic.fromDegrees(track.lon[i] ?? Number.NaN, track.lat[i] ?? Number.NaN));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), CALIBRATION_TIMEOUT_MS);
+  });
+  const sampled = await Promise.race([sampleTerrainMostDetailed(terrain, places), timeout]).catch(() => null);
+  clearTimeout(timer);
+  if (!sampled) return track;
+
+  const terrainHeights = new Float64Array(n).fill(Number.NaN);
+  onGround.forEach((i, k) => {
+    terrainHeights[i] = sampled[k]?.height ?? Number.NaN;
+  });
+  const [start, end] = (['start', 'end'] as const).map((side) => {
+    const indices = groundSegment(track.t, track.lat, track.lon, track.gSpeed, side);
+    const offset = groundOffset(
+      indices.map((i) => track.alt[i] ?? Number.NaN),
+      indices.map((i) => terrainHeights[i] ?? Number.NaN),
+    );
+    return groundAnchor(track.t, indices, offset, side);
+  });
+  const calibrated = calibrateAltitudes(track.t, track.alt, start ?? null, end ?? null);
+  return { ...track, alt: settleOnGround(track.t, calibrated, terrainHeights, range) };
+}
 
 /** Поправки мыши для следящего режима; у Free их нет — там управляет Cesium. */
 const adjustFor = (mode: CameraMode): CameraAdjust | null => (mode === 'free' ? null : initialAdjust(mode));
@@ -208,7 +266,17 @@ export function Scene({ track, showGlow = false }: SceneProps) {
         const credits = viewer.cesiumWidget.creditContainer;
         if (credits instanceof HTMLElement) credits.style.display = 'none';
 
-        const geometry = buildTrackGeometry(track);
+        // Линия и пилот — по высоте, откалиброванной по земле; телеметрия — по данным.
+        const range = flightRange(track.t, track.lat, track.lon, track.gSpeed);
+        const shown = await calibratedForScene(terrain, track, range);
+        if (disposed) return;
+
+        // Ходьба до взлёта и после посадки — серым: вариометр там — шум GPS на месте.
+        const [r = 0, g = 0, b = 0, a = 0] = Color.fromCssColorString(documentColorTokens().secondary).toBytes();
+        const geometry = buildTrackGeometry(shown, {
+          flight: range,
+          groundRgba: [r, g, b, a],
+        });
         const positions = Cartesian3.fromDegreesArrayHeights(Array.from(geometry.positions));
         const colors: Color[] = [];
         for (let i = 0; i < geometry.pointCount; i++) {
@@ -272,7 +340,7 @@ export function Scene({ track, showGlow = false }: SceneProps) {
           },
         });
 
-        const flightClock = setupFlightClock(viewer, track);
+        const flightClock = setupFlightClock(viewer, shown);
         clockRef.current = flightClock;
 
         // Кадровый обработчик: время → HUD и камера. Состояние React обновляется
