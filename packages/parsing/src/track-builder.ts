@@ -1,6 +1,7 @@
 import {
   PARSER,
   type AltitudeSource,
+  type GnssAltitudeDatum,
   type ParseResult,
   type ParseWarning,
   type ParseWarningCode,
@@ -8,6 +9,7 @@ import {
   type TrackMeta,
 } from '@skyline/core';
 
+import { applyGnssDatum } from './altitude-datum.js';
 import { checkFixDate, isoDate } from './dates.js';
 
 /** Общая часть всех парсеров: опции, журнал предупреждений, накопление точек. */
@@ -187,8 +189,10 @@ export function finishTimedTrack(
   meta: TrackMeta,
   warnings: WarningLog,
   now: number,
+  gnssDatum: GnssAltitudeDatum,
 ): ParseResult {
   const points = builder.finish();
+  meta.gnssAltitudeDatum = applyGnssDatum(points, gnssDatum);
   const altitudeSource = summarizeAltitudes(points, warnings);
 
   const check = checkFixDate(points.t[0] ?? Number.NaN, now);

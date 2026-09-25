@@ -1,6 +1,7 @@
 import { pointAt, type ParsedTrack, type ParseWarningCode } from '@skyline/core';
 import { describe, expect, it } from 'vitest';
 
+import { geoidHeightM } from './geoid.js';
 import { parseIgc } from './igc.js';
 import {
   defineFixtureChecks,
@@ -39,7 +40,9 @@ describe('B-запись', () => {
     expect(point.t).toBe(Date.UTC(2026, 6, 15, 9, 40, 9));
     expectDegrees(point.lat, 46.776933333, 'lat'); // 46° 46.616′
     expectDegrees(point.lon, 13.149833333, 'lon'); // 13° 08.990′
-    expect(point).toMatchObject({ altBaro: 1752, altGnss: 1889, valid: true });
+    expect(point).toMatchObject({ altBaro: 1752, valid: true });
+    // Без HFALG высота над геоидом (CIVL 7H §3.2.1) → в эллипсоид.
+    expect(point.altGnss).toBeCloseTo(1889 + geoidHeightM(point.lat, point.lon), 9);
   });
 
   it('строка и байты дают один результат', () => {
@@ -138,6 +141,8 @@ describe('заголовки и высоты', () => {
     expect(meta).toEqual({
       date: '2026-07-15',
       dateSource: 'header',
+      // baseline.igc без HFALG — высота над геоидом (CIVL 7H §3.2.1).
+      gnssAltitudeDatum: 'assumed-geoid',
       logger: 'XCT Skyline fixture generator',
       pilot: 'Test Pilot',
       glider: 'Ozone Zeno 2',
@@ -230,5 +235,53 @@ describe('отказ по файлу целиком', () => {
       code: 'no_fixes',
       warnings: [{ code: 'malformed_fix', line: 3 }],
     });
+  });
+});
+
+describe('датум GNSS-высоты (HF ALG)', () => {
+  const N = geoidHeightM(46.776933333333, 13.149833333333);
+  const altGnssOf = (...headers: string[]): number | null =>
+    pointAt(parse(igc(...HEADER, ...headers, REFERENCE_FIX)).points, 0).altGnss;
+
+  it.each([
+    ['HFALG:GEO', 'geoid'],
+    ['HFALGALTGPS:GEO', 'geoid'],
+    ['HFALG:ELL', 'ellipsoid'],
+    ['HFALGALTGPS:NKN', 'assumed-geoid'],
+  ] as const)('%s → meta %s', (header, datum) => {
+    expect(parse(igc(...HEADER, header, REFERENCE_FIX)).meta.gnssAltitudeDatum).toBe(datum);
+  });
+
+  it('GEO — высота переводится в эллипсоид, ELL — остаётся', () => {
+    expect(altGnssOf('HFALG:GEO')).toBeCloseTo(1889 + N, 6);
+    expect(altGnssOf('HFALG:ELL')).toBe(1889);
+  });
+
+  it('NIL — GNSS-высоты нет, даже если в B-записи число', () => {
+    const track = parse(igc(...HEADER, 'HFALG:NIL', REFERENCE_FIX));
+    expect(pointAt(track.points, 0).altGnss).toBeNull();
+    expect(track.meta.gnssAltitudeDatum).toBe('none');
+    expect(codes(track)).toContain('no_gnss_altitude');
+  });
+
+  it('заголовок после B-записей — действует на весь трек', () => {
+    const track = parse(igc(...HEADER, REFERENCE_FIX, 'HFALG:ELL'));
+    expect(pointAt(track.points, 0).altGnss).toBe(1889);
+  });
+
+  it('два заголовка — действует первый', () => {
+    expect(altGnssOf('HFALG:ELL', 'HFALG:GEO')).toBe(1889);
+  });
+
+  it('незнакомый код — геоид и предупреждение со строкой', () => {
+    const track = parse(igc(...HEADER, 'HFALG:WGS', REFERENCE_FIX));
+    expect(track.meta.gnssAltitudeDatum).toBe('assumed-geoid');
+    expect(track.warnings).toContainEqual({ code: 'unknown_altitude_datum', line: 3 });
+  });
+
+  it('прибор не пишет GNSS-высоту (00000) — NaN, а не высота геоида', () => {
+    const track = parse(igc(...HEADER, 'B0940094646616N01308990EA0175200000'));
+    expect(pointAt(track.points, 0).altGnss).toBeNull();
+    expect(track.meta.gnssAltitudeDatum).toBe('none');
   });
 });

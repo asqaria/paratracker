@@ -58,6 +58,7 @@ const processor = createFlightProcessor({
   },
   notify: (event) => notifyFlightStatus(database.db, event),
   onError: (error, flightId) => logger.error({ err: error, flightId }, 'flight processing failed'),
+  onReady: (flightId, summary) => logger.info({ flightId, ...summary }, 'flight ready'),
 });
 
 const queue = createFlightQueue({

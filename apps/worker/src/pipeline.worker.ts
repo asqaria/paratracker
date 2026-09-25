@@ -1,7 +1,7 @@
 import { parentPort } from 'node:worker_threads';
 
 import { cleanAndDerive } from '@skyline/analysis';
-import type { FlightErrorCode, ParsedTrack, ParseResult, SourceFormat } from '@skyline/core';
+import type { FlightErrorCode, GnssAltitudeDatum, ParsedTrack, ParseResult, SourceFormat } from '@skyline/core';
 import { parseGpx, parseIgc, parseKml } from '@skyline/parsing';
 import { writeTrack } from '@skyline/track-format';
 
@@ -24,6 +24,8 @@ export interface PipelineSuccess {
   pointCount: number;
   analysisLevel: 'full' | 'basic';
   altitudeSource: 'baro' | 'gnss';
+  /** Датум GNSS-высоты в исходном файле — для логов: assumed-geoid видно по прибору (спек высот). */
+  gnssAltitudeDatum: GnssAltitudeDatum;
   /** UNIX мс первой и последней точки. */
   startedAt: number;
   endedAt: number;
@@ -93,6 +95,8 @@ export function runPipeline(message: PipelineTaskMessage, onProgress: (value: nu
       pointCount: points.t.length,
       analysisLevel: derived.analysisLevel,
       altitudeSource: derived.altitudeSource,
+      // Парсер заполняет датум всегда; 'none' — на случай парсера, который его не выставил.
+      gnssAltitudeDatum: track.meta.gnssAltitudeDatum ?? 'none',
       startedAt,
       endedAt,
       durationS: Math.round((endedAt - startedAt) / MS_PER_SECOND),

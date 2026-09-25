@@ -25,6 +25,8 @@ export const PARSE_WARNING_CODES = [
   'date_missing',
   /** Датум не WGS84. */
   'unexpected_datum',
+  /** IGC HFALG с незнакомым кодом — высота принята над геоидом (CIVL 7H §3.2.1). */
+  'unknown_altitude_datum',
   /** Барометрической высоты нет — вариометр по GNSS, менее точен (ТЗ §3.3). */
   'no_baro_altitude',
   /** GNSS-высоты нет. */

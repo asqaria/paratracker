@@ -1,4 +1,4 @@
-import type { ParseFailureCode, ParseResult } from '@skyline/core';
+import type { GnssAltitudeDatum, ParseFailureCode, ParseResult } from '@skyline/core';
 import { unzipSync } from 'fflate';
 
 import { parseIsoTime } from './dates.js';
@@ -23,6 +23,8 @@ import { lineLocator, scanXml, type XmlHandler } from './xml.js';
 
 /** Сигнатура локального заголовка ZIP: `PK\x03\x04`. */
 const ZIP_SIGNATURE = [0x50, 0x4b, 0x03, 0x04] as const;
+/** KML: altitudeMode absolute — «relative to sea level» (OGC KML 2.2), EGM96. */
+const KML_ALTITUDE_DATUM: GnssAltitudeDatum = 'geoid';
 const KMZ_MAIN_DOCUMENT = 'doc.kml';
 const KML_EXTENSION = '.kml';
 const ABSOLUTE_ALTITUDE = 'absolute';
@@ -357,5 +359,5 @@ export function parseKml(input: string | Uint8Array, options: ParseOptions): Par
     }
   }
 
-  return finishTimedTrack(builder, { date: null, dateSource: null }, warnings, options.now);
+  return finishTimedTrack(builder, { date: null, dateSource: null }, warnings, options.now, KML_ALTITUDE_DATUM);
 }

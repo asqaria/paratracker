@@ -132,9 +132,11 @@ export default defineConfig(
   },
   {
     // fflate — распаковка KMZ (zip): чистый JS без зависимостей, работает в worker и в браузере.
+    // egm96-universal — сетка геоида EGM96 (NGA, 15′) и её интерполяция: чистый JS, данные
+    // внутри модуля, без сети и ФС. Пересчёт GNSS-высот геоид → эллипсоид (спек высот).
     files: ['packages/parsing/**'],
     rules: {
-      ...restrict(allowOnly('@skyline.core|fflate', PURE_MESSAGE)),
+      ...restrict(allowOnly('@skyline.core|fflate|egm96-universal', PURE_MESSAGE)),
       'no-restricted-globals': ['error', ...IO_GLOBALS],
     },
   },

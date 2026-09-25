@@ -1,4 +1,4 @@
-import type { ParseResult, TrackMeta } from '@skyline/core';
+import type { GnssAltitudeDatum, ParseResult, TrackMeta } from '@skyline/core';
 
 import { parseIsoTime } from './dates.js';
 import { decodeUtf8, inputSize, parseDecimal, stripBom } from './text.js';
@@ -17,6 +17,8 @@ import { lineLocator, readAttributes, scanXml, type XmlHandler } from './xml.js'
  * Баровысоты в GPX нет — altitudeSource 'gnss'. Маршруты (rte) и путевые точки (wpt) не трек.
  */
 
+/** GPX 1.1 <ele> — «Elevation (in meters)»; Garmin и телефоны пишут над уровнем моря. */
+const GPX_ELEVATION_DATUM: GnssAltitudeDatum = 'geoid';
 /** Дочерние элементы trkpt, текст которых нужен. */
 const POINT_FIELDS = new Set(['ele', 'time', 'fix', 'sat']);
 /** GPX <fix>: none и 2d — не 3D-фикс. */
@@ -166,5 +168,5 @@ export function parseGpx(input: string | Uint8Array, options: ParseOptions): Par
     return { ok: false, code, warnings: warnings.list() };
   }
 
-  return finishTimedTrack(builder, reader.meta, warnings, options.now);
+  return finishTimedTrack(builder, reader.meta, warnings, options.now, GPX_ELEVATION_DATUM);
 }

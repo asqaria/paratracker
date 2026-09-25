@@ -2,6 +2,7 @@ import { pointAt, type ParsedTrack, type ParseWarningCode } from '@skyline/core'
 import { strToU8, zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
 
+import { geoidHeightM } from './geoid.js';
 import { parseKml } from './kml.js';
 import { defineFixtureChecks, fixtureCases, NOW, readFixture, readFixtureText, unwrap } from './testing/fixtures.js';
 import type { ParseOptions } from './track-builder.js';
@@ -127,4 +128,17 @@ describe('KML: отказ по файлу целиком', () => {
       expect(parseKml(text, { now: NOW })).toMatchObject({ ok: false, code: 'no_fixes' });
     },
   );
+});
+
+describe('датум высоты', () => {
+  it('altitudeMode absolute — над уровнем моря: переводится в эллипсоид, meta geoid', () => {
+    const track = parse(
+      '<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">' +
+        '<Document><Placemark><gx:Track><altitudeMode>absolute</altitudeMode>' +
+        '<when>2026-07-15T09:00:00Z</when><gx:coord>76.4648 43.1274 1935</gx:coord>' +
+        '</gx:Track></Placemark></Document></kml>',
+    );
+    expect(track.meta.gnssAltitudeDatum).toBe('geoid');
+    expect(pointAt(track.points, 0).altGnss).toBeCloseTo(1935 + geoidHeightM(43.1274, 76.4648), 9);
+  });
 });
