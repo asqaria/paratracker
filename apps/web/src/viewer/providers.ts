@@ -5,8 +5,11 @@
  */
 
 export interface AttributionEntry {
+  /** Дословно, как требует лицензия провайдера, — не переводится. */
   text: string;
   href?: string;
+  /** Подпись перед записью («Рельеф:» / «Подложка:») — переводит сцена по ключу. */
+  label?: 'terrain' | 'imagery';
 }
 
 export const IMAGERY_IDS = ['sentinel2', 'esri'] as const;
@@ -70,7 +73,7 @@ export function terrainSource(config: ViewerConfig): TerrainSource {
   return {
     url: config.terrainUrl,
     attribution: [
-      { text: 'Рельеф: Re:Earth Terrain', href: 'https://terrain.reearth.land/' },
+      { label: 'terrain', text: 'Re:Earth Terrain', href: 'https://terrain.reearth.land/' },
       { text: 'Mapterhorn DEM, CC BY 4.0' },
     ],
   };
@@ -85,7 +88,7 @@ export function imagerySources(config: ViewerConfig): ImagerySource[] {
       layer: config.imageryWmtsLayer,
       maximumLevel: SENTINEL_MAX_LEVEL,
       attribution: [
-        { text: 'Подложка: Sentinel-2 cloudless', href: 'https://s2maps.eu' },
+        { label: 'imagery', text: 'Sentinel-2 cloudless', href: 'https://s2maps.eu' },
         { text: 'by EOX IT Services GmbH (Contains modified Copernicus Sentinel data), CC BY 4.0' },
       ],
     },
@@ -98,7 +101,7 @@ export function imagerySources(config: ViewerConfig): ImagerySource[] {
       url: config.esriTileUrl,
       maximumLevel: ESRI_MAX_LEVEL,
       attribution: [
-        { text: 'Подложка: Esri World Imagery — Esri, Maxar, Earthstar Geographics' },
+        { label: 'imagery', text: 'Esri World Imagery — Esri, Maxar, Earthstar Geographics' },
         { text: 'Powered by Esri' },
       ],
     });

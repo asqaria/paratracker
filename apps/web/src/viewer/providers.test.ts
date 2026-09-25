@@ -49,4 +49,13 @@ describe('конфиг провайдеров', () => {
     expect(sentinel?.attribution.map((entry) => entry.text).join(' ')).toMatch(/Sentinel-2 cloudless.*EOX.*CC BY 4\.0/s);
     expect(esri?.attribution.map((entry) => entry.text).join(' ')).toMatch(/Powered by Esri/);
   });
+
+  it('подпись «Рельеф» / «Подложка» — ключ для i18n, а не текст: переводит сцена', () => {
+    const config = readViewerConfig(ENV);
+    const entries = [terrainSource(config), ...imagerySources(config)].map((source) => source.attribution);
+
+    expect(entries.map((attribution) => attribution[0]?.label)).toEqual(['terrain', 'imagery', 'imagery']);
+    // Текст провайдеров — дословный по лицензиям, без русских вставок.
+    expect(entries.flat().map((entry) => entry.text).join(' ')).not.toMatch(/[А-Яа-яЁё]/);
+  });
 });
