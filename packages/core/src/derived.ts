@@ -71,3 +71,25 @@ export interface FlightSummary {
   /** Наибольший непрерывный прирост высоты max(alt[j] − alt[i]), i < j, м; 0 — только снижение. */
   maxGainM: number;
 }
+
+/**
+ * Круг (вираж), ТЗ §6.2. Индексы — точки сетки 1 Гц: курс от startIndex
+ * повернул на 360° к endIndex. Координаты — WGS84, высоты — метры.
+ */
+export interface Circle {
+  startIndex: number;
+  endIndex: number;
+  /** UTC, мс. */
+  startTimeMs: number;
+  endTimeMs: number;
+  periodS: number;
+  /** cw — по часовой (вправо), ccw — против. */
+  direction: 'cw' | 'ccw';
+  /** Центр — среднее координат за оборот. */
+  centerLat: number;
+  centerLon: number;
+  /** Медиана расстояний от точек оборота до центра, м. */
+  radiusM: number;
+  /** Набор высоты за круг, м (отрицательный — снижение). */
+  gainM: number;
+}

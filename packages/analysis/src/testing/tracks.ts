@@ -20,6 +20,9 @@ export interface Trajectory {
   circleRadiusM: number;
   turnDirection: 'cw' | 'ccw';
   turnRateDegS: number;
+  /** Снос спирали ветром, м/с (восток, север). */
+  climbDriftEastMs: number;
+  climbDriftNorthMs: number;
   glideGroundSpeedMs: number;
   glideTrackDeg: number;
   metresPerDegreeLat: number;

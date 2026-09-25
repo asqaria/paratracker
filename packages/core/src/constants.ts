@@ -54,6 +54,55 @@ export const MOTION = {
   minMovementForHeadingM: 1,
 } as const;
 
+/** Тип ЛА: пороги детекции у них разные — радиусы виражей и скорости (CLAUDE.md). */
+export const AIRCRAFT_TYPES = ['paraglider', 'hangglider', 'sailplane'] as const;
+export type AircraftType = (typeof AIRCRAFT_TYPES)[number];
+
+export interface CircleLimits {
+  minRadiusM: number;
+  maxRadiusM: number;
+  minPeriodS: number;
+  maxPeriodS: number;
+}
+
+/**
+ * Детекция кругов, ТЗ §6.2: пределы радиуса и периода по типу ЛА.
+ * Оценка вне пределов — не вираж термика (плавный разворот, ошибка GPS).
+ */
+export const CIRCLE: Record<AircraftType, CircleLimits> & {
+  fullTurnDeg: number;
+  counterTurnNoiseDeg: number;
+  closureToleranceDeg: number;
+} = {
+  /** ТЗ §6.2: радиус 15–120 м, период 10–35 с. */
+  paraglider: { minRadiusM: 15, maxRadiusM: 120, minPeriodS: 10, maxPeriodS: 35 },
+  /**
+   * Предварительно, до сверки на реальных треках. Координированный вираж
+   * r = v²/(g·tg крена): дельтаплан 40–60 км/ч при крене 25–50° — 10–60 м,
+   * круг 10–30 с; верх радиуса с запасом на пологие круги в слабом термике.
+   */
+  hangglider: { minRadiusM: 15, maxRadiusM: 150, minPeriodS: 10, maxPeriodS: 40 },
+  /**
+   * Предварительно, до сверки на реальных треках. Планер 80–110 км/ч при крене
+   * 30–50°: r = 45–165 м, круг 15–35 с.
+   */
+  sailplane: { minRadiusM: 40, maxRadiusM: 250, minPeriodS: 12, maxPeriodS: 45 },
+  /** Полный круг, градусы. */
+  fullTurnDeg: 360,
+  /**
+   * Поворот в обратную сторону меньше этого за шаг — шум, а не смена
+   * направления (ТЗ §6.2). IGC округляет координаты до 0.001′ ≈ 1.85 м: на хорде
+   * 10 м (10 м/с) это до 10° курса. Настоящая восьмёрка разворачивается быстрее
+   * (18 °/с при круге 20 с), а медленнее — уже за пределом периода 35 с.
+   */
+  counterTurnNoiseDeg: 10,
+  /**
+   * Сумма поворотов курса — сумма чисел с плавающей точкой: ровный круг из
+   * 20 шагов по 18° даёт 359.99999999999994. Допуск много меньше шага курса.
+   */
+  closureToleranceDeg: 1e-6,
+};
+
 export const TIME = {
   msPerSecond: 1000,
   secondsPerDay: 86_400,
