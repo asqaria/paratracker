@@ -15,6 +15,7 @@ import {
   type PlaybackSpeed,
   type TrackTimeline,
 } from './playback';
+import { TRACK_SHOWN, type TrackShown } from './track-progress';
 import { groundSpeed as formatGroundSpeed, metres, verticalSpeed } from './units';
 import { varioCss } from './vario-palette';
 
@@ -30,6 +31,9 @@ export interface TimelinePanelProps {
   playing: boolean;
   speed: PlaybackSpeed;
   cameraMode: CameraMode;
+  /** Весь трек или только пройденный путь. */
+  trackShown: TrackShown;
+  onTrackShown: (shown: TrackShown) => void;
   onTogglePlay: () => void;
   onSeekTo: (timeMs: number) => void;
   onSpeed: (speed: PlaybackSpeed) => void;
@@ -162,6 +166,15 @@ export function TimelinePanel(props: TimelinePanelProps) {
           ))}
         </select>
 
+        <button
+          type="button"
+          aria-label={`${t('viewer.trackShown')}: ${t(`viewer.trackShown.${props.trackShown}`)}`}
+          onClick={() => props.onTrackShown(props.trackShown === 'all' ? 'flown' : 'all')}
+          className="hidden min-h-11 rounded bg-subtle px-3 compact:block"
+        >
+          {t(`viewer.trackShown.${props.trackShown}`)}
+        </button>
+
         <div role="group" aria-label={t('viewer.speed')} className="flex gap-1 compact:hidden">
           {PLAYBACK_SPEEDS.map((value) => (
             <button
@@ -186,6 +199,20 @@ export function TimelinePanel(props: TimelinePanelProps) {
               className="rounded px-2 py-1 text-secondary aria-pressed:bg-subtle aria-pressed:text-primary"
             >
               {t(`viewer.camera.${mode}`)}
+            </button>
+          ))}
+        </div>
+
+        <div role="group" aria-label={t('viewer.trackShown')} className="flex gap-1 compact:hidden">
+          {TRACK_SHOWN.map((shown) => (
+            <button
+              key={shown}
+              type="button"
+              aria-pressed={shown === props.trackShown}
+              onClick={() => props.onTrackShown(shown)}
+              className="rounded px-2 py-1 text-secondary aria-pressed:bg-subtle aria-pressed:text-primary"
+            >
+              {t(`viewer.trackShown.${shown}`)}
             </button>
           ))}
         </div>

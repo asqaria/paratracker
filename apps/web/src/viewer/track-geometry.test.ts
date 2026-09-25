@@ -40,6 +40,13 @@ describe('buildTrackGeometry', () => {
     expect(Array.from(geometry.positions)).toEqual([76.9, 43.1, 2350]);
   });
 
+  it('у каждой вершины — индекс исходной точки: по нему «пройденный путь» режет линию', () => {
+    const geometry = buildTrackGeometry(
+      columns([43.1, Number.NaN, 43.3, 43.4], [76.9, 77.0, 77.1, 77.2], [2350, 2400, 2450, 2500], [1, 1, 1, 1]),
+    );
+    expect(Array.from(geometry.sourceIndex)).toEqual([0, 2, 3]);
+  });
+
   it('пустой трек — пустые массивы, а не падение', () => {
     const geometry = buildTrackGeometry(columns([], [], [], []));
     expect(geometry).toMatchObject({ pointCount: 0 });

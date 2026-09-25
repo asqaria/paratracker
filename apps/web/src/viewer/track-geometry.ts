@@ -21,6 +21,8 @@ export interface TrackGeometry {
   colors: Uint8Array;
   /** Долгота и широта парами для тени на рельефе (ТЗ §7.2). */
   groundPositions: Float64Array;
+  /** Индекс исходной точки трека для каждой вершины: точки без координат пропущены. */
+  sourceIndex: Int32Array;
   pointCount: number;
 }
 
@@ -45,6 +47,7 @@ export function buildTrackGeometry(track: DecodedTrackColumns, ground?: GroundSt
   const positions = new Float64Array(count * COORDS_PER_POSITION);
   const groundPositions = new Float64Array(count * COORDS_PER_GROUND);
   const colors = new Uint8Array(count * CHANNELS_PER_COLOR);
+  const sourceIndex = new Int32Array(count);
 
   let kept = 0;
   for (let i = 0; i < count; i++) {
@@ -58,6 +61,7 @@ export function buildTrackGeometry(track: DecodedTrackColumns, ground?: GroundSt
     positions[kept * COORDS_PER_POSITION + 2] = alt;
     groundPositions[kept * COORDS_PER_GROUND] = lon;
     groundPositions[kept * COORDS_PER_GROUND + 1] = lat;
+    sourceIndex[kept] = i;
 
     const onGround = ground !== undefined && (i < ground.flight.takeoff || i > ground.flight.landing);
     const [r, g, b, a] = onGround ? ground.groundRgba : varioRgba(track.vSpeed[i] ?? Number.NaN);
@@ -72,6 +76,7 @@ export function buildTrackGeometry(track: DecodedTrackColumns, ground?: GroundSt
     positions: positions.slice(0, kept * COORDS_PER_POSITION),
     colors: colors.slice(0, kept * CHANNELS_PER_COLOR),
     groundPositions: groundPositions.slice(0, kept * COORDS_PER_GROUND),
+    sourceIndex: sourceIndex.slice(0, kept),
     pointCount: kept,
   };
 }

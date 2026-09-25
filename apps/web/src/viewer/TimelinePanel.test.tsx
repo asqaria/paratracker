@@ -34,7 +34,7 @@ const track = (): DecodedTrack => {
 
 const noop = (): void => {};
 
-const render = (timeMs: number, playing: boolean): string => {
+const render = (timeMs: number, playing: boolean, trackShown: 'all' | 'flown' = 'all'): string => {
   const decoded = track();
   return renderToString(
     <TimelinePanel
@@ -44,6 +44,8 @@ const render = (timeMs: number, playing: boolean): string => {
       playing={playing}
       speed={4}
       cameraMode="chase"
+      trackShown={trackShown}
+      onTrackShown={noop}
       onTogglePlay={noop}
       onSeekTo={noop}
       onSpeed={noop}
@@ -99,5 +101,19 @@ describe('TimelinePanel', () => {
       expect(html).toMatch(new RegExp(`<option value="${mode}"`));
     }
     expect(html).toMatch(/<option value="chase" selected="">/);
+  });
+
+  it('трек: «Весь / Пройденный» — две кнопки на десктопе, одна по кругу на телефоне', () => {
+    const shown = messages[locale]['viewer.trackShown'];
+    const all = messages[locale]['viewer.trackShown.all'];
+    const flown = messages[locale]['viewer.trackShown.flown'];
+
+    const html = render(START_MS, false, 'all');
+    expect(html).toMatch(new RegExp(`role="group" aria-label="${shown}"`));
+    expect(html).toMatch(new RegExp(`aria-pressed="true"[^>]*>${all}<`));
+    expect(html).toMatch(new RegExp(`aria-pressed="false"[^>]*>${flown}<`));
+    expect(html).toMatch(new RegExp(`<button[^>]*aria-label="${shown}: ${all}"`));
+
+    expect(render(START_MS, false, 'flown')).toMatch(new RegExp(`<button[^>]*aria-label="${shown}: ${flown}"`));
   });
 });
