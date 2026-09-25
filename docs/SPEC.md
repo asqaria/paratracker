@@ -176,7 +176,7 @@ type TrackPoint = {
   lat:     number;   // градусы, WGS84
   lon:     number;   // градусы, WGS84
   altBaro: number | null;  // м, барометрическая (QNE/ISA)
-  altGnss: number | null;  // м, эллипсоидальная или геоидная — см. ниже
+  altGnss: number | null;  // м, над эллипсоидом WGS84 — парсер пересчитывает из геоида (HFALG, GPX, KML)
   valid:   boolean;  // 3D-фикс
   fxa?:    number;   // точность, м
   siu?:    number;   // спутники
