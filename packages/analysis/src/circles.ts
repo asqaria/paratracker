@@ -162,40 +162,103 @@ const withinLimits = (circle: Circle, limits: CircleLimits): boolean =>
   circle.periodS >= limits.minPeriodS &&
   circle.periodS <= limits.maxPeriodS;
 
-/** Поворот курса на шаге i (от сегмента i−1 к сегменту i); NaN — поворота нет. */
-function turnAt(points: CircleColumns, i: number): number {
-  const stepMs = (points.t[i] ?? Number.NaN) - (points.t[i - 1] ?? Number.NaN);
-  if (!(stepMs <= GRID_STEP_MS)) return Number.NaN;
-  return normalizeSignedDegrees((points.heading[i] ?? Number.NaN) - (points.heading[i - 1] ?? Number.NaN));
+/**
+ * Поворот курса по шагам. turn[i] — поворот от последнего наблюдаемого курса
+ * до курса сегмента i, градусы (плюс — по часовой); NaN — шаг i пропущен
+ * (курс не наблюдаем) или с него начинается новое накопление (broken[i] = 1).
+ * noise[i] — допуск отката курса на этом шаге (CIRCLE.positionQuantumM).
+ *
+ * Курс не наблюдаем, если его нет (NaN) или шаг короче minReliableStepM: в
+ * сильном ветре пилот раз за круг почти стоит над землёй, и курс по земле там —
+ * шум на десятки градусов. Через такие шаги (не дольше maxBridgeS) поворот
+ * считается от последнего наблюдаемого курса, а направление берётся от
+ * текущего виража: через «стоянку» курс проворачивается быстро и больше чем
+ * на 180°, кратчайший поворот дал бы обратный знак.
+ */
+export interface HeadingTurns {
+  turn: Float64Array;
+  broken: Uint8Array;
+  noise: Float64Array;
+}
+
+export function headingTurns(points: CircleColumns): HeadingTurns {
+  const n = points.t.length;
+  const turn = new Float64Array(n).fill(Number.NaN);
+  const broken = new Uint8Array(n);
+  const noise = new Float64Array(n).fill(CIRCLE.counterTurnNoiseDeg);
+  const stepM = (i: number): number =>
+    haversineDistance(
+      points.lat[i] ?? Number.NaN,
+      points.lon[i] ?? Number.NaN,
+      points.lat[i + 1] ?? Number.NaN,
+      points.lon[i + 1] ?? Number.NaN,
+    );
+  const observable = (i: number): boolean =>
+    Number.isFinite(points.heading[i] ?? Number.NaN) && stepM(i) >= CIRCLE.minReliableStepM;
+
+  let last = n > 0 && observable(0) ? 0 : -1;
+  let lastSign = 0;
+  if (n > 0) broken[0] = 1;
+  for (let i = 1; i < n; i++) {
+    const gridGap = !((points.t[i] ?? Number.NaN) - (points.t[i - 1] ?? Number.NaN) <= GRID_STEP_MS);
+    const bridgeTooLong =
+      last >= 0 && (points.t[i] ?? Number.NaN) - (points.t[last] ?? Number.NaN) > CIRCLE.maxBridgeS * TIME.msPerSecond;
+    if (gridGap || last < 0 || bridgeTooLong) {
+      broken[i] = 1;
+      last = observable(i) ? i : -1;
+      lastSign = 0;
+      continue;
+    }
+    if (!observable(i)) continue;
+    let d = normalizeSignedDegrees((points.heading[i] ?? Number.NaN) - (points.heading[last] ?? Number.NaN));
+    if (i - last > 1 && lastSign !== 0 && Math.sign(d) === -lastSign) d += lastSign * CIRCLE.fullTurnDeg;
+    turn[i] = d;
+    const shortest = Math.min(stepM(i), stepM(last));
+    noise[i] = Math.max(CIRCLE.counterTurnNoiseDeg, Math.atan(CIRCLE.positionQuantumM / shortest) / DEG);
+    if (d !== 0) lastSign = Math.sign(d);
+    last = i;
+  }
+  return { turn, broken, noise };
+}
+
+/** Поворот на шаге для накопления: пропущенный шаг ничего не добавляет. */
+function turnOf(turns: HeadingTurns, i: number): number {
+  const value = turns.turn[i] ?? Number.NaN;
+  return Number.isFinite(value) ? value : 0;
 }
 
 /** Круги трека по порядку времени; limits — пределы типа ЛА (CIRCLE.paraglider и др.). */
 export function detectCircles(points: CircleColumns, limits: CircleLimits): Circle[] {
   const circles: Circle[] = [];
   const minTurnPerStep = minTurningRate(limits) * CLEAN.resampleIntervalS;
+  const turns = headingTurns(points);
   let start = -1;
   let sum = 0;
+  let previous = -1;
 
   for (let i = 1; i < points.t.length; i++) {
-    const turn = turnAt(points, i);
-    if (Number.isNaN(turn)) {
+    if (turns.broken[i]) {
       start = -1;
       sum = 0;
+      previous = i;
       continue;
     }
-    // Новое накопление — с сегмента i−1; и при смене направления поворота тоже.
-    const reversed = sum !== 0 && Math.sign(turn) === -Math.sign(sum) && Math.abs(turn) > CIRCLE.counterTurnNoiseDeg;
+    const turn = turns.turn[i] ?? Number.NaN;
+    if (Number.isNaN(turn)) continue;
+    // Новое накопление — с предыдущего наблюдаемого сегмента; и при смене направления.
+    const reversed = sum !== 0 && Math.sign(turn) === -Math.sign(sum) && Math.abs(turn) > (turns.noise[i] ?? 0);
     if (start < 0 || reversed) {
-      start = i - 1;
+      start = previous;
       sum = 0;
     }
+    previous = i;
     sum += turn;
 
     while (Math.abs(sum) >= FULL_TURN) {
       // Прямая в начале окна — не часть круга.
       const side = Math.sign(sum);
-      while (start < i - 1 && turnAt(points, start + 1) * side < minTurnPerStep) {
-        sum -= turnAt(points, start + 1);
+      while (start < i - 1 && turnOf(turns, start + 1) * side < minTurnPerStep) {
+        sum -= turnOf(turns, start + 1);
         start += 1;
       }
       if (Math.abs(sum) < FULL_TURN) break;
@@ -210,7 +273,7 @@ export function detectCircles(points: CircleColumns, limits: CircleLimits): Circ
         break;
       }
       // Не круг: окно сжимается с начала, пока в нём ещё полный оборот.
-      sum -= turnAt(points, start + 1);
+      sum -= turnOf(turns, start + 1);
       start += 1;
     }
   }

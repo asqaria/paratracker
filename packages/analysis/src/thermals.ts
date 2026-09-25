@@ -1,10 +1,11 @@
 import { GEO, THERMAL, TIME, type Circle, type CircleLimits, type Thermal, type ThermalStrength } from '@skyline/core';
 
-import { minTurningRate, type CircleColumns } from './circles.js';
-import { normalizeSignedDegrees } from './geo.js';
+import { headingTurns, minTurningRate, type CircleColumns, type HeadingTurns } from './circles.js';
 
 /**
  * ТЗ §6.3: термик — круги подряд (разрыв между ними ≤ 15 с) с набором.
+ * Разрыв дольше, но с набором (до THERMAL.maxClimbingGapS), — тот же термик:
+ * пилот выпал из ядра и ищет его, не выходя из подъёма.
  *
  * «≥ 1.5 круга» — а детекция кругов (§6.2) засчитывает только полные. Поэтому
  * к группе кругов добавляется доворот: до первого полного круга и после
@@ -22,11 +23,10 @@ export interface ThermalColumns extends CircleColumns {
 const DEG = Math.PI / 180;
 const FULL_TURN_DEG = 360;
 
-/** Поворот курса на шаге i в градусах за секунду; NaN — нет курса или разрыв. */
-function stepRateAt(points: CircleColumns, i: number): number {
+/** Поворот курса на шаге i в градусах за секунду шага; NaN — шаг пропущен или разрыв. */
+function stepRateAt(points: CircleColumns, turns: HeadingTurns, i: number): number {
   const dtS = ((points.t[i] ?? Number.NaN) - (points.t[i - 1] ?? Number.NaN)) / TIME.msPerSecond;
-  const turn = normalizeSignedDegrees((points.heading[i] ?? Number.NaN) - (points.heading[i - 1] ?? Number.NaN));
-  return turn / dtS;
+  return (turns.turn[i] ?? Number.NaN) / dtS;
 }
 
 /**
@@ -34,13 +34,13 @@ function stepRateAt(points: CircleColumns, i: number): number {
  * с нулевым поворотом (одинаковые курсы после округления) не обрывает вираж.
  * Шаги без курса пропускаются; нет ни одного — NaN.
  */
-function turnRateAt(points: CircleColumns, i: number): number {
+function turnRateAt(points: CircleColumns, turns: HeadingTurns, i: number): number {
   const half = Math.floor(THERMAL.turnRateWindowS / 2);
   let sum = 0;
   let count = 0;
   for (let k = i - half; k <= i + half; k++) {
     if (k < 1 || k >= points.t.length) continue;
-    const rate = stepRateAt(points, k);
+    const rate = stepRateAt(points, turns, k);
     if (Number.isNaN(rate)) continue;
     sum += rate;
     count += 1;
@@ -48,13 +48,22 @@ function turnRateAt(points: CircleColumns, i: number): number {
   return count > 0 ? sum / count : Number.NaN;
 }
 
-/** Круги, между которыми не больше maxCircleGapS, — одна группа. */
-function groupCircles(circles: readonly Circle[]): Circle[][] {
+/**
+ * Круги одной группы: разрыв не больше maxCircleGapS (ТЗ §6.3), или до
+ * maxClimbingGapS, если за разрыв пилот набирал — перецентровка, а не переход.
+ */
+function groupCircles(points: ThermalColumns, circles: readonly Circle[]): Circle[][] {
   const groups: Circle[][] = [];
   for (const circle of circles) {
     const group = groups.at(-1);
     const last = group?.at(-1);
-    if (group && last && circle.startTimeMs - last.endTimeMs <= THERMAL.maxCircleGapS * TIME.msPerSecond) group.push(circle);
+    const gapS = last ? (circle.startTimeMs - last.endTimeMs) / TIME.msPerSecond : Number.POSITIVE_INFINITY;
+    const gapClimbMs = last
+      ? ((points.altitude[circle.startIndex] ?? Number.NaN) - (points.altitude[last.endIndex] ?? Number.NaN)) / gapS
+      : Number.NaN;
+    const sameThermal =
+      gapS <= THERMAL.maxCircleGapS || (gapS <= THERMAL.maxClimbingGapS && gapClimbMs > THERMAL.minAvgClimbMs);
+    if (group && sameThermal) group.push(circle);
     else groups.push([circle]);
   }
   return groups;
@@ -89,9 +98,14 @@ function driftOf(circles: readonly Circle[]): { east: number; north: number } | 
  */
 export function detectThermals(points: ThermalColumns, circles: readonly Circle[], limits: CircleLimits): Thermal[] {
   const minTurnRate = minTurningRate(limits);
+  const turns = headingTurns(points);
+  const stepTurn = (i: number): number => {
+    const rate = stepRateAt(points, turns, i);
+    return Number.isFinite(rate) ? Math.abs(rate) : 0;
+  };
   const thermals: Thermal[] = [];
 
-  for (const group of groupCircles(circles)) {
+  for (const group of groupCircles(points, circles)) {
     const first = group[0];
     const last = group.at(-1);
     if (!first || !last) continue;
@@ -102,16 +116,16 @@ export function detectThermals(points: ThermalColumns, circles: readonly Circle[
     let start = first.startIndex;
     let leading = 0;
     while (start > 0 && leading < FULL_TURN_DEG) {
-      if (!turningWith(turnRateAt(points, start), first.direction)) break;
-      leading += Math.abs(stepRateAt(points, start));
+      if (!turningWith(turnRateAt(points, turns, start), first.direction)) break;
+      leading += stepTurn(start);
       start -= 1;
     }
     // …и после последнего — пока пилот не вышел на прямую.
     let end = last.endIndex;
     let trailing = 0;
     while (end + 1 < points.t.length && trailing < FULL_TURN_DEG) {
-      if (!turningWith(turnRateAt(points, end + 1), last.direction)) break;
-      trailing += Math.abs(stepRateAt(points, end + 1));
+      if (!turningWith(turnRateAt(points, turns, end + 1), last.direction)) break;
+      trailing += stepTurn(end + 1);
       end += 1;
     }
 

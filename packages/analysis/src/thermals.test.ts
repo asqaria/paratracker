@@ -85,6 +85,8 @@ const LON0 = 76.9;
 const M_LAT = 111_320;
 const mLon = M_LAT * Math.cos((LAT0 * Math.PI) / 180);
 const START = Date.UTC(2026, 6, 15, 10);
+/** IGC пишет минуты с тремя знаками: 60 000 шагов на градус. */
+const IGC_MINUTE_STEPS = 60_000;
 
 interface Leg {
   seconds: number;
@@ -146,6 +148,17 @@ describe('detectThermals — условия §6.3', () => {
     expect(thermals(flight([glide, climb, longPause, climb, glide]))).toHaveLength(2);
   });
 
+  it('пауза дольше 15 с, но с набором — перецентровка, тот же термик; со снижением — два', () => {
+    // В ветре пилот выпадает из ядра и широко ищет его, продолжая набирать.
+    const climb: Leg = { seconds: 60, turnDegS: 18, climbMs: 1.5 };
+    const searching: Leg = { seconds: 50, turnDegS: 6, climbMs: 1.1 };
+    const sinking: Leg = { seconds: 50, turnDegS: 6, climbMs: -1 };
+    const merged = thermals(flight([glide, climb, searching, climb, glide]));
+    expect(merged).toHaveLength(1);
+    expect(merged[0]?.durationS).toBeGreaterThan(160);
+    expect(thermals(flight([glide, climb, sinking, climb, glide]))).toHaveLength(2);
+  });
+
   it('классы по среднему набору: слабый < 1, средний 1–3, сильный 3–5, мощный > 5 м/с', () => {
     const strengthAt = (climbMs: number) => thermals(flight([glide, { seconds: 80, turnDegS: 18, climbMs }, glide]))[0]?.strength;
     expect(strengthAt(0.6)).toBe('weak');
@@ -165,5 +178,24 @@ describe('detectThermals — условия §6.3', () => {
     expect(thermals(flight([glide, glide]))).toEqual([]);
     const empty = new Float64Array();
     expect(detectThermals({ t: empty, lat: empty, lon: empty, altitude: empty, heading: empty, vSpeed: empty }, [], PARAGLIDER)).toEqual([]);
+  });
+
+  it('сильный ветер (путевая против ветра почти ноль) — один термик, а не россыпь', () => {
+    // Воздушная 10 м/с по кругу 25 м, ветер 9 м/с: против ветра путевая 1 м/с —
+    // курс по земле там не наблюдаем (шаг короче метра) или шумит на десятки градусов.
+    const n = 301;
+    const t = Float64Array.from({ length: n }, (_, s) => START + s * 1000);
+    // Координаты округлены, как в IGC: до 0.001′ (1/60000 градуса ≈ 1.85 м по широте).
+    const igc = (deg: number): number => Math.round(deg * IGC_MINUTE_STEPS) / IGC_MINUTE_STEPS;
+    const lat = Float64Array.from({ length: n }, (_, s) => igc(LAT0 + (25 * Math.cos(0.4 * s)) / M_LAT));
+    const lon = Float64Array.from({ length: n }, (_, s) => igc(LON0 + (9 * s + 25 * Math.sin(0.4 * s)) / mLon));
+    const altitude = Float64Array.from({ length: n }, (_, s) => 1500 + 2 * s);
+    const vSpeed = new Float64Array(n).fill(2);
+    const { heading } = computeMotion(t, lat, lon, { intervalS: 1, minMovementM: MOTION.minMovementForHeadingM, turnRate: false });
+    const columns: ThermalColumns = { t, lat, lon, altitude, heading, vSpeed };
+    const found = detectThermals(columns, detectCircles(columns, PARAGLIDER), PARAGLIDER);
+    expect(found).toHaveLength(1);
+    expect(found[0]?.durationS).toBeGreaterThan(250);
+    expect(Math.abs((found[0]?.driftEastMs ?? 0) - 9)).toBeLessThan(0.3);
   });
 });
