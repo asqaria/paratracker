@@ -25,14 +25,18 @@ export function SummaryPanel({ summary }: SummaryPanelProps) {
   return (
     <section
       aria-label={t('viewer.summary')}
-      className="rounded-xl glass p-3 text-sm"
+      data-panel="summary"
+      className="rounded-xl glass p-3 text-sm compact:px-2.5 compact:py-1.5"
     >
-      {/* Цифры — моноширинные с табличными цифрами (ТЗ §8.4). */}
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+      {/*
+        Цифры — моноширинные с табличными цифрами (ТЗ §8.4).
+        На телефоне — одной строкой в четыре колонки: сцене нужна высота.
+      */}
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 compact:grid-cols-4 compact:gap-x-3 compact:gap-y-0">
         {ITEMS.map((item) => (
           <div key={item.key} className="flex flex-col">
-            <dt className="text-xs text-secondary">{t(item.label)}</dt>
-            <dd className="numeric text-base">{formatted[item.key]}</dd>
+            <dt className="text-xs text-secondary compact:text-2xs">{t(item.label)}</dt>
+            <dd className="numeric text-base compact:text-xs">{formatted[item.key]}</dd>
           </div>
         ))}
       </dl>

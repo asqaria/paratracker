@@ -9,6 +9,7 @@ import {
   elapsedClock,
   fractionAt,
   indexAt,
+  nextSpeed,
   PLAYBACK_SPEEDS,
   timeAtFraction,
   type PlaybackSpeed,
@@ -35,7 +36,6 @@ export interface TimelinePanelProps {
   onCameraMode: (mode: CameraMode) => void;
 }
 
-const CHART_HEIGHT_PX = 96;
 /** Заливка под графиком — акцентный токен, сверху полупрозрачный, книзу в ноль. */
 const FILL_TOP_ALPHA = 0.26;
 const FILL_BOTTOM_ALPHA = 0;
@@ -61,8 +61,10 @@ export function TimelinePanel(props: TimelinePanelProps) {
     if (!element || !box) return undefined;
 
     const draw = (): void => {
+      // Высота — из вёрстки: на телефоне график ниже (compact:h-14).
       const width = box.clientWidth;
-      const height = CHART_HEIGHT_PX;
+      const height = box.clientHeight;
+      if (height === 0) return;
       const ratio = window.devicePixelRatio || 1;
       element.width = Math.max(1, Math.round(width * ratio));
       element.height = Math.round(height * ratio);
@@ -117,18 +119,50 @@ export function TimelinePanel(props: TimelinePanelProps) {
   );
 
   return (
-    <section className="glass">
-      <div className="flex items-center gap-4 px-4 py-2 text-sm">
+    // Снизу — отступ под полоску «домой» iPhone (viewport-fit=cover в index.html).
+    <section data-panel="timeline" className="glass pb-[env(safe-area-inset-bottom)]">
+      {/*
+        На телефоне (compact) ряд кнопок не помещается: скорость — одна кнопка
+        по кругу, камера — системный список, телеметрия — сеткой: в альбомной
+        ориентации в том же ряду, в портрете (max-sm) — вторым рядом.
+        Кнопки — не меньше 44 px (compact:min-h-11), под палец.
+      */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 text-sm compact:gap-x-2 compact:px-3">
         <button
           type="button"
           onClick={props.onTogglePlay}
           aria-label={props.playing ? t('viewer.pause') : t('viewer.play')}
-          className="rounded bg-accent px-3 py-1 font-semibold text-void"
+          className="rounded bg-accent px-3 py-1 font-semibold text-void compact:min-h-11 compact:min-w-11"
         >
           {props.playing ? '❚❚' : '▶'}
         </button>
 
-        <div role="group" aria-label={t('viewer.speed')} className="flex gap-1">
+        <button
+          type="button"
+          aria-label={`${t('viewer.speed')}: ×${props.speed}`}
+          onClick={() => props.onSpeed(nextSpeed(props.speed))}
+          className="hidden min-h-11 min-w-14 rounded bg-subtle px-3 numeric compact:block"
+        >
+          {`×${props.speed}`}
+        </button>
+
+        <select
+          aria-label={t('viewer.camera')}
+          value={props.cameraMode}
+          onChange={(event) => {
+            const mode = CAMERA_MODES.find((value) => value === event.target.value);
+            if (mode) props.onCameraMode(mode);
+          }}
+          className="hidden min-h-11 rounded bg-subtle px-2 text-primary compact:block"
+        >
+          {CAMERA_MODES.map((mode) => (
+            <option key={mode} value={mode}>
+              {t(`viewer.camera.${mode}`)}
+            </option>
+          ))}
+        </select>
+
+        <div role="group" aria-label={t('viewer.speed')} className="flex gap-1 compact:hidden">
           {PLAYBACK_SPEEDS.map((value) => (
             <button
               key={value}
@@ -142,7 +176,7 @@ export function TimelinePanel(props: TimelinePanelProps) {
           ))}
         </div>
 
-        <div role="group" aria-label={t('viewer.camera')} className="flex gap-1">
+        <div role="group" aria-label={t('viewer.camera')} className="flex gap-1 compact:hidden">
           {CAMERA_MODES.map((mode) => (
             <button
               key={mode}
@@ -157,23 +191,23 @@ export function TimelinePanel(props: TimelinePanelProps) {
         </div>
 
         {/* Цифры телеметрии — моноширинные с табличными цифрами (ТЗ §8.4). */}
-        <dl className="ml-auto flex items-center gap-4 numeric">
-          <div className="flex gap-1">
-            <dt className="text-secondary">{t('viewer.time')}</dt>
+        <dl className="ml-auto flex items-center gap-4 numeric compact:ml-0 compact:grid compact:grid-cols-4 compact:gap-2 compact:sm:min-w-0 compact:sm:flex-1 max-sm:w-full">
+          <div className="flex gap-1 compact:flex-col compact:gap-0">
+            <dt className="text-secondary compact:text-2xs">{t('viewer.time')}</dt>
             <dd>{elapsedClock(props.timeline, props.timeMs)}</dd>
           </div>
-          <div className="flex gap-1">
-            <dt className="text-secondary">{t('viewer.altitude')}</dt>
+          <div className="flex gap-1 compact:flex-col compact:gap-0">
+            <dt className="text-secondary compact:text-2xs">{t('viewer.altitude')}</dt>
             <dd>{metres(altitude, locale, t)}</dd>
           </div>
-          <div className="flex gap-1">
-            <dt className="text-secondary">{t('viewer.vario')}</dt>
+          <div className="flex gap-1 compact:flex-col compact:gap-0">
+            <dt className="text-secondary compact:text-2xs">{t('viewer.vario')}</dt>
             <dd style={{ color: varioCss(vSpeed) }}>
               {verticalSpeed(vSpeed, locale, t)}
             </dd>
           </div>
-          <div className="flex gap-1">
-            <dt className="text-secondary">{t('viewer.groundSpeed')}</dt>
+          <div className="flex gap-1 compact:flex-col compact:gap-0">
+            <dt className="text-secondary compact:text-2xs">{t('viewer.groundSpeed')}</dt>
             <dd>{groundSpeedText}</dd>
           </div>
         </dl>
@@ -188,8 +222,7 @@ export function TimelinePanel(props: TimelinePanelProps) {
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(fraction * 100)}
-        className="relative cursor-col-resize"
-        style={{ height: CHART_HEIGHT_PX }}
+        className="relative h-24 cursor-col-resize touch-none compact:h-14"
         onPointerDown={(event) => {
           dragging.current = true;
           event.currentTarget.setPointerCapture(event.pointerId);

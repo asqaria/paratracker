@@ -87,4 +87,17 @@ describe('TimelinePanel', () => {
       expect(html).toContain(messages[locale][`viewer.camera.${mode}`]);
     }
   });
+
+  it('на телефоне: скорость — одна кнопка по кругу, камера — выпадающий список', () => {
+    const html = render(START_MS, false);
+    const speed = messages[locale]['viewer.speed'];
+    const camera = messages[locale]['viewer.camera'];
+
+    expect(html).toMatch(new RegExp(`<button[^>]*aria-label="${speed}: ×4"`));
+    expect(html).toMatch(new RegExp(`<select[^>]*aria-label="${camera}"`));
+    for (const mode of ['chase', 'free', 'cockpit', 'top'] as const) {
+      expect(html).toMatch(new RegExp(`<option value="${mode}"`));
+    }
+    expect(html).toMatch(/<option value="chase" selected="">/);
+  });
 });

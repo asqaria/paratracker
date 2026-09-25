@@ -70,6 +70,18 @@ export function zoomBy(adjust: CameraAdjust, mode: FollowMode, zoomInPx: number)
   return { ...adjust, rangeM: clamp(adjust.rangeM / factor, minRangeM, maxRangeM) };
 }
 
+/**
+ * Щипок двумя пальцами: дистанция до пилота меняется во столько раз, во сколько
+ * изменилось расстояние между пальцами, — картинка «прилипает» к пальцам.
+ * Вырожденное расстояние (0, NaN, ∞) поправок не меняет.
+ */
+export function pinchBy(adjust: CameraAdjust, mode: FollowMode, fromDistancePx: number, toDistancePx: number): CameraAdjust {
+  const valid = (d: number): boolean => Number.isFinite(d) && d > 0;
+  if (!valid(fromDistancePx) || !valid(toDistancePx)) return adjust;
+  const { minRangeM, maxRangeM } = CAMERA_LIMITS[mode];
+  return { ...adjust, rangeM: clamp((adjust.rangeM * fromDistancePx) / toDistancePx, minRangeM, maxRangeM) };
+}
+
 /** Перетаскивание: вправо — облёт по курсу, вверх — к горизонту. */
 export function orbitBy(adjust: CameraAdjust, mode: FollowMode, dxPx: number, dyPx: number): CameraAdjust {
   // ТЗ §7.4: Top следит за пилотом «без вращения».

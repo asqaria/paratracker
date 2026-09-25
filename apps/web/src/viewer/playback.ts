@@ -58,6 +58,12 @@ export const PLAYBACK_SPEEDS = [1, 2, 4, 8, 16, 60] as const;
 export type PlaybackSpeed = (typeof PLAYBACK_SPEEDS)[number];
 export const DEFAULT_PLAYBACK_SPEED: PlaybackSpeed = 4;
 
+/** Следующая скорость по кругу — одна кнопка вместо ряда на узком экране. */
+export function nextSpeed(speed: PlaybackSpeed): PlaybackSpeed {
+  const index = PLAYBACK_SPEEDS.indexOf(speed);
+  return PLAYBACK_SPEEDS[(index + 1) % PLAYBACK_SPEEDS.length] ?? DEFAULT_PLAYBACK_SPEED;
+}
+
 /** Часы:минуты:секунды от начала полёта — моноширинная телеметрия (§8.4). */
 export function elapsedClock(timeline: TrackTimeline, timeMs: number): string {
   const total = Math.max(0, Math.round((timeMs - timeline.startMs) / MS_PER_SECOND));
