@@ -106,8 +106,7 @@ export function defineFixtureChecks(track: ParsedTrack, exp: FixtureExpectation,
 
   it('дата', () => {
     expect(track.meta).toMatchObject({ date: exp.date, dateSource });
-    // GPX и KML заполняют датум в задаче 4 плана высот; до неё сверяется только IGC.
-    if (exp.format === 'igc') expect(track.meta.gnssAltitudeDatum).toBe(exp.gnssAltitudeDatum);
+    expect(track.meta.gnssAltitudeDatum).toBe(exp.gnssAltitudeDatum);
   });
 
   it.each(['first', 'middle', 'last'] as const)('контрольная точка %s', (key) => {

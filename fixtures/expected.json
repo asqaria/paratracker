@@ -1057,7 +1057,7 @@
     "date": "2026-07-15",
     "dateHeaderRaw": null,
     "altitudeSource": "gnss",
-    "gnssAltitudeDatum": "ellipsoid",
+    "gnssAltitudeDatum": "geoid",
     "iRecord": null,
     "medianFixIntervalSeconds": 1,
     "maxFixIntervalSeconds": 1,
@@ -1070,7 +1070,7 @@
         "lat": 43.128,
         "lon": 76.955,
         "altBaro": null,
-        "altGnss": 2350,
+        "altGnss": 2307.414696,
         "valid": true
       },
       "middle": {
@@ -1079,7 +1079,7 @@
         "lat": 43.1294912,
         "lon": 76.9669639,
         "altBaro": null,
-        "altGnss": 2698,
+        "altGnss": 2655.4077701218425,
         "valid": true
       },
       "last": {
@@ -1088,7 +1088,7 @@
         "lat": 43.136592,
         "lon": 77.0232808,
         "altBaro": null,
-        "altGnss": 2978.3,
+        "altGnss": 2935.6796206841345,
         "valid": true
       }
     },
@@ -1097,8 +1097,8 @@
       "maxLat": 43.136592,
       "minLon": 76.9544954,
       "maxLon": 77.0240385,
-      "minAlt": 2350,
-      "maxAlt": 2978.3
+      "minAlt": 2307.414696,
+      "maxAlt": 2935.6796206841345
     },
     "trajectory": {
       "cyclePoints": 480,
@@ -1197,7 +1197,7 @@
     "date": "2026-07-15",
     "dateHeaderRaw": null,
     "altitudeSource": "gnss",
-    "gnssAltitudeDatum": "ellipsoid",
+    "gnssAltitudeDatum": "geoid",
     "iRecord": null,
     "medianFixIntervalSeconds": 1,
     "maxFixIntervalSeconds": 1,
@@ -1210,7 +1210,7 @@
         "lat": 43.128,
         "lon": 76.955,
         "altBaro": null,
-        "altGnss": 2350,
+        "altGnss": 2307.414696,
         "valid": true
       },
       "middle": {
@@ -1219,7 +1219,7 @@
         "lat": 43.1275598,
         "lon": 76.9575848,
         "altBaro": null,
-        "altGnss": 2612.5,
+        "altGnss": 2569.9213206853706,
         "valid": true
       },
       "last": {
@@ -1228,7 +1228,7 @@
         "lat": 43.129475,
         "lon": 76.9668334,
         "altBaro": null,
-        "altGnss": 2699.2,
+        "altGnss": 2656.607844506716,
         "valid": true
       }
     },
@@ -1237,8 +1237,8 @@
       "maxLat": 43.129475,
       "minLon": 76.9544954,
       "maxLon": 76.9668334,
-      "minAlt": 2350,
-      "maxAlt": 2770
+      "minAlt": 2307.414696,
+      "maxAlt": 2727.4122333383193
     },
     "trajectory": {
       "cyclePoints": 480,
@@ -1267,7 +1267,7 @@
     "date": "2026-07-15",
     "dateHeaderRaw": null,
     "altitudeSource": "gnss",
-    "gnssAltitudeDatum": "ellipsoid",
+    "gnssAltitudeDatum": "geoid",
     "iRecord": null,
     "medianFixIntervalSeconds": 1,
     "maxFixIntervalSeconds": 91,
@@ -1280,7 +1280,7 @@
         "lat": 43.128,
         "lon": 76.955,
         "altBaro": null,
-        "altGnss": 2350,
+        "altGnss": 2307.414696,
         "valid": true
       },
       "middle": {
@@ -1289,7 +1289,7 @@
         "lat": 43.128521,
         "lon": 76.9591357,
         "altBaro": null,
-        "altGnss": 2770,
+        "altGnss": 2727.4122333383193,
         "valid": true
       },
       "last": {
@@ -1298,7 +1298,7 @@
         "lat": 43.1323856,
         "lon": 76.9903181,
         "altBaro": null,
-        "altGnss": 2483.2,
+        "altGnss": 2440.5946718420623,
         "valid": true
       }
     },
@@ -1307,8 +1307,8 @@
       "maxLat": 43.1323856,
       "minLon": 76.9544954,
       "maxLon": 76.9903181,
-      "minAlt": 2350,
-      "maxAlt": 2770
+      "minAlt": 2307.414696,
+      "maxAlt": 2727.4122333383193
     },
     "trajectory": {
       "cyclePoints": 480,
@@ -1337,7 +1337,7 @@
     "date": "2026-07-15",
     "dateHeaderRaw": null,
     "altitudeSource": "gnss",
-    "gnssAltitudeDatum": "ellipsoid",
+    "gnssAltitudeDatum": "geoid",
     "iRecord": null,
     "medianFixIntervalSeconds": 1,
     "maxFixIntervalSeconds": 1,
@@ -1350,7 +1350,7 @@
         "lat": 43.128,
         "lon": 76.955,
         "altBaro": null,
-        "altGnss": 2350,
+        "altGnss": 2307.414696,
         "valid": false
       },
       "middle": {
@@ -1359,7 +1359,7 @@
         "lat": 43.128521,
         "lon": 76.9591357,
         "altBaro": null,
-        "altGnss": 2770,
+        "altGnss": 2727.4122333383193,
         "valid": false
       },
       "last": {
@@ -1368,7 +1368,7 @@
         "lat": 43.1323856,
         "lon": 76.9903181,
         "altBaro": null,
-        "altGnss": 2483.2,
+        "altGnss": 2440.5946718420623,
         "valid": true
       }
     },
@@ -1377,8 +1377,8 @@
       "maxLat": 43.1323856,
       "minLon": 76.9544954,
       "maxLon": 76.9903181,
-      "minAlt": 2350,
-      "maxAlt": 2770
+      "minAlt": 2307.414696,
+      "maxAlt": 2727.4122333383193
     },
     "trajectory": {
       "cyclePoints": 480,
@@ -1407,7 +1407,7 @@
     "date": "2026-07-15",
     "dateHeaderRaw": null,
     "altitudeSource": "gnss",
-    "gnssAltitudeDatum": "ellipsoid",
+    "gnssAltitudeDatum": "geoid",
     "iRecord": null,
     "medianFixIntervalSeconds": 1,
     "maxFixIntervalSeconds": 1,
@@ -1420,7 +1420,7 @@
         "lat": 43.128,
         "lon": 76.955,
         "altBaro": null,
-        "altGnss": 2350,
+        "altGnss": 2307.414696,
         "valid": true
       },
       "middle": {
@@ -1429,7 +1429,7 @@
         "lat": 43.1288666,
         "lon": 76.9581933,
         "altBaro": null,
-        "altGnss": 2698.3,
+        "altGnss": 2655.7078437865134,
         "valid": true
       },
       "last": {
@@ -1438,7 +1438,7 @@
         "lat": 43.1310758,
         "lon": 76.97975,
         "altBaro": null,
-        "altGnss": 2580.4,
+        "altGnss": 2537.80055926812,
         "valid": true
       }
     },
@@ -1447,8 +1447,8 @@
       "maxLat": 43.1310758,
       "minLon": 76.9544954,
       "maxLon": 76.97975,
-      "minAlt": 2350,
-      "maxAlt": 2770
+      "minAlt": 2307.414696,
+      "maxAlt": 2727.4122333383193
     },
     "trajectory": {
       "cyclePoints": 480,
@@ -1477,7 +1477,7 @@
     "date": "2026-07-15",
     "dateHeaderRaw": null,
     "altitudeSource": "gnss",
-    "gnssAltitudeDatum": "ellipsoid",
+    "gnssAltitudeDatum": "geoid",
     "iRecord": null,
     "medianFixIntervalSeconds": 1,
     "maxFixIntervalSeconds": 1,
@@ -1490,7 +1490,7 @@
         "lat": 43.128,
         "lon": 76.955,
         "altBaro": null,
-        "altGnss": 2350,
+        "altGnss": 2307.414696,
         "valid": true
       },
       "middle": {
@@ -1499,7 +1499,7 @@
         "lat": 43.1294912,
         "lon": 76.9669639,
         "altBaro": null,
-        "altGnss": 2698,
+        "altGnss": 2655.4077701218425,
         "valid": true
       },
       "last": {
@@ -1508,7 +1508,7 @@
         "lat": 43.136592,
         "lon": 77.0232808,
         "altBaro": null,
-        "altGnss": 2978.3,
+        "altGnss": 2935.6796206841345,
         "valid": true
       }
     },
@@ -1517,8 +1517,8 @@
       "maxLat": 43.136592,
       "minLon": 76.9544954,
       "maxLon": 77.0240385,
-      "minAlt": 2350,
-      "maxAlt": 2978.3
+      "minAlt": 2307.414696,
+      "maxAlt": 2935.6796206841345
     },
     "trajectory": {
       "cyclePoints": 480,
@@ -1547,7 +1547,7 @@
     "date": "2026-07-15",
     "dateHeaderRaw": null,
     "altitudeSource": "gnss",
-    "gnssAltitudeDatum": "ellipsoid",
+    "gnssAltitudeDatum": "geoid",
     "iRecord": null,
     "medianFixIntervalSeconds": 1,
     "maxFixIntervalSeconds": 91,
@@ -1560,7 +1560,7 @@
         "lat": 43.128,
         "lon": 76.955,
         "altBaro": null,
-        "altGnss": 2350,
+        "altGnss": 2307.414696,
         "valid": true
       },
       "middle": {
@@ -1569,7 +1569,7 @@
         "lat": 43.128521,
         "lon": 76.9591357,
         "altBaro": null,
-        "altGnss": 2770,
+        "altGnss": 2727.4122333383193,
         "valid": true
       },
       "last": {
@@ -1578,7 +1578,7 @@
         "lat": 43.1323856,
         "lon": 76.9903181,
         "altBaro": null,
-        "altGnss": 2483.2,
+        "altGnss": 2440.5946718420623,
         "valid": true
       }
     },
@@ -1587,8 +1587,8 @@
       "maxLat": 43.1323856,
       "minLon": 76.9544954,
       "maxLon": 76.9903181,
-      "minAlt": 2350,
-      "maxAlt": 2770
+      "minAlt": 2307.414696,
+      "maxAlt": 2727.4122333383193
     },
     "trajectory": {
       "cyclePoints": 480,
@@ -1617,7 +1617,7 @@
     "date": "2026-07-15",
     "dateHeaderRaw": null,
     "altitudeSource": "gnss",
-    "gnssAltitudeDatum": "ellipsoid",
+    "gnssAltitudeDatum": "geoid",
     "iRecord": null,
     "medianFixIntervalSeconds": 1,
     "maxFixIntervalSeconds": 1,
@@ -1630,7 +1630,7 @@
         "lat": 43.128,
         "lon": 76.955,
         "altBaro": null,
-        "altGnss": 2350,
+        "altGnss": 2307.414696,
         "valid": true
       },
       "middle": {
@@ -1639,7 +1639,7 @@
         "lat": 43.1275598,
         "lon": 76.9575848,
         "altBaro": null,
-        "altGnss": 2612.5,
+        "altGnss": 2569.9213206853706,
         "valid": true
       },
       "last": {
@@ -1648,7 +1648,7 @@
         "lat": 43.129475,
         "lon": 76.9668334,
         "altBaro": null,
-        "altGnss": 2699.2,
+        "altGnss": 2656.607844506716,
         "valid": true
       }
     },
@@ -1657,8 +1657,8 @@
       "maxLat": 43.129475,
       "minLon": 76.9544954,
       "maxLon": 76.9668334,
-      "minAlt": 2350,
-      "maxAlt": 2770
+      "minAlt": 2307.414696,
+      "maxAlt": 2727.4122333383193
     },
     "trajectory": {
       "cyclePoints": 480,
@@ -1687,7 +1687,7 @@
     "date": "2026-07-15",
     "dateHeaderRaw": null,
     "altitudeSource": "gnss",
-    "gnssAltitudeDatum": "ellipsoid",
+    "gnssAltitudeDatum": "geoid",
     "iRecord": null,
     "medianFixIntervalSeconds": 1,
     "maxFixIntervalSeconds": 1,
@@ -1700,7 +1700,7 @@
         "lat": 43.128,
         "lon": 76.955,
         "altBaro": null,
-        "altGnss": 2350,
+        "altGnss": 2307.414696,
         "valid": true
       },
       "middle": {
@@ -1709,7 +1709,7 @@
         "lat": 43.128521,
         "lon": 76.9591357,
         "altBaro": null,
-        "altGnss": 2770,
+        "altGnss": 2727.4122333383193,
         "valid": true
       },
       "last": {
@@ -1718,7 +1718,7 @@
         "lat": 43.1323856,
         "lon": 76.9903181,
         "altBaro": null,
-        "altGnss": 2483.2,
+        "altGnss": 2440.5946718420623,
         "valid": true
       }
     },
@@ -1727,8 +1727,8 @@
       "maxLat": 43.1323856,
       "minLon": 76.9544954,
       "maxLon": 76.9903181,
-      "minAlt": 2350,
-      "maxAlt": 2770
+      "minAlt": 2307.414696,
+      "maxAlt": 2727.4122333383193
     },
     "trajectory": {
       "cyclePoints": 480,

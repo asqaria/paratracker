@@ -816,7 +816,7 @@ function summaryOf(points) {
    модели — packages/parsing/src/geoid.test.ts (узлы NGA).
    ─────────────────────────────────────────────────────────────────────────── */
 function gnssDatumOf(format, algHeader) {
-  if (format !== 'igc') return 'ellipsoid'; // GPX и KML — задача 4
+  if (format !== 'igc') return 'geoid'; // GPX <ele>, KML absolute — над уровнем моря
   const code = (algHeader?.split(':')[1] ?? '').trim().toUpperCase();
   if (code === 'ELL') return 'ellipsoid';
   if (code === 'NIL') return 'none';
