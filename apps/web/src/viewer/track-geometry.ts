@@ -1,4 +1,5 @@
-import { varioRgba } from './vario-palette';
+import type { FlightRange } from './ground-calibration';
+import { varioRgba, type Rgba } from './vario-palette';
 
 /**
  * Геометрия трека как обычные массивы — без Cesium, чтобы это было проверяемо
@@ -30,7 +31,16 @@ const CHANNELS_PER_COLOR = 4;
 const usable = (lat: number, lon: number, alt: number): boolean =>
   Number.isFinite(lat) && Number.isFinite(lon) && Number.isFinite(alt);
 
-export function buildTrackGeometry(track: DecodedTrackColumns): TrackGeometry {
+/**
+ * Ходьба по земле до взлёта и после посадки рисуется одним нейтральным цветом:
+ * вариометр там — шум GPS на месте, раскраска выдавала его за полёт.
+ */
+export interface GroundStyle {
+  flight: FlightRange;
+  groundRgba: Rgba;
+}
+
+export function buildTrackGeometry(track: DecodedTrackColumns, ground?: GroundStyle): TrackGeometry {
   const count = track.lat.length;
   const positions = new Float64Array(count * COORDS_PER_POSITION);
   const groundPositions = new Float64Array(count * COORDS_PER_GROUND);
@@ -49,7 +59,8 @@ export function buildTrackGeometry(track: DecodedTrackColumns): TrackGeometry {
     groundPositions[kept * COORDS_PER_GROUND] = lon;
     groundPositions[kept * COORDS_PER_GROUND + 1] = lat;
 
-    const [r, g, b, a] = varioRgba(track.vSpeed[i] ?? Number.NaN);
+    const onGround = ground !== undefined && (i < ground.flight.takeoff || i > ground.flight.landing);
+    const [r, g, b, a] = onGround ? ground.groundRgba : varioRgba(track.vSpeed[i] ?? Number.NaN);
     colors[kept * CHANNELS_PER_COLOR] = r;
     colors[kept * CHANNELS_PER_COLOR + 1] = g;
     colors[kept * CHANNELS_PER_COLOR + 2] = b;
