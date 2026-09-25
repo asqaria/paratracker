@@ -22,8 +22,18 @@ services:
       retries: 20
 
   minio:
-    # Официальный реестр MinIO; на Docker Hub образ больше не публикуется.
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # MinIO закрыл анонимную загрузку образов и на quay.io, и на Docker Hub
+    # (401 с сентября 2026) — CI и любая новая машина не могли поднять окружение.
+    # Chainguard собирает тот же сервер из исходников и раздаёт бесплатно, но
+    # только тег latest: версию закрепить нельзя. Для локального S3 и тестов
+    # это приемлемо — API стабилен; в проде хранилище — R2 (ТЗ §4.2).
+    # Образ без shell; mc внутри есть — healthcheck прежний.
+    image: cgr.dev/chainguard/minio:latest
+    # По умолчанию образ работает от uid 65532, а старый MinIO писал том от root:
+    # на существующем miniodata сервер падал с «file access denied». От root он
+    # читает прежние данные — проверено на томе, записанном старым образом.
+    # Только локальная разработка и CI; в проде хранилище — R2.
+    user: "0:0"
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-skyline}
@@ -41,17 +51,15 @@ services:
 
   # Одноразово создаёт бакет: /health проверяет именно его, а не только доступность MinIO.
   minio-init:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # Без shell: mc берёт адрес и ключи из MC_HOST_<alias>, имя бакета
+    # подставляет сам compose.
+    image: cgr.dev/chainguard/minio-client:latest
     depends_on:
       minio:
         condition: service_healthy
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-skyline}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-skyline-dev-secret}
-      S3_BUCKET: ${S3_BUCKET:-skyline}
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" && mc mb --ignore-existing "local/$$S3_BUCKET"
+      MC_HOST_local: http://${MINIO_ROOT_USER:-skyline}:${MINIO_ROOT_PASSWORD:-skyline-dev-secret}@minio:9000
+    command: ["mb", "--ignore-existing", "local/${S3_BUCKET:-skyline}"]
     restart: "no"
 
 volumes:
