@@ -14,9 +14,10 @@ export function VarioLegend() {
     <figure
       role="img"
       aria-label={t('viewer.varioLegend.description')}
-      className="w-48 rounded-xl glass px-3 py-2"
+      data-panel="legend"
+      className="w-48 rounded-xl glass px-3 py-2 compact:w-40 compact:px-2 compact:py-1"
     >
-      <figcaption className="mb-1.5 text-xs text-secondary">{t('viewer.varioLegend')}</figcaption>
+      <figcaption className="mb-1.5 text-xs text-secondary compact:mb-1 compact:text-2xs">{t('viewer.varioLegend')}</figcaption>
       <div className="rounded-full" style={{ height: BAR_HEIGHT_PX, background: legendGradient() }} />
       {/* Подписи — на истинных позициях шкалы; крайние прижаты к краям полосы. */}
       <div className="relative mt-1 numeric text-xs text-secondary" style={{ height: LABELS_HEIGHT_PX }}>

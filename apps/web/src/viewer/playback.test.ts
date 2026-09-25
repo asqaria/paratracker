@@ -6,6 +6,7 @@ import {
   elapsedClock,
   fractionAt,
   indexAt,
+  nextSpeed,
   PLAYBACK_SPEEDS,
   seekBy,
   timeAtFraction,
@@ -67,5 +68,13 @@ describe('таймлайн трека', () => {
     expect(elapsedClock(timeline, START)).toBe('00:00:00');
     expect(elapsedClock(timeline, START + 3_661_000)).toBe('01:01:01');
     expect(elapsedClock(timeline, START - 5_000)).toBe('00:00:00');
+  });
+});
+
+describe('nextSpeed — одна кнопка скорости на телефоне', () => {
+  it('идёт по скоростям ТЗ по кругу', () => {
+    const visited = [DEFAULT_PLAYBACK_SPEED];
+    for (let i = 0; i < PLAYBACK_SPEEDS.length; i++) visited.push(nextSpeed(visited.at(-1) ?? DEFAULT_PLAYBACK_SPEED));
+    expect(visited).toEqual([4, 8, 16, 60, 1, 2, 4]);
   });
 });

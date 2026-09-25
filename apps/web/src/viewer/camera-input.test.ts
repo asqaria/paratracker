@@ -10,6 +10,7 @@ import {
   orbitAroundPilot,
   ORBIT_DEG_PER_PX,
   orbitBy,
+  pinchBy,
   poseFor,
   WHEEL_NOTCH,
   wheelZoomInPx,
@@ -180,5 +181,36 @@ describe('orbitAroundPilot — Ctrl + перетаскивание в Free', () 
     expect(orbitAroundPilot(hpr, 0, -10_000).pitchDeg).toBe(FREE_ORBIT_PITCH.maxDeg);
     expect(orbitAroundPilot(hpr, 0, 10_000).pitchDeg).toBe(FREE_ORBIT_PITCH.minDeg);
     expect(FREE_ORBIT_PITCH.minDeg).toBeGreaterThan(-90);
+  });
+});
+
+describe('pinchBy — два пальца меняют дистанцию до пилота, как колесо', () => {
+  const mode = 'chase' as const;
+  const start = { ...initialAdjust(mode), rangeM: 40 };
+
+  it('развели пальцы вдвое — камера вдвое ближе', () => {
+    expect(pinchBy(start, mode, 100, 200).rangeM).toBeCloseTo(20, 9);
+  });
+
+  it('свели вдвое — вдвое дальше', () => {
+    expect(pinchBy(start, mode, 200, 100).rangeM).toBeCloseTo(80, 9);
+  });
+
+  it('держит пределы режима (ТЗ §7.4)', () => {
+    const { minRangeM, maxRangeM } = CAMERA_LIMITS[mode];
+    expect(pinchBy(start, mode, 10, 1000).rangeM).toBe(minRangeM);
+    expect(pinchBy(start, mode, 1000, 10).rangeM).toBe(maxRangeM);
+  });
+
+  it('вырожденное расстояние между пальцами — поправки не меняются', () => {
+    for (const [from, to] of [[0, 100], [100, 0], [Number.NaN, 100], [100, Number.POSITIVE_INFINITY]] as const) {
+      expect(pinchBy(start, mode, from, to)).toEqual(start);
+    }
+  });
+
+  it('поворот и наклон не трогает', () => {
+    const next = pinchBy(start, mode, 100, 150);
+    expect(next.headingOffsetDeg).toBe(start.headingOffsetDeg);
+    expect(next.pitchDeg).toBe(start.pitchDeg);
   });
 });

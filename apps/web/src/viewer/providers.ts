@@ -12,6 +12,8 @@ export interface AttributionEntry {
   href?: string;
   /** Подпись перед записью («Рельеф:» / «Подложка:») — переводит сцена по ключу. */
   label?: 'terrain' | 'imagery';
+  /** Видна всегда, даже в свёрнутой строке на телефоне (требование лицензии). */
+  pinned?: true;
 }
 
 export const IMAGERY_IDS = ['sentinel2', 'esri'] as const;
@@ -104,7 +106,7 @@ export function imagerySources(config: ViewerConfig): ImagerySource[] {
       maximumLevel: ESRI_MAX_LEVEL,
       attribution: [
         { label: 'imagery', text: 'Esri World Imagery — Esri, Maxar, Earthstar Geographics' },
-        { text: 'Powered by Esri' },
+        { text: 'Powered by Esri', pinned: true },
       ],
     });
   }
@@ -152,6 +154,15 @@ export function tileFailureTracker(threshold: number = IMAGERY_FALLBACK_AFTER_ER
       return failures === threshold;
     },
   };
+}
+
+/**
+ * Свёрнутая атрибуция для узкого экрана: названия источников (с подписью
+ * «Рельеф» / «Подложка») и то, что лицензия велит держать на виду всегда.
+ * Полный текст — по тапу; так сворачивает атрибуцию и сам ArcGIS JS API.
+ */
+export function collapsedAttribution(entries: readonly AttributionEntry[]): AttributionEntry[] {
+  return entries.filter((entry) => entry.label !== undefined || entry.pinned === true);
 }
 
 export function imagerySourceById(config: ViewerConfig, id: ImageryId): ImagerySource | null {

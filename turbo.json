@@ -13,6 +13,11 @@
     "lint": {
       "dependsOn": ["^build"]
     },
+    "e2e": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$"],
+      "passThroughEnv": ["CI"]
+    },
     "test": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.env", "$TURBO_ROOT$/fixtures/**"],

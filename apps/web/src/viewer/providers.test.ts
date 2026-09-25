@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   availableImagery,
+  collapsedAttribution,
   IMAGERY_FALLBACK_AFTER_ERRORS,
   imagerySourceById,
   imagerySources,
@@ -116,5 +117,32 @@ describe('tileFailureTracker — откат на Sentinel-2 при потоке 
     const fired = Array.from({ length: IMAGERY_FALLBACK_AFTER_ERRORS }, () => [tracker.failed(404), tracker.failed(503)]).flat();
     expect(fired.filter(Boolean)).toHaveLength(1);
     expect(fired.at(-1)).toBe(true);
+  });
+});
+
+describe('collapsedAttribution — одна строка атрибуции на телефоне', () => {
+  const config = readViewerConfig(ENV);
+  const full = (id: 'sentinel2' | 'esri') => [
+    ...terrainSource(config).attribution,
+    ...(imagerySourceById(config, id)?.attribution ?? []),
+  ];
+
+  it('названия рельефа и подложки остаются со ссылками', () => {
+    const short = collapsedAttribution(full('sentinel2'));
+    expect(short.map((entry) => entry.text)).toEqual(['Re:Earth Terrain', 'Sentinel-2 cloudless']);
+    expect(short.every((entry) => entry.href !== undefined)).toBe(true);
+  });
+
+  it('«Powered by Esri» видно всегда — требование Esri, его не сворачивают', () => {
+    expect(collapsedAttribution(full('esri')).map((entry) => entry.text)).toContain('Powered by Esri');
+  });
+
+  it('короткая строка — часть полной, в том же порядке', () => {
+    for (const id of ['sentinel2', 'esri'] as const) {
+      const entries = full(id);
+      const short = collapsedAttribution(entries);
+      expect(short.length).toBeLessThan(entries.length);
+      expect(entries.filter((entry) => short.includes(entry))).toEqual(short);
+    }
   });
 });

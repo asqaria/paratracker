@@ -39,6 +39,7 @@ import {
   initialAdjust,
   orbitAroundPilot,
   orbitBy,
+  pinchBy,
   poseFor,
   wheelZoomInPx,
   zoomBy,
@@ -62,11 +63,13 @@ import { DEFAULT_PLAYBACK_SPEED, indexAt, type PlaybackSpeed, seekBy, timelineOf
 import { fetchImageryCapabilities } from './imagery-capabilities';
 import {
   availableImagery,
+  collapsedAttribution,
   imagerySourceById,
   imagerySources,
   readViewerConfig,
   terrainSource,
   tileFailureTracker,
+  type AttributionEntry,
   type ImageryId,
   type ImagerySource,
   type ViewerConfig,
@@ -252,6 +255,7 @@ export function Scene({ track, showGlow = false }: SceneProps) {
   });
   const shownSources = useMemo(() => availableImagery(sources, capabilities.data), [sources, capabilities.data]);
   const [imageryNotice, setImageryNotice] = useState<string | null>(null);
+  const [attributionOpen, setAttributionOpen] = useState(false);
   const stopTileWatch = useRef<(() => void) | null>(null);
   const timeline = useMemo(() => timelineOf(track.t), [track]);
 
@@ -487,6 +491,13 @@ export function Scene({ track, showGlow = false }: SceneProps) {
     const element = container.current;
     if (!element) return undefined;
     let drag: { x: number; y: number; kind: 'follow' | 'free-orbit' } | null = null;
+    // Пальцы на экране: два — щипок (дистанция до пилота), один — облёт.
+    const touches = new Map<number, { x: number; y: number }>();
+    let pinchDistance: number | null = null;
+    const touchSpread = (): number | null => {
+      const [a, b] = [...touches.values()];
+      return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : null;
+    };
 
     const follow = (): Exclude<CameraMode, 'free'> | null => {
       const mode = cameraModeRef.current;
@@ -517,6 +528,15 @@ export function Scene({ track, showGlow = false }: SceneProps) {
     };
 
     const onPointerDown = (event: PointerEvent): void => {
+      if (event.pointerType === 'touch') {
+        touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (touches.size >= 2) {
+          // Второй палец — это щипок, а не облёт: облёт гасим до отпускания.
+          drag = null;
+          pinchDistance = touchSpread();
+          return;
+        }
+      }
       if (event.button !== PRIMARY_BUTTON) return;
       if (follow()) {
         drag = { x: event.clientX, y: event.clientY, kind: 'follow' };
@@ -529,6 +549,17 @@ export function Scene({ track, showGlow = false }: SceneProps) {
       // всплывают сюда и так.
     };
     const onPointerMove = (event: PointerEvent): void => {
+      if (touches.has(event.pointerId)) touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pinchDistance !== null) {
+        const mode = follow();
+        const spread = touchSpread();
+        if (mode && adjustRef.current && spread !== null) {
+          adjustRef.current = pinchBy(adjustRef.current, mode, pinchDistance, spread);
+          pinchDistance = spread;
+          redraw();
+        }
+        return;
+      }
       if (!drag) return;
       const dx = event.clientX - drag.x;
       const dy = event.clientY - drag.y;
@@ -543,7 +574,9 @@ export function Scene({ track, showGlow = false }: SceneProps) {
       }
       redraw();
     };
-    const onPointerUp = (): void => {
+    const onPointerUp = (event: PointerEvent): void => {
+      touches.delete(event.pointerId);
+      if (touches.size < 2) pinchDistance = null;
       drag = null;
     };
 
@@ -615,40 +648,48 @@ export function Scene({ track, showGlow = false }: SceneProps) {
 
   return (
     <div className="relative h-dvh w-full">
-      <div ref={container} className="h-full w-full" data-testid="cesium-container" />
+      {/* touch-none: жесты на сцене — камере, а не прокрутке и зуму страницы. */}
+      <div ref={container} className="h-full w-full touch-none" data-testid="cesium-container" />
 
-      <div className="absolute left-4 top-4 flex flex-col gap-2">
-        <SummaryPanel summary={track.summary} />
-        {error !== null && (
-          <p role="alert" className="glass rounded-xl px-3 py-2 text-danger">
-            {error}
-          </p>
-        )}
-      </div>
-
-      <div className="absolute right-4 top-4 flex flex-col gap-2 rounded-xl glass p-3 text-sm">
-        <span className="text-secondary">{t('viewer.imagery')}</span>
-        <div role="group" aria-label={t('viewer.imagery')} className="flex gap-1">
-          {shownSources.map((source) => (
-            <button
-              key={source.id}
-              type="button"
-              aria-pressed={source.id === imagery}
-              onClick={() => switchImagery(source.id)}
-              className="rounded px-2 py-1 text-secondary aria-pressed:bg-subtle aria-pressed:text-primary"
-            >
-              {source.id === 'esri' ? t('viewer.imagery.esri') : t('viewer.imagery.sentinel2')}
-            </button>
-          ))}
+      {/*
+        Верх сцены — один ряд с переносом: на узком экране подложка уходит под
+        сводку, а не наезжает на неё. Пустое место ряда пропускает жесты к сцене.
+        Отступы — не меньше выреза экрана (viewport-fit=cover).
+      */}
+      <div className="pointer-events-none absolute left-4 right-4 top-4 flex flex-wrap items-start gap-2 compact:left-[max(0.5rem,env(safe-area-inset-left))] compact:right-[max(0.5rem,env(safe-area-inset-right))] compact:top-[max(0.5rem,env(safe-area-inset-top))]">
+        <div className="pointer-events-auto flex flex-col gap-2">
+          <SummaryPanel summary={track.summary} />
+          {error !== null && (
+            <p role="alert" className="glass rounded-xl px-3 py-2 text-danger">
+              {error}
+            </p>
+          )}
         </div>
-        {imageryNotice !== null && (
-          <p role="status" className="max-w-48 text-xs text-danger">
-            {imageryNotice}
-          </p>
-        )}
-        <span className="numeric text-secondary">
-          {t('viewer.points')}: {track.pointCount}
-        </span>
+
+        <div data-panel="imagery" className="pointer-events-auto ml-auto flex flex-col gap-2 rounded-xl glass p-3 text-sm compact:gap-1 compact:p-1">
+          <span className="text-secondary compact:hidden">{t('viewer.imagery')}</span>
+          <div role="group" aria-label={t('viewer.imagery')} className="flex gap-1">
+            {shownSources.map((source) => (
+              <button
+                key={source.id}
+                type="button"
+                aria-pressed={source.id === imagery}
+                onClick={() => switchImagery(source.id)}
+                className="rounded px-2 py-1 text-secondary aria-pressed:bg-subtle aria-pressed:text-primary compact:min-h-11"
+              >
+                {source.id === 'esri' ? t('viewer.imagery.esri') : t('viewer.imagery.sentinel2')}
+              </button>
+            ))}
+          </div>
+          {imageryNotice !== null && (
+            <p role="status" className="max-w-48 text-xs text-danger">
+              {imageryNotice}
+            </p>
+          )}
+          <span className="numeric text-secondary compact:hidden">
+            {t('viewer.points')}: {track.pointCount}
+          </span>
+        </div>
       </div>
 
       {/*
@@ -657,24 +698,30 @@ export function Scene({ track, showGlow = false }: SceneProps) {
         а она обязательна по лицензиям и не скрывается (ТЗ §4.4, §11.3).
       */}
       <div className="absolute bottom-0 left-0 right-0">
-        <div className="px-4 pb-2">
+        <div className="px-4 pb-2 compact:px-2 compact:pb-1">
           <VarioLegend />
         </div>
-        <p className="bg-void/70 px-3 py-1 text-xs text-secondary">
-          {attribution.map((entry, index) => (
-            <span key={entry.text}>
-              {index > 0 && ' · '}
-              {entry.label !== undefined && `${t(`viewer.attribution.${entry.label}`)}: `}
-              {entry.href === undefined ? (
-                entry.text
-              ) : (
-                <a href={entry.href} target="_blank" rel="noopener noreferrer" className="text-accent">
-                  {entry.text}
-                </a>
-              )}
-            </span>
-          ))}
-        </p>
+
+        {/*
+          На телефоне атрибуция свёрнута до названий источников и «Powered by
+          Esri» (collapsedAttribution), полный текст — по кнопке. Не скрывается.
+        */}
+        <div data-panel="attribution" className="flex items-start bg-void/70 text-xs text-secondary compact:text-2xs">
+          <AttributionLine entries={attribution} className={attributionOpen ? '' : 'compact:hidden'} />
+          <AttributionLine
+            entries={collapsedAttribution(attribution)}
+            className={attributionOpen ? 'hidden' : 'hidden compact:block'}
+          />
+          <button
+            type="button"
+            aria-expanded={attributionOpen}
+            aria-label={attributionOpen ? t('viewer.attribution.less') : t('viewer.attribution.more')}
+            onClick={() => setAttributionOpen((open) => !open)}
+            className="hidden min-h-8 px-3 text-primary compact:block"
+          >
+            {attributionOpen ? '▴' : '▾'}
+          </button>
+        </div>
 
         <TimelinePanel
           track={track}
@@ -690,6 +737,28 @@ export function Scene({ track, showGlow = false }: SceneProps) {
         />
       </div>
     </div>
+  );
+}
+
+/** Строка атрибуции: подпись «Рельеф» / «Подложка» переводится, текст лицензии — дословно. */
+function AttributionLine({ entries, className }: { entries: readonly AttributionEntry[]; className: string }) {
+  const t = useT();
+  return (
+    <p className={`flex-1 px-3 py-1 ${className}`}>
+      {entries.map((entry, index) => (
+        <span key={entry.text}>
+          {index > 0 && ' · '}
+          {entry.label !== undefined && `${t(`viewer.attribution.${entry.label}`)}: `}
+          {entry.href === undefined ? (
+            entry.text
+          ) : (
+            <a href={entry.href} target="_blank" rel="noopener noreferrer" className="text-accent">
+              {entry.text}
+            </a>
+          )}
+        </span>
+      ))}
+    </p>
   );
 }
 

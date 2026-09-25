@@ -48,3 +48,7 @@ jobs:
 
       # Одна дорожка. Сборка web валится при превышении бюджета начальной загрузки (SPEC §7.7).
       - run: pnpm turbo build test lint typecheck
+
+      # Раскладка просмотрщика на телефоне и десктопе (apps/web/e2e). Браузер —
+      # Google Chrome, предустановленный на ubuntu-latest: Playwright его не качает.
+      - run: pnpm turbo e2e
