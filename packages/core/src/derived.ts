@@ -93,3 +93,42 @@ export interface Circle {
   /** Набор высоты за круг, м (отрицательный — снижение). */
   gainM: number;
 }
+
+/** Сила термика по среднему набору, ТЗ §6.3. */
+export type ThermalStrength = 'weak' | 'medium' | 'strong' | 'powerful';
+
+/**
+ * Термик, ТЗ §6.3: полтора оборота и больше подряд с набором. Индексы —
+ * точки сетки 1 Гц; всё в СИ.
+ */
+export interface Thermal {
+  startIndex: number;
+  endIndex: number;
+  /** UTC, мс. */
+  startTimeMs: number;
+  endTimeMs: number;
+  durationS: number;
+  entryAltM: number;
+  exitAltM: number;
+  gainM: number;
+  /** gain / duration — основной показатель. */
+  avgClimbMs: number;
+  /** Максимум демпфированного варио (окно 4 с) внутри. */
+  maxClimbMs: number;
+  /** Оборотов: полные круги плюс доворот до первого и после последнего. */
+  turnCount: number;
+  circleCount: number;
+  avgRadiusM: number;
+  /** Преобладающее направление кругов. */
+  direction: 'cw' | 'ccw';
+  /**
+   * Снос термика, м/с — КУДА сносит (куда дует ветер), по центрам первого и
+   * последнего круга. Метеорологическое «откуда» — +180°, в оценке ветра (§6.5).
+   * null — один круг, сносу не из чего взяться.
+   */
+  driftEastMs: number | null;
+  driftNorthMs: number | null;
+  /** avgClimb / maxClimb — насколько чисто центрировал, 0..1. */
+  efficiency: number;
+  strength: ThermalStrength;
+}

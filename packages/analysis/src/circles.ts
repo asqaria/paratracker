@@ -16,7 +16,10 @@ import { haversineDistance, normalizeSignedDegrees } from './geo.js';
  * Сброс накопления: смена направления поворота (§6.2: «направление не
  * меняется внутри круга»), нет курса (стоит, NaN) и разрыв сетки. Откат
  * курса меньше CIRCLE.counterTurnNoiseDeg за шаг — шум округления координат,
- * а не смена направления: иначе на реальных IGC терялся каждый третий круг.
+ * а не смена направления: иначе на реальных IGC терялся каждый десятый круг.
+ * Круг не начинается с прямой: поворот на прямой — ровно 0 и накопление не
+ * сбрасывает, поэтому перед замером начало окна подрезается до первого шага,
+ * где пилот поворачивает (minTurningRate).
  *
  * Центр и радиус — не «среднее точек и медиана расстояний» из §6.2, а подгонка
  * x(τ) = a + b·τ + A·sin ωτ + B·cos ωτ по каждой оси. ω — фактическая угловая
@@ -39,6 +42,11 @@ export interface CircleColumns {
 }
 
 const GRID_STEP_MS = CLEAN.resampleIntervalS * TIME.msPerSecond;
+
+/** Угловая скорость, ниже которой пилот не поворачивает, °/с (CIRCLE.turningRateFraction). */
+export function minTurningRate(limits: CircleLimits): number {
+  return (CIRCLE.fullTurnDeg / limits.maxPeriodS) * CIRCLE.turningRateFraction;
+}
 const FULL_TURN = CIRCLE.fullTurnDeg - CIRCLE.closureToleranceDeg;
 
 function median(values: number[]): number {
@@ -164,6 +172,7 @@ function turnAt(points: CircleColumns, i: number): number {
 /** Круги трека по порядку времени; limits — пределы типа ЛА (CIRCLE.paraglider и др.). */
 export function detectCircles(points: CircleColumns, limits: CircleLimits): Circle[] {
   const circles: Circle[] = [];
+  const minTurnPerStep = minTurningRate(limits) * CLEAN.resampleIntervalS;
   let start = -1;
   let sum = 0;
 
@@ -183,6 +192,13 @@ export function detectCircles(points: CircleColumns, limits: CircleLimits): Circ
     sum += turn;
 
     while (Math.abs(sum) >= FULL_TURN) {
+      // Прямая в начале окна — не часть круга.
+      const side = Math.sign(sum);
+      while (start < i - 1 && turnAt(points, start + 1) * side < minTurnPerStep) {
+        sum -= turnAt(points, start + 1);
+        start += 1;
+      }
+      if (Math.abs(sum) < FULL_TURN) break;
       // Слишком долгий оборот отсекается сразу, без подгонки: на длинном пологом
       // развороте окно сжимается шаг за шагом, и подгонка на каждом шаге стоила бы O(окно²).
       const periodS = ((points.t[i] ?? Number.NaN) - (points.t[start] ?? Number.NaN)) / TIME.msPerSecond;
