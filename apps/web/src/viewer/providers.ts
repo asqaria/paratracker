@@ -4,6 +4,8 @@
  * Ключ ArcGIS во фронт не попадает — тайлы Esri идут через прокси apps/api.
  */
 
+import type { ImageryCapabilities } from '@skyline/core';
+
 export interface AttributionEntry {
   /** Дословно, как требует лицензия провайдера, — не переводится. */
   text: string;
@@ -107,6 +109,36 @@ export function imagerySources(config: ViewerConfig): ImagerySource[] {
     });
   }
   return sources;
+}
+
+/**
+ * Кнопки подложек: Esri — только если сервер подтвердил настроенный прокси.
+ * Ответа нет или запрос упал — только Sentinel-2: иначе пилот нажимал Esri
+ * и получал синий шар без единого слова.
+ */
+export function availableImagery(
+  sources: readonly ImagerySource[],
+  capabilities: ImageryCapabilities | undefined,
+): ImagerySource[] {
+  return sources.filter((source) => source.id !== 'esri' || capabilities?.esri === true);
+}
+
+/**
+ * Ошибок тайлов подряд, после которых подложка считается сломанной и сцена
+ * откатывается на Sentinel-2. Одиночная ошибка тайла — обычное дело и
+ * подложку срывать не должна; восемь — это уже экран без снимков.
+ */
+export const IMAGERY_FALLBACK_AFTER_ERRORS = 8;
+
+/** Счётчик ошибок тайлов активной подложки: true — ровно один раз, на пороге. */
+export function tileFailureTracker(threshold: number = IMAGERY_FALLBACK_AFTER_ERRORS): { failed(): boolean } {
+  let failures = 0;
+  return {
+    failed: () => {
+      failures += 1;
+      return failures === threshold;
+    },
+  };
 }
 
 export function imagerySourceById(config: ViewerConfig, id: ImageryId): ImagerySource | null {

@@ -1,3 +1,4 @@
+import { ImageryCapabilities } from '@skyline/core';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
@@ -23,6 +24,8 @@ const HTTP = { badRequest: 400, serviceUnavailable: 503, badGateway: 502 } as co
 const MAX_ZOOM = 23;
 const TILE_TIMEOUT_S = 10;
 const MS_PER_SECOND = 1000;
+/** Настройка подложек меняется только перезапуском API — минута кэша безопасна. */
+const CAPABILITIES_MAX_AGE_S = 60;
 
 const TileParams = z.object({
   z: z.coerce.number().int().min(0).max(MAX_ZOOM),
@@ -32,6 +35,13 @@ const TileParams = z.object({
 
 export function registerTileRoutes(app: FastifyInstance, deps: TileRoutesDeps): void {
   const fetchTile = deps.fetchImpl ?? fetch;
+
+  // Какие подложки через сервер реально работают: фронт показывает кнопку Esri
+  // только при настроенном прокси. Ключ наружу не уходит — только факт.
+  app.get('/imagery', async (_request, reply) => {
+    void reply.header('cache-control', `public, max-age=${CAPABILITIES_MAX_AGE_S}`);
+    return ImageryCapabilities.parse({ esri: deps.tileUrlTemplate !== null && deps.apiKey !== null });
+  });
 
   app.get('/tiles/esri/:z/:y/:x', async (request, reply) => {
     if (deps.tileUrlTemplate === null || deps.apiKey === null) {

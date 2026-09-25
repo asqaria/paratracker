@@ -26,6 +26,7 @@ import {
   WebMapTileServiceImageryProvider,
 } from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
+import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { documentColorTokens } from '../design/tokens';
@@ -55,11 +56,14 @@ import {
   type FlightRange,
 } from './ground-calibration';
 import { DEFAULT_PLAYBACK_SPEED, indexAt, MS_PER_SECOND, type PlaybackSpeed, seekBy, timelineOf } from './playback';
+import { fetchImageryCapabilities } from './imagery-capabilities';
 import {
+  availableImagery,
   imagerySourceById,
   imagerySources,
   readViewerConfig,
   terrainSource,
+  tileFailureTracker,
   type ImageryId,
   type ImagerySource,
   type ViewerConfig,
@@ -98,6 +102,9 @@ const SHADOW_WIDTH_PX = 2;
 const ASSUMED_FPS = 60;
 /** Основная кнопка мыши (PointerEvent.button): ею облетают пилота. */
 const PRIMARY_BUTTON = 0;
+
+/** Ответ /api/v1/imagery меняется только с перезапуском API — минуты хватит. */
+const IMAGERY_CAPABILITIES_STALE_MS = 60_000;
 
 /** Высоты рельефа для калибровки ждём не дольше 4 с: медленный Re:Earth не должен задерживать сцену. */
 const CALIBRATION_TIMEOUT_MS = 4000;
@@ -198,6 +205,18 @@ export function Scene({ track, showGlow = false }: SceneProps) {
   }, []);
   const config = 'config' in configured ? configured.config : null;
   const sources = useMemo(() => (config ? imagerySources(config) : []), [config]);
+  // Кнопки — только для подложек, которые сервер подтвердил. Сам Viewer строится
+  // по полному списку: смена sources в его зависимостях пересоздала бы сцену
+  // и сбросила бы время проигрывания, когда придёт ответ.
+  const capabilities = useQuery({
+    queryKey: ['imagery-capabilities'],
+    queryFn: ({ signal }) => fetchImageryCapabilities(signal),
+    staleTime: IMAGERY_CAPABILITIES_STALE_MS,
+    retry: false,
+  });
+  const shownSources = useMemo(() => availableImagery(sources, capabilities.data), [sources, capabilities.data]);
+  const [imageryNotice, setImageryNotice] = useState<string | null>(null);
+  const stopTileWatch = useRef<(() => void) | null>(null);
   const timeline = useMemo(() => timelineOf(track.t), [track]);
 
   const [imagery, setImagery] = useState<ImageryId>('sentinel2');
@@ -531,15 +550,28 @@ export function Scene({ track, showGlow = false }: SceneProps) {
   useHotkeys(hotkeys);
 
   /** Переключение подложки: слой пересоздаётся, атрибуция меняется вместе с ним. */
-  const switchImagery = (id: ImageryId): void => {
+  const switchImagery = (id: ImageryId, notice: string | null = null): void => {
     const viewer = viewerRef.current;
     const source = config ? imagerySourceById(config, id) : null;
     if (!viewer || !source) return;
+    stopTileWatch.current?.();
+    stopTileWatch.current = null;
     viewer.imageryLayers.removeAll();
-    viewer.imageryLayers.add(createImageryProvider(source));
+    const layer = createImageryProvider(source);
+    viewer.imageryLayers.add(layer);
+    // Esri через прокси может перестать отдавать тайлы (истёк ключ, лимит, сбой).
+    // Поток ошибок — откат на Sentinel-2 с объяснением, а не синий шар.
+    // Для Sentinel-2 отката нет: откатываться некуда, пусть будет видно.
+    if (id !== 'sentinel2') {
+      const tracker = tileFailureTracker();
+      stopTileWatch.current = layer.imageryProvider.errorEvent.addEventListener(() => {
+        if (tracker.failed()) switchImagery('sentinel2', t('viewer.imagery.fallback'));
+      });
+    }
     viewer.scene.requestRender();
     imageryRef.current = id;
     setImagery(id);
+    setImageryNotice(notice);
   };
 
   const active = (config ? imagerySourceById(config, imagery) : null) ?? sources[0] ?? null;
@@ -561,7 +593,7 @@ export function Scene({ track, showGlow = false }: SceneProps) {
       <div className="absolute right-4 top-4 flex flex-col gap-2 rounded-xl glass p-3 text-sm">
         <span className="text-secondary">{t('viewer.imagery')}</span>
         <div role="group" aria-label={t('viewer.imagery')} className="flex gap-1">
-          {sources.map((source) => (
+          {shownSources.map((source) => (
             <button
               key={source.id}
               type="button"
@@ -573,6 +605,11 @@ export function Scene({ track, showGlow = false }: SceneProps) {
             </button>
           ))}
         </div>
+        {imageryNotice !== null && (
+          <p role="status" className="max-w-48 text-xs text-danger">
+            {imageryNotice}
+          </p>
+        )}
         <span className="numeric text-secondary">
           {t('viewer.points')}: {track.pointCount}
         </span>
