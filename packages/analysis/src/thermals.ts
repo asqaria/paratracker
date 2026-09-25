@@ -1,11 +1,12 @@
-import { GEO, THERMAL, TIME, type Circle, type CircleLimits, type Thermal, type ThermalStrength } from '@skyline/core';
+import { CLEAN, GEO, THERMAL, TIME, type Circle, type CircleLimits, type Thermal, type ThermalStrength } from '@skyline/core';
 
 import { headingTurns, minTurningRate, type CircleColumns, type HeadingTurns } from './circles.js';
 
 /**
  * ТЗ §6.3: термик — круги подряд (разрыв между ними ≤ 15 с) с набором.
  * Разрыв дольше, но с набором (до THERMAL.maxClimbingGapS), — тот же термик:
- * пилот выпал из ядра и ищет его, не выходя из подъёма.
+ * пилот выпал из ядра и ищет его, не выходя из подъёма. И границы термика —
+ * не последний круг, а конец набора: после кругов пилот может набирать по прямой.
  *
  * «≥ 1.5 круга» — а детекция кругов (§6.2) засчитывает только полные. Поэтому
  * к группе кругов добавляется доворот: до первого полного круга и после
@@ -92,19 +93,49 @@ function driftOf(circles: readonly Circle[]): { east: number; north: number } | 
   };
 }
 
+/** Средний набор между точками a и b, м/с; NaN — между ними разрыв сетки или нет высоты. */
+function climbBetween(points: ThermalColumns, a: number, b: number): number {
+  const dtS = ((points.t[b] ?? Number.NaN) - (points.t[a] ?? Number.NaN)) / TIME.msPerSecond;
+  if (!(dtS > 0) || dtS > (b - a) * CLIMB_GRID_TOLERANCE) return Number.NaN;
+  return ((points.altitude[b] ?? Number.NaN) - (points.altitude[a] ?? Number.NaN)) / dtS;
+}
+
+/** Шаг сетки 1 Гц с запасом: окно длиннее — в нём разрыв. */
+const CLIMB_GRID_TOLERANCE = 1.5;
+
+/**
+ * Отрезок будущего термика: границы, его круги и доворот в оборотах.
+ * climbStart/climbEnd — докуда от крайних кругов не прерывался набор: по ним
+ * решается, один ли это подъём с соседним отрезком.
+ */
+interface Span {
+  start: number;
+  end: number;
+  climbStart: number;
+  climbEnd: number;
+  circles: Circle[];
+  partialTurns: number;
+}
+
 /**
  * Термики по уже найденным кругам (detectCircles). limits — пределы типа ЛА:
  * по ним — скорость поворота, которая ещё считается виражом при довороте.
+ *
+ * Порядок: группы кругов → доворот до первого и после последнего круга →
+ * расширение, пока идёт набор (THERMAL.climbWindowS) → отрезки, которые
+ * сомкнулись, — один термик (подъём между ними не прерывался) → условия §6.3.
  */
 export function detectThermals(points: ThermalColumns, circles: readonly Circle[], limits: CircleLimits): Thermal[] {
   const minTurnRate = minTurningRate(limits);
   const turns = headingTurns(points);
+  const window = Math.max(1, Math.round(THERMAL.climbWindowS / CLEAN.resampleIntervalS));
+  const n = points.t.length;
   const stepTurn = (i: number): number => {
     const rate = stepRateAt(points, turns, i);
     return Number.isFinite(rate) ? Math.abs(rate) : 0;
   };
-  const thermals: Thermal[] = [];
 
+  const spans: Span[] = [];
   for (const group of groupCircles(points, circles)) {
     const first = group[0];
     const last = group.at(-1);
@@ -123,13 +154,48 @@ export function detectThermals(points: ThermalColumns, circles: readonly Circle[
     // …и после последнего — пока пилот не вышел на прямую.
     let end = last.endIndex;
     let trailing = 0;
-    while (end + 1 < points.t.length && trailing < FULL_TURN_DEG) {
+    while (end + 1 < n && trailing < FULL_TURN_DEG) {
       if (!turningWith(turnRateAt(points, turns, end + 1), last.direction)) break;
       trailing += stepTurn(end + 1);
       end += 1;
     }
+    // Термик длится, пока идёт набор — и по прямой тоже (под облаком, в ядре без кругов).
+    let climbEnd = last.endIndex;
+    while (climbEnd + window < n && climbBetween(points, climbEnd, climbEnd + window) > THERMAL.minAvgClimbMs) climbEnd += 1;
+    let climbStart = first.startIndex;
+    while (climbStart - window >= 0 && climbBetween(points, climbStart - window, climbStart) > THERMAL.minAvgClimbMs) {
+      climbStart -= 1;
+    }
 
-    const turnCount = group.length + (leading + trailing) / FULL_TURN_DEG;
+    spans.push({
+      start: Math.min(start, climbStart),
+      end: Math.max(end, climbEnd),
+      climbStart,
+      climbEnd,
+      circles: [...group],
+      partialTurns: (leading + trailing) / FULL_TURN_DEG,
+    });
+  }
+
+  // Набор между отрезками не прерывался — один термик. Сомкнулись только
+  // доворотами (пилот медленно крутил, снижаясь) — два, граница по началу второго.
+  const merged: Span[] = [];
+  for (const span of spans) {
+    const previous = merged.at(-1);
+    if (previous && span.climbStart <= previous.climbEnd) {
+      previous.end = Math.max(previous.end, span.end);
+      previous.climbEnd = Math.max(previous.climbEnd, span.climbEnd);
+      previous.circles.push(...span.circles);
+      previous.partialTurns += span.partialTurns;
+      continue;
+    }
+    if (previous && span.start < previous.end) previous.end = span.start;
+    merged.push({ ...span, circles: [...span.circles] });
+  }
+
+  const thermals: Thermal[] = [];
+  for (const { start, end, circles: group, partialTurns } of merged) {
+    const turnCount = group.length + partialTurns;
     const startTimeMs = points.t[start] ?? Number.NaN;
     const endTimeMs = points.t[end] ?? Number.NaN;
     const durationS = (endTimeMs - startTimeMs) / TIME.msPerSecond;

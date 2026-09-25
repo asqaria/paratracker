@@ -15,8 +15,11 @@ import { detectThermals, type ThermalColumns } from './thermals.js';
  */
 
 const PARAGLIDER = CIRCLE.paraglider;
-/** Граница термика — с точностью до шага поворота курса. */
-const BOUNDARY_TOLERANCE_S = 2;
+/**
+ * Граница термика — конец набора; высота сглажена окном 9 отсчётов (±4 с,
+ * CLEAN.altitudeSmoothingWindow), и сглаженный набор заходит в глайд на столько же.
+ */
+const BOUNDARY_TOLERANCE_S = 4;
 /** Средний набор по округлённой до метра высоте за ~240 с. */
 const CLIMB_TOLERANCE_MS = 0.05;
 /** Снос по центрам кругов (±3 м) за ~200 с. */
@@ -157,6 +160,31 @@ describe('detectThermals — условия §6.3', () => {
     expect(merged).toHaveLength(1);
     expect(merged[0]?.durationS).toBeGreaterThan(160);
     expect(thermals(flight([glide, climb, sinking, climb, glide]))).toHaveLength(2);
+  });
+
+  it('набор по прямой после кругов — тот же термик, пока пилот набирает (граница — конец подъёма)', () => {
+    // Круги минуту, затем 90 с прямо с набором 2 м/с (под облаком), затем глайд.
+    const found = thermals(flight([glide, { seconds: 60, turnDegS: 18, climbMs: 1.5 }, { seconds: 90, turnDegS: 0, climbMs: 2 }, glide]));
+    expect(found).toHaveLength(1);
+    const end = found[0]?.endIndex ?? 0;
+    expect(end).toBeGreaterThanOrEqual(60 + 60 + 90 - THERMAL.climbWindowS);
+    expect(end).toBeLessThanOrEqual(60 + 60 + 90 + 2);
+    expect(found[0]?.gainM).toBeGreaterThan(60 * 1.5 + 90 * 2 - THERMAL.climbWindowS * 2);
+  });
+
+  it('набор по прямой перед кругами — термик начинается с начала подъёма', () => {
+    const found = thermals(flight([glide, { seconds: 60, turnDegS: 0, climbMs: 1.5 }, { seconds: 60, turnDegS: 18, climbMs: 1.5 }, glide]));
+    expect(found).toHaveLength(1);
+    expect(found[0]?.startIndex).toBeLessThanOrEqual(60 + THERMAL.climbWindowS);
+  });
+
+  it('два термика, между которыми 3 минуты набора по прямой, — один', () => {
+    const climb: Leg = { seconds: 60, turnDegS: 18, climbMs: 1.5 };
+    expect(thermals(flight([glide, climb, { seconds: 180, turnDegS: 0, climbMs: 1 }, climb, glide]))).toHaveLength(1);
+  });
+
+  it('набор по прямой без кругов — не термик (динамик, волна)', () => {
+    expect(thermals(flight([glide, { seconds: 200, turnDegS: 0, climbMs: 2 }, glide]))).toEqual([]);
   });
 
   it('классы по среднему набору: слабый < 1, средний 1–3, сильный 3–5, мощный > 5 м/с', () => {
