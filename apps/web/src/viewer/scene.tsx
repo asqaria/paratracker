@@ -384,6 +384,7 @@ export function Scene({ track, showGlow = false }: SceneProps) {
           {attribution.map((entry, index) => (
             <span key={entry.text}>
               {index > 0 && ' · '}
+              {entry.label !== undefined && `${t(`viewer.attribution.${entry.label}`)}: `}
               {entry.href === undefined ? (
                 entry.text
               ) : (

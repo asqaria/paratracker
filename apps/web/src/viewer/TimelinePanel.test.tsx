@@ -2,10 +2,11 @@ import { renderToString } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { useLocaleStore } from '../i18n/locale';
-import { messages } from '../i18n/messages';
+import { messages, type MessageKey } from '../i18n/messages';
 import type { DecodedTrack } from './decode-track';
 import { timelineOf } from './playback';
 import { TimelinePanel } from './TimelinePanel';
+import { groundSpeed, metres, verticalSpeed } from './units';
 
 /**
  * Панель проверяется серверным рендером: canvas и ResizeObserver живут
@@ -56,13 +57,14 @@ describe('TimelinePanel', () => {
   const { locale } = useLocaleStore.getInitialState();
 
   it('показывает телеметрию точки под курсором времени', () => {
-    // Третья секунда полёта: высота 2420 м, варио +2.4 м/с, скорость 12 м/с.
+    // Третья секунда полёта: высота 2420 м, варио +2.4 м/с, скорость 11.6 м/с = 42 км/ч.
     const html = render(START_MS + 2000, false);
+    const t = (key: MessageKey): string => messages[locale][key];
 
     expect(html).toContain('00:00:02');
-    expect(html).toContain('2420');
-    expect(html).toContain('+2.4');
-    expect(html).toContain('12');
+    expect(html).toContain(metres(2420, locale, t));
+    expect(html).toContain(verticalSpeed(2.4, locale, t));
+    expect(html).toContain(groundSpeed(11.6, locale, t));
     expect(html).toContain(messages[locale]['viewer.altitude']);
   });
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-import { useT } from '../i18n/locale';
+import { useLocaleStore, useT } from '../i18n/locale';
 import { buildChartGeometry } from './altitude-chart';
 import { CAMERA_MODES, type CameraMode } from './camera-modes';
 import type { DecodedTrack } from './decode-track';
@@ -13,6 +13,7 @@ import {
   type PlaybackSpeed,
   type TrackTimeline,
 } from './playback';
+import { groundSpeed as formatGroundSpeed, metres, verticalSpeed } from './units';
 import { varioCss } from './vario-palette';
 
 /**
@@ -40,6 +41,7 @@ const LINE_WIDTH_PX = 2.2;
 
 export function TimelinePanel(props: TimelinePanelProps) {
   const t = useT();
+  const locale = useLocaleStore((state) => state.locale);
   const canvas = useRef<HTMLCanvasElement | null>(null);
   const chartBox = useRef<HTMLDivElement | null>(null);
   const dragging = useRef(false);
@@ -47,7 +49,7 @@ export function TimelinePanel(props: TimelinePanelProps) {
   const index = indexAt(props.track.t, props.timeMs);
   const altitude = props.track.alt[index] ?? Number.NaN;
   const vSpeed = props.track.vSpeed[index] ?? Number.NaN;
-  const groundSpeed = props.track.gSpeed[index] ?? Number.NaN;
+  const groundSpeedText = formatGroundSpeed(props.track.gSpeed[index] ?? Number.NaN, locale, t);
   const fraction = fractionAt(props.timeline, props.timeMs);
 
   /** График перерисовывается на изменение размера и трека, но не на каждый кадр. */
@@ -159,17 +161,17 @@ export function TimelinePanel(props: TimelinePanelProps) {
           </div>
           <div className="flex gap-1">
             <dt className="text-secondary">{t('viewer.altitude')}</dt>
-            <dd>{Number.isFinite(altitude) ? `${Math.round(altitude)} м` : '—'}</dd>
+            <dd>{metres(altitude, locale, t)}</dd>
           </div>
           <div className="flex gap-1">
             <dt className="text-secondary">{t('viewer.vario')}</dt>
             <dd style={{ color: varioCss(vSpeed) }}>
-              {Number.isFinite(vSpeed) ? `${vSpeed >= 0 ? '+' : ''}${vSpeed.toFixed(1)} м/с` : '—'}
+              {verticalSpeed(vSpeed, locale, t)}
             </dd>
           </div>
           <div className="flex gap-1">
             <dt className="text-secondary">{t('viewer.groundSpeed')}</dt>
-            <dd>{Number.isFinite(groundSpeed) ? `${Math.round(groundSpeed)} м/с` : '—'}</dd>
+            <dd>{groundSpeedText}</dd>
           </div>
         </dl>
       </div>
