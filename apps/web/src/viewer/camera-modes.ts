@@ -52,3 +52,24 @@ export function smoothHeading(previous: number | null, targetDeg: number, elapse
   const k = Math.min(1, Math.max(0, elapsedS / CHASE_SMOOTHING_TAU_S));
   return previous + shortestTurn(previous, targetDeg) * k;
 }
+
+/** Курс, если его нет ни в одной точке трека: камера смотрит на север. */
+const FALLBACK_HEADING_DEG = 0;
+
+/**
+ * Курс для камеры в точке index. Пока пилот стоит (смещение за шаг меньше
+ * MOTION.minMovementForHeadingM), курс в треке — NaN: берём последний
+ * известный до точки, а на стартовой стоянке — первый известный после.
+ * NaN в camera.lookAt останавливает рендер Cesium целиком.
+ */
+export function nearestHeading(heading: Float64Array, index: number): number {
+  for (let i = Math.min(index, heading.length - 1); i >= 0; i--) {
+    const value = heading[i] ?? Number.NaN;
+    if (!Number.isNaN(value)) return value;
+  }
+  for (let i = index + 1; i < heading.length; i++) {
+    const value = heading[i] ?? Number.NaN;
+    if (!Number.isNaN(value)) return value;
+  }
+  return FALLBACK_HEADING_DEG;
+}

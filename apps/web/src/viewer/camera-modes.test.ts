@@ -6,6 +6,7 @@ import {
   CAMERA_POSES,
   CHASE_SMOOTHING_TAU_S,
   DEFAULT_CAMERA_MODE,
+  nearestHeading,
   shortestTurn,
   smoothHeading,
 } from './camera-modes';
@@ -56,5 +57,27 @@ describe('smoothHeading', () => {
 
   it('курс не определён — держим прежний', () => {
     expect(smoothHeading(42, Number.NaN, 1)).toBe(42);
+  });
+});
+
+describe('nearestHeading — курс для камеры, когда пилот стоит', () => {
+  const nan = Number.NaN;
+
+  it('курс в точке есть — он и берётся', () => {
+    expect(nearestHeading(Float64Array.from([10, 20, 30]), 1)).toBe(20);
+  });
+
+  it('стоянка посреди полёта — последний известный курс до неё', () => {
+    expect(nearestHeading(Float64Array.from([10, 20, nan, nan, 50]), 3)).toBe(20);
+  });
+
+  it('стоянка на старте — первый известный курс после неё', () => {
+    // Реальный трек: первые 14 точек без курса, камера Chase падала с NaN.
+    expect(nearestHeading(Float64Array.from([nan, nan, nan, 75, 80]), 0)).toBe(75);
+  });
+
+  it('курса нет во всём треке — север, а не NaN', () => {
+    expect(nearestHeading(Float64Array.from([nan, nan]), 1)).toBe(0);
+    expect(nearestHeading(new Float64Array(0), 0)).toBe(0);
   });
 });

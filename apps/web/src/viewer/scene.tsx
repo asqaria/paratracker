@@ -38,7 +38,7 @@ import {
   zoomBy,
   type CameraAdjust,
 } from './camera-input';
-import { CAMERA_POSES, DEFAULT_CAMERA_MODE, smoothHeading, type CameraMode } from './camera-modes';
+import { CAMERA_POSES, DEFAULT_CAMERA_MODE, nearestHeading, smoothHeading, type CameraMode } from './camera-modes';
 import type { DecodedTrack } from './decode-track';
 import { setupFlightClock, type FlightClock } from './flight-clock';
 import {
@@ -294,10 +294,12 @@ export function Scene({ track, showGlow = false }: SceneProps) {
           if (!position) return;
 
           // Сглаживается только курс полёта; поправка мыши применяется сразу.
-          const target = modePose.headingDeg ?? (track.heading[index] ?? Number.NaN);
+          const target = modePose.headingDeg ?? nearestHeading(track.heading, index);
           const elapsedS = Math.abs(viewer.clock.multiplier) / ASSUMED_FPS;
           smoothHeadingRef.current = smoothHeading(smoothHeadingRef.current, target, elapsedS);
           const pose = poseFor(mode, adjust, smoothHeadingRef.current);
+          // NaN в lookAt останавливает рендер Cesium целиком — лучше пропустить кадр.
+          if (![pose.headingDeg, pose.pitchDeg, pose.rangeM].every(Number.isFinite)) return;
           viewer.camera.lookAt(
             position,
             new HeadingPitchRange(
