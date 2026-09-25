@@ -47,15 +47,16 @@ import type { DecodedTrack } from './decode-track';
 import { setupFlightClock, type FlightClock } from './flight-clock';
 import {
   calibrateAltitudes,
+  fillTerrain,
   flightRange,
-  GROUND_CALIBRATION,
   groundAnchor,
   groundOffset,
-  groundSegment,
+  groundWindow,
   settleOnGround,
+  terrainSampleIndices,
   type FlightRange,
 } from './ground-calibration';
-import { DEFAULT_PLAYBACK_SPEED, indexAt, MS_PER_SECOND, type PlaybackSpeed, seekBy, timelineOf } from './playback';
+import { DEFAULT_PLAYBACK_SPEED, indexAt, type PlaybackSpeed, seekBy, timelineOf } from './playback';
 import { fetchImageryCapabilities } from './imagery-capabilities';
 import {
   availableImagery,
@@ -106,47 +107,54 @@ const PRIMARY_BUTTON = 0;
 /** Ответ /api/v1/imagery меняется только с перезапуском API — минуты хватит. */
 const IMAGERY_CAPABILITIES_STALE_MS = 60_000;
 
-/** Высоты рельефа для калибровки ждём не дольше 4 с: медленный Re:Earth не должен задерживать сцену. */
+/**
+ * Высоты рельефа у старта и посадки ждём не дольше 4 с: медленный Re:Earth не
+ * должен задерживать сцену. По длинной ходьбе (подъём пешком — часы) — ещё до 6 с.
+ */
 const CALIBRATION_TIMEOUT_MS = 4000;
+const WALK_TERRAIN_TIMEOUT_MS = 6000;
+
+/** Высоты рельефа в точках трека или null, если не пришли вовремя. */
+async function sampleTerrain(
+  terrain: TerrainProvider,
+  track: DecodedTrack,
+  indices: readonly number[],
+  timeoutMs: number,
+): Promise<number[] | null> {
+  if (indices.length === 0) return [];
+  const places = indices.map((i) => Cartographic.fromDegrees(track.lon[i] ?? Number.NaN, track.lat[i] ?? Number.NaN));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), timeoutMs);
+  });
+  const sampled = await Promise.race([sampleTerrainMostDetailed(terrain, places), timeout]).catch(() => null);
+  clearTimeout(timer);
+  return sampled ? sampled.map((place) => place.height) : null;
+}
 
 /**
  * Трек для сцены, откалиброванный по земле (ground-calibration.ts): полёт
  * сдвигается поправками старта и посадки, ходьба до взлёта и после посадки
- * ложится ровно на рельеф — тот, который сцена рисует. Нет ответа рельефа —
- * трек как есть. Данные трека не меняются.
+ * ложится ровно на рельеф — тот, который сцена рисует. Рельеф спрашивается
+ * в два захода: точно у старта и посадки (без них калибровки нет) и редко по
+ * длинной ходьбе (не пришло — ходьба остаётся со сдвигом стартовой поправки).
+ * Данные трека не меняются.
  */
 async function calibratedForScene(
   terrain: TerrainProvider,
   track: DecodedTrack,
   range: FlightRange,
 ): Promise<DecodedTrack> {
-  const n = track.pointCount;
-  const onGround: number[] = [];
-  // Рельеф нужен для ходьбы и для плавного перехода в первые/последние секунды полёта.
-  const transitionMs = GROUND_CALIBRATION.transitionS * MS_PER_SECOND;
-  const takeoffMs = track.t[range.takeoff] ?? Number.NaN;
-  const landingMs = track.t[range.landing] ?? Number.NaN;
-  for (let i = 0; i < n; i++) {
-    const tMs = track.t[i] ?? Number.NaN;
-    if (tMs <= takeoffMs + transitionMs || tMs >= landingMs - transitionMs) onGround.push(i);
-  }
-  if (onGround.length === 0) return track;
+  const { exact, sparse } = terrainSampleIndices(track.t, range);
+  const exactHeights = await sampleTerrain(terrain, track, exact, CALIBRATION_TIMEOUT_MS);
+  if (!exactHeights) return track;
 
-  const places = onGround.map((i) => Cartographic.fromDegrees(track.lon[i] ?? Number.NaN, track.lat[i] ?? Number.NaN));
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<null>((resolve) => {
-    timer = setTimeout(() => resolve(null), CALIBRATION_TIMEOUT_MS);
-  });
-  const sampled = await Promise.race([sampleTerrainMostDetailed(terrain, places), timeout]).catch(() => null);
-  clearTimeout(timer);
-  if (!sampled) return track;
-
-  const terrainHeights = new Float64Array(n).fill(Number.NaN);
-  onGround.forEach((i, k) => {
-    terrainHeights[i] = sampled[k]?.height ?? Number.NaN;
+  const terrainHeights = new Float64Array(track.pointCount).fill(Number.NaN);
+  exact.forEach((i, k) => {
+    terrainHeights[i] = exactHeights[k] ?? Number.NaN;
   });
   const [start, end] = (['start', 'end'] as const).map((side) => {
-    const indices = groundSegment(track.t, track.lat, track.lon, track.gSpeed, side);
+    const indices = groundWindow(track.t, range, side);
     const offset = groundOffset(
       indices.map((i) => track.alt[i] ?? Number.NaN),
       indices.map((i) => terrainHeights[i] ?? Number.NaN),
@@ -154,7 +162,14 @@ async function calibratedForScene(
     return groundAnchor(track.t, indices, offset, side);
   });
   const calibrated = calibrateAltitudes(track.t, track.alt, start ?? null, end ?? null);
-  return { ...track, alt: settleOnGround(track.t, calibrated, terrainHeights, range) };
+
+  const walkHeights = await sampleTerrain(terrain, track, sparse, WALK_TERRAIN_TIMEOUT_MS);
+  if (!walkHeights) return { ...track, alt: settleOnGround(track.t, calibrated, terrainHeights, range) };
+  sparse.forEach((i, k) => {
+    terrainHeights[i] = walkHeights[k] ?? Number.NaN;
+  });
+  const filled = fillTerrain(track.t, terrainHeights, range);
+  return { ...track, alt: settleOnGround(track.t, calibrated, filled, range) };
 }
 
 /** Поправки мыши для следящего режима; у Free их нет — там управляет Cesium. */
@@ -286,7 +301,7 @@ export function Scene({ track, showGlow = false }: SceneProps) {
         if (credits instanceof HTMLElement) credits.style.display = 'none';
 
         // Линия и пилот — по высоте, откалиброванной по земле; телеметрия — по данным.
-        const range = flightRange(track.t, track.lat, track.lon, track.gSpeed);
+        const range = flightRange(track.t, track.gSpeed);
         const shown = await calibratedForScene(terrain, track, range);
         if (disposed) return;
 
