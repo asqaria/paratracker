@@ -45,11 +45,20 @@
 |---|---|---|
 | IGC, `HFALG:ELL` (или `HFALGALTGPS:ELL`) | эллипсоид | как есть |
 | IGC, `HFALG:GEO` | геоид | `+ N` |
-| IGC без `HFALG`, `NKN` | см. открытый вопрос 1 | предварительно `+ N` |
+| IGC без `HFALG`, `HFALG:NKN` | по умолчанию — геоид (см. «Датум по умолчанию») | `+ N` |
 | IGC, `HFALG:NIL` | GNSS-высоты нет | `altGnss = NaN` |
 | GPX `<ele>` | уровень моря (де-факто у Garmin и телефонов) | `+ N` |
 | KML altitude, `altitudeMode absolute` | «над уровнем моря» по спецификации KML | `+ N` |
 | Баровысота IGC | давление по ISA, не высота | не трогаем — см. «Не входит» |
+
+#### Датум по умолчанию для IGC: геоид
+
+Две спецификации расходятся сознательно:
+
+- **IGC FR Specification** (планеры), глоссарий и §2.2.4.1.2: «GNSS altitude data must be with respect to the WGS84 Ellipsoid which is the IGC GNSS altitude zero datum». Коды заголовка `HF ALG` (приложение A3): `ELL` — «mandatory zero-datum for IGC FRs», `GEO` — «WGS84 Geoid (approx Sea Level datum)», `NKN` — датум неизвестен, `NIL` — высота не записана.
+- **CIVL, FAI Sporting Code Section 7H** (парапланы и дельтапланы, редакция 2018), §3.2.1: «GNSS altitude must be recorded with reference to the WGS84 geoid, as opposed to the ellipsoid which is a requirement for official IGC flight recorders. The reason for this major deviation from the IGC Specification is that this is what HPG instruments have always recorded». §3.2.3 обязывает такие приборы писать `HFALGALTGPS:GEO`.
+
+Мы — продукт для парапланеристов, поэтому IGC без заголовка и с `NKN` считаем записанным над геоидом: так парапланерные приборы писали всегда, и это закреплено в CIVL. Ошибка возможна только для сертифицированных планерных логгеров без заголовка — на них трек сместится на `N`, как сейчас у всех. Такие файлы отмечаются в `meta` как `assumed-geoid`, чтобы их было видно в логах.
 
 Датум, который был в источнике, сохраняется в `meta.gnssAltitudeDatum: 'ellipsoid' | 'geoid' | 'assumed-geoid' | 'none'` — для диагностики и логов. `assumed-geoid` — когда датум не объявлен и принят по умолчанию.
 
@@ -63,7 +72,7 @@ EGM2008 точнее описывает Землю, но приёмник её �
 
 ### Откуда данные: два варианта
 
-**A (рекомендую). Пакет `egm96-universal`** (MIT, сетка EGM96 15′, ~5.5 МБ в `node_modules`).
+**A — выбран. Пакет `egm96-universal`** (MIT, сетка EGM96 15′, ~5.5 МБ в `node_modules`).
 - Зависимость с точной версией в `packages/parsing`, обёрнута в свой модуль `geoid.ts`. Остальной код про пакет не знает, заменить его — правка одного файла.
 - Корректность проверяется не доверием к пакету, а тестом на опорных значениях (см. «Тесты»).
 
@@ -104,9 +113,18 @@ export function geoidHeightM(latDeg: number, lonDeg: number): number;
 - Поправка на DSM/DTM рельефа (лес, застройка — ТЗ §4.4).
 - Свой рельеф и переход с Re:Earth (Фаза 6).
 
-## Открытые вопросы (закрыть до плана)
+## Решённые вопросы
 
-1. **IGC без `HFALG`.** Что по спецификации IGC означает отсутствие заголовка — эллипсоид или «не указано»? Решение о значении по умолчанию принять по тексту спецификации FAI/IGC (приложение про H-записи), а не по памяти. Если спецификация говорит «эллипсоид», но реальные логгеры без заголовка пишут уровень моря — выбирать по данным: собрать хотя бы по одному такому файлу от распространённых приборов в рамках проверки на 20 треках.
-2. **Вариант данных — A или B.** Рекомендую A.
+1. **IGC без `HFALG`** — геоид, по CIVL Section 7H §3.2.1 (см. «Датум по умолчанию»).
+2. **Данные геоида** — вариант A, пакет `egm96-universal` в обёртке `geoid.ts`.
+
+## Открытые вопросы
+
 3. **Калибровка баро** — делать следующей задачей сразу после этой? Без неё проверка на 20 реальных треках с вариометров даст ту же картину «трек над землёй».
 4. **Приёмник не на EGM96.** Если какой-то прибор переводит в «уровень моря» по другой модели, остаток после пересчёта будет единицы метров — внутри шума GNSS и порога приёмки ±10 м. Отдельно не лечим; фиксируем, если проверка на 20 треках покажет систематику по конкретному прибору.
+
+## Источники
+
+- IGC FR Specification with AL8 (2023): <https://xp-soaring.github.io/igc_file_format/igc_fr_specification_with_al8_2023-2-1_0.pdf>
+- FAI Sporting Code Section 7H — CIVL Flight Recorder Specification (2018): <https://www.fai.org/sites/default/files/civl/documents/sporting_code_s7_h_-_civl_flight_recorder_specification_2018_v0.9.0.pdf>
+- XCSoar PR #1611 — переход записи B-record на эллипсоид: <https://github.com/XCSoar/XCSoar/pull/1611>
