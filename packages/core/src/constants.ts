@@ -72,6 +72,7 @@ export interface CircleLimits {
 export const CIRCLE: Record<AircraftType, CircleLimits> & {
   fullTurnDeg: number;
   counterTurnNoiseDeg: number;
+  turningRateFraction: number;
   closureToleranceDeg: number;
 } = {
   /** ТЗ §6.2: радиус 15–120 м, период 10–35 с. */
@@ -97,11 +98,35 @@ export const CIRCLE: Record<AircraftType, CircleLimits> & {
    */
   counterTurnNoiseDeg: 10,
   /**
+   * «Пилот поворачивает» — не медленнее этой доли угловой скорости самого
+   * медленного круга (360° / maxPeriodS). Медленнее — это прямая с шумом курса:
+   * с неё круг не начинается, и доворот термика на ней кончается.
+   */
+  turningRateFraction: 0.5,
+  /**
    * Сумма поворотов курса — сумма чисел с плавающей точкой: ровный круг из
    * 20 шагов по 18° даёт 359.99999999999994. Допуск много меньше шага курса.
    */
   closureToleranceDeg: 1e-6,
 };
+
+/** Детекция термиков, ТЗ §6.3. */
+export const THERMAL = {
+  /** ТЗ §6.3: термик — не меньше полутора оборотов подряд… */
+  minTurns: 1.5,
+  /** …со средним набором больше 0.2 м/с (меньше — это «держаться», не набор). */
+  minAvgClimbMs: 0.2,
+  /** ТЗ §6.3: разрыв между кругами до 15 с — ещё тот же термик (пилот поправил центр). */
+  maxCircleGapS: 15,
+  /**
+   * Доворот до первого круга и после последнего судится по среднему повороту
+   * за столько секунд: одиночный шаг с нулевым поворотом (два одинаковых курса
+   * после округления IGC) — не выход на прямую.
+   */
+  turnRateWindowS: 3,
+  /** ТЗ §6.3: классы по среднему набору, м/с: слабый < 1, средний 1–3, сильный 3–5, мощный > 5. */
+  strengthUpperBoundsMs: { weak: 1, medium: 3, strong: 5 },
+} as const;
 
 export const TIME = {
   msPerSecond: 1000,

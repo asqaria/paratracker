@@ -155,6 +155,19 @@ describe('detectCircles — отсечки §6.2', () => {
     expect(circles.every((c) => c.direction === 'cw')).toBe(true);
   });
 
+  it('прямой участок перед виражом не входит в круг: круг — с первого поворота', () => {
+    // 16 с прямо, затем круги по 20 с. Поворот на прямой — ровно 0, накопление не
+    // сбрасывается; без обрезки начала первый «круг» захватывал бы прямую (35 с).
+    const straightThenCircles = (s: number) => {
+      if (s <= 16) return { east: 0, north: 10 * s };
+      const a = (2 * Math.PI * (s - 16)) / 20;
+      return { east: 32 - 32 * Math.cos(a), north: 160 + 32 * Math.sin(a) };
+    };
+    const [first] = detectCircles(columnsOf(120, straightThenCircles), PARAGLIDER);
+    expect(first?.startIndex).toBeGreaterThanOrEqual(15);
+    expect(first?.periodS).toBeLessThanOrEqual(21);
+  });
+
   it('прямой полёт — кругов нет', () => {
     expect(detectCircles(columnsOf(300, (s) => ({ east: 10 * s, north: 2 * s })), PARAGLIDER)).toEqual([]);
   });
