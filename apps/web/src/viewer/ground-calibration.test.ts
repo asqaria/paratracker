@@ -2,63 +2,136 @@ import { describe, expect, it } from 'vitest';
 
 import {
   calibrateAltitudes,
+  fillTerrain,
   flightRange,
   GROUND_CALIBRATION,
-  settleOnGround,
   groundAnchor,
-  groundIndices,
   groundOffset,
+  groundWindow,
   offsetAt,
+  settleOnGround,
+  terrainSampleIndices,
   type GroundAnchor,
 } from './ground-calibration';
 
-/**
- * Синтетический трек: stillStart с стоит на старте, потом летит на восток
- * 12 м/с (точки разбега не попадают ровно на границу радиуса 30 м), в конце stillEnd с стоит на посадке. Шаг 1 с. Широта 43° — метры
- * в градусы по сфере, как в самой функции.
- */
-const LAT = 43;
-const METRES_PER_DEG_LAT = 111_320;
-const METRES_PER_DEG_LON = METRES_PER_DEG_LAT * Math.cos((LAT * Math.PI) / 180);
+/** Шаг 1 с: t в мс по номеру точки. */
+const times = (n: number): Float64Array => Float64Array.from({ length: n }, (_, i) => i * 1000);
 
-function track(stillStart: number, flying: number, stillEnd: number) {
-  const n = stillStart + flying + stillEnd;
-  const t = new Float64Array(n);
-  const lat = new Float64Array(n).fill(LAT);
-  const lon = new Float64Array(n);
-  let x = 0;
-  for (let i = 0; i < n; i++) {
-    t[i] = i * 1000;
-    if (i >= stillStart && i < stillStart + flying) x += 12;
-    lon[i] = 77 + x / METRES_PER_DEG_LON;
-  }
-  return { t, lat, lon, n };
+/**
+ * Путевая скорость синтетического трека по участкам: [секунд, м/с]. Ходьба в гору
+ * — 1.3 м/с (замер на реальном подъёме пешком), полёт — 10 м/с, разбег — 4.5 м/с.
+ */
+function speeds(...parts: Array<[seconds: number, speedMs: number]>): Float64Array {
+  return Float64Array.from(parts.flatMap(([seconds, speed]) => Array.from({ length: seconds }, () => speed)));
 }
 
-/** Путевая скорость по синтетическому треку: на земле 0, в полёте 12 м/с. */
-const speeds = (stillStart: number, flying: number, stillEnd: number): Float64Array =>
-  Float64Array.from({ length: stillStart + flying + stillEnd }, (_, i) =>
-    i >= stillStart && i < stillStart + flying ? 12 : 0,
-  );
-
-describe('groundIndices — точки на земле у старта и посадки', () => {
-  it('стоянка на старте: точки до взлёта, в радиусе от первой точки', () => {
-    const { t, lat, lon } = track(20, 100, 15);
-    const start = groundIndices(t, lat, lon, 'start');
-    // 20 с стоянки + первые 2 с разбега (12 и 24 м) в радиусе 30 м; 36 м — уже нет.
-    expect(start).toEqual(Array.from({ length: 22 }, (_, i) => i));
+describe('flightRange — взлёт и посадка по скорости', () => {
+  it('подъём пешком полтора часа — не полёт: взлёт после него', () => {
+    const speed = speeds([5400, 1.3], [3, 4.5], [600, 10], [120, 0]);
+    const range = flightRange(times(speed.length), speed);
+    expect(range.takeoff).toBeGreaterThanOrEqual(5400);
+    expect(range.takeoff).toBeLessThanOrEqual(5403);
   });
 
-  it('посадка: точки после приземления, в радиусе от последней точки', () => {
-    const { t, lat, lon, n } = track(20, 100, 15);
-    const end = groundIndices(t, lat, lon, 'end');
-    expect(end.every((i) => i >= n - 18)).toBe(true);
-    expect(end).toContain(n - 1);
+  it('короткий разбег не взлёт — взлёт, когда скорость держится', () => {
+    // Два разбега по 5 с с остановкой, потом настоящий взлёт.
+    const speed = speeds([60, 0], [5, 5], [20, 0], [5, 5], [20, 0], [600, 10]);
+    expect(flightRange(times(speed.length), speed).takeoff).toBeGreaterThanOrEqual(110);
   });
 
-  it('только внутри окна по времени, даже если пилот долго стоит', () => {
-    const { t, lat, lon } = track(300, 50, 10);
-    expect(groundIndices(t, lat, lon, 'start').length).toBe(GROUND_CALIBRATION.windowS + 1);
+  it('запись началась в воздухе — взлёт на первой точке', () => {
+    const speed = speeds([600, 10], [60, 0]);
+    expect(flightRange(times(speed.length), speed).takeoff).toBe(0);
+  });
+
+  it('после посадки пилот 30 минут идёт к дороге — это не полёт', () => {
+    const speed = speeds([60, 0], [600, 10], [1800, 1.3]);
+    const range = flightRange(times(speed.length), speed);
+    expect(range.landing).toBeGreaterThanOrEqual(659);
+    expect(range.landing).toBeLessThanOrEqual(661);
+  });
+
+  it('запись оборвалась в воздухе — посадка на последней точке', () => {
+    const speed = speeds([60, 0], [600, 10]);
+    expect(flightRange(times(speed.length), speed).landing).toBe(speed.length - 1);
+  });
+
+  it('полёта нет вовсе (запись на земле) — весь трек земля', () => {
+    const speed = speeds([200, 1]);
+    const range = flightRange(times(speed.length), speed);
+    expect(range.takeoff).toBeGreaterThanOrEqual(range.landing);
+  });
+});
+
+describe('groundWindow — где пилот стоит на старте и на посадке', () => {
+  it('минута перед взлётом и минута после посадки, по времени', () => {
+    const t = times(1000);
+    const range = { takeoff: 300, landing: 800 };
+    const start = groundWindow(t, range, 'start');
+    const end = groundWindow(t, range, 'end');
+    expect(start[0]).toBe(300 - GROUND_CALIBRATION.groundWindowS);
+    expect(start.at(-1)).toBe(300);
+    expect(end[0]).toBe(800);
+    expect(end.at(-1)).toBe(800 + GROUND_CALIBRATION.groundWindowS);
+  });
+
+  it('у края записи — сколько есть', () => {
+    const t = times(100);
+    expect(groundWindow(t, { takeoff: 10, landing: 95 }, 'start')).toEqual(Array.from({ length: 11 }, (_, i) => i));
+    expect(groundWindow(t, { takeoff: 10, landing: 95 }, 'end')).toEqual([95, 96, 97, 98, 99]);
+  });
+
+  it('взлёт на первой точке — у старта земли нет', () => {
+    expect(groundWindow(times(100), { takeoff: 0, landing: 99 }, 'start')).toEqual([0]);
+  });
+});
+
+describe('terrainSampleIndices — где спрашивать рельеф', () => {
+  const t = times(4000);
+  const range = { takeoff: 3000, landing: 3500 };
+  const { exact, sparse } = terrainSampleIndices(t, range);
+
+  it('у стыков — каждая точка: окна поправок и плавного перехода', () => {
+    for (const i of [3000 - GROUND_CALIBRATION.groundWindowS, 2999, 3000, 3001, 3000 + GROUND_CALIBRATION.transitionS, 3500, 3520]) {
+      expect(exact).toContain(i);
+    }
+  });
+
+  it('длинная ходьба — не чаще раза в terrainSampleStepS, но с первой точкой', () => {
+    expect(sparse[0]).toBe(0);
+    const steps = sparse.slice(1).map((i, k) => i - (sparse[k] ?? 0));
+    expect(Math.min(...steps)).toBeGreaterThanOrEqual(GROUND_CALIBRATION.terrainSampleStepS);
+    // 3000 с ходьбы до взлёта — около трёхсот точек, а не три тысячи.
+    expect(sparse.filter((i) => i < 3000).length).toBeLessThan(3000 / GROUND_CALIBRATION.terrainSampleStepS + 2);
+  });
+
+  it('внутри полёта рельеф не нужен', () => {
+    const middle = (3000 + 3500) / 2;
+    expect([...exact, ...sparse].some((i) => i === middle)).toBe(false);
+  });
+});
+
+describe('fillTerrain — рельеф между редкими точками ходьбы', () => {
+  it('линейно по времени между соседними известными', () => {
+    const t = times(21);
+    const terrain = new Float64Array(21).fill(Number.NaN);
+    terrain[0] = 1000;
+    terrain[10] = 1100;
+    terrain[20] = 1300;
+    const filled = fillTerrain(t, terrain, { takeoff: 20, landing: 20 });
+    expect(filled[5]).toBeCloseTo(1050, 9);
+    expect(filled[15]).toBeCloseTo(1200, 9);
+  });
+
+  it('через полёт не тянет: внутри полёта остаётся NaN', () => {
+    const t = times(100);
+    const terrain = new Float64Array(100).fill(Number.NaN);
+    terrain[0] = 1000;
+    terrain[99] = 500;
+    const filled = fillTerrain(t, terrain, { takeoff: 10, landing: 90 });
+    expect(filled[50]).toBeNaN();
+    expect(filled[5]).toBe(1000); // до взлёта — ближайшая известная
+    expect(filled[95]).toBe(500);
   });
 });
 
@@ -151,37 +224,6 @@ describe('groundAnchor — момент, к которому привязана 
 
   it('поправки нет — привязки нет', () => {
     expect(groundAnchor(t, [0, 1, 2], null, 'start')).toBeNull();
-  });
-});
-
-describe('flightRange — где полёт, а где ходьба по земле', () => {
-  it('от взлёта (последняя точка на земле у старта) до посадки (первая у финиша)', () => {
-    const { t, lat, lon, n } = track(20, 100, 15);
-    const range = flightRange(t, lat, lon, speeds(20, 100, 15));
-    expect(range.takeoff).toBe(21); // 20 с стоянки + 12 и 24 м разбега
-    expect(range.landing).toBeGreaterThanOrEqual(n - 18);
-    expect(range.landing).toBeLessThan(n);
-  });
-
-  it('запись началась в воздухе — полёт с первой точки', () => {
-    const { t, lat, lon, n } = track(0, 100, 15);
-    expect(flightRange(t, lat, lon, speeds(0, 100, 15)).takeoff).toBe(0);
-    expect(n).toBeGreaterThan(0);
-  });
-
-  it('кружит в термике у первой точки — это не земля: слишком быстро', () => {
-    // 60 с по кругу радиусом 20 м со скоростью 8 м/с — все точки в радиусе 30 м.
-    const n = 120;
-    const t = Float64Array.from({ length: n }, (_, i) => i * 1000);
-    const lat = Float64Array.from({ length: n }, (_, i) => LAT + (20 * Math.sin((i * 8) / 20)) / METRES_PER_DEG_LAT);
-    const lon = Float64Array.from({ length: n }, (_, i) => 77 + (20 * (1 - Math.cos((i * 8) / 20))) / METRES_PER_DEG_LON);
-    const gSpeed = new Float64Array(n).fill(8);
-    expect(flightRange(t, lat, lon, gSpeed)).toEqual({ takeoff: 0, landing: n - 1 });
-  });
-
-  it('запись оборвалась в воздухе — полёт до последней точки', () => {
-    const { t, lat, lon, n } = track(20, 100, 0);
-    expect(flightRange(t, lat, lon, speeds(20, 100, 0)).landing).toBe(n - 1);
   });
 });
 

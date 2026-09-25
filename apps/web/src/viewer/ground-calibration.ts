@@ -12,14 +12,17 @@
  */
 
 export const GROUND_CALIBRATION = {
-  /** Точки на земле ищутся в первые и последние 60 с записи: дальше пилот уже в воздухе. */
-  windowS: 60,
   /**
-   * …и не дальше 30 м от первой/последней точки. Пилоты взлетают через 20–30 с
-   * после начала записи: без радиуса окно по времени захватывало полёт (замер
-   * на реальных треках, спек высот).
+   * Полёт — путевая скорость выше 4 м/с, державшаяся 30 с (по медиане). Ходьба
+   * в гору — 1–2.5 м/с (замер: подъём пешком 1.3 м/с больше полутора часов),
+   * разбег на старте — 3–5 м/с, но несколько секунд; параплан в воздухе —
+   * 8–12 м/с. Проверено на 51 реальном треке: подъём пешком больше не
+   * засчитывается полётом, обычные старты сдвигаются не больше чем на полминуты.
    */
-  groundRadiusM: 30,
+  flyingSpeedMs: 4,
+  flyingWindowS: 30,
+  /** Поправки считаются по минуте перед взлётом и минуте после посадки: пилот стоит на старте. */
+  groundWindowS: 60,
   /** Меньше 5 точек на земле — запись началась (кончилась) в воздухе, калибровать не по чему. */
   minGroundFixes: 5,
   /**
@@ -39,72 +42,20 @@ export const GROUND_CALIBRATION = {
   /** Пилот на земле стоит, подвесная система — примерно в метре над склоном. */
   harnessHeightM: 1,
   /**
-   * Земля — это ходьба: медианная путевая скорость точек не выше 3 м/с. Без
-   * этого запись, начатая в воздухе в термике, держалась бы в радиусе 30 м от
-   * первой точки и сошла бы за стоянку; параплан в воздухе заметно быстрее.
-   */
-  maxGroundSpeedMs: 3,
-  /**
    * Первые и последние 15 с полёта трек плавно уходит от земли и возвращается
    * к ней: GPS-высота у земли отстаёт, и резкий стык давал ступеньку в 15–19 м.
    * 15 с — разбег и первые секунды над склоном, пока крыло набирает скорость.
    */
   transitionS: 15,
+  /**
+   * Длинная ходьба (подъём пешком — часы, тысячи точек) ложится на рельеф по
+   * точкам не чаще раза в 10 с, между ними — линейно: склон за 10 с шага не
+   * меняется, а запрос рельефа на каждую точку не укладывался бы во время.
+   */
+  terrainSampleStepS: 10,
 } as const;
 
 const MS_PER_SECOND = 1000;
-const METRES_PER_DEGREE_LAT = 111_320;
-const RADIANS_PER_DEGREE = Math.PI / 180;
-
-/** Поправка на одном конце полёта: когда и на сколько сдвинуть. */
-export interface GroundAnchor {
-  tMs: number;
-  offsetM: number;
-}
-
-/** Индексы точек на земле у старта ('start') или посадки ('end'). */
-export function groundIndices(
-  t: Float64Array,
-  lat: Float64Array,
-  lon: Float64Array,
-  end: 'start' | 'end',
-): number[] {
-  const n = t.length;
-  if (n === 0) return [];
-  const anchor = end === 'start' ? 0 : n - 1;
-  const anchorT = t[anchor] ?? Number.NaN;
-  const anchorLat = lat[anchor] ?? Number.NaN;
-  const anchorLon = lon[anchor] ?? Number.NaN;
-  const metresPerDegreeLon = METRES_PER_DEGREE_LAT * Math.cos(anchorLat * RADIANS_PER_DEGREE);
-  const windowMs = GROUND_CALIBRATION.windowS * MS_PER_SECOND;
-
-  const indices: number[] = [];
-  for (let i = 0; i < n; i++) {
-    if (Math.abs((t[i] ?? Number.NaN) - anchorT) > windowMs) continue;
-    const dNorth = ((lat[i] ?? Number.NaN) - anchorLat) * METRES_PER_DEGREE_LAT;
-    const dEast = ((lon[i] ?? Number.NaN) - anchorLon) * metresPerDegreeLon;
-    if (Math.hypot(dNorth, dEast) <= GROUND_CALIBRATION.groundRadiusM) indices.push(i);
-  }
-  return indices;
-}
-
-/**
- * Точки на земле у старта или посадки — или пусто, если их мало или они
- * движутся быстрее ходьбы (запись началась или кончилась в воздухе).
- */
-export function groundSegment(
-  t: Float64Array,
-  lat: Float64Array,
-  lon: Float64Array,
-  gSpeed: Float64Array,
-  end: 'start' | 'end',
-): number[] {
-  const indices = groundIndices(t, lat, lon, end);
-  if (indices.length < GROUND_CALIBRATION.minGroundFixes) return [];
-  const speeds = indices.map((i) => gSpeed[i] ?? Number.NaN).filter(Number.isFinite).sort((a, b) => a - b);
-  const median = speeds[speeds.length >> 1] ?? Number.NaN;
-  return median <= GROUND_CALIBRATION.maxGroundSpeedMs ? indices : [];
-}
 
 /** Полёт — от взлёта до посадки, индексы точек трека; вне него — ходьба по земле. */
 export interface FlightRange {
@@ -112,10 +63,117 @@ export interface FlightRange {
   landing: number;
 }
 
-export function flightRange(t: Float64Array, lat: Float64Array, lon: Float64Array, gSpeed: Float64Array): FlightRange {
-  const start = groundSegment(t, lat, lon, gSpeed, 'start');
-  const end = groundSegment(t, lat, lon, gSpeed, 'end');
-  return { takeoff: start.at(-1) ?? 0, landing: end[0] ?? t.length - 1 };
+/** Поправка на одном конце полёта: когда и на сколько сдвинуть. */
+export interface GroundAnchor {
+  tMs: number;
+  offsetM: number;
+}
+
+const medianOf = (values: number[]): number => {
+  const sorted = values.map((v) => (Number.isFinite(v) ? v : 0)).sort((a, b) => a - b);
+  return sorted[sorted.length >> 1] ?? 0;
+};
+
+/**
+ * Взлёт — первый момент, с которого скорость держится выше flyingSpeedMs
+ * flyingWindowS секунд; уточняется до первой точки быстрее порога, иначе
+ * медиана окна ставила бы взлёт на полокна раньше. Посадка — то же с конца.
+ * Полёта нет вовсе — вся запись земля (takeoff = landing = последняя точка).
+ */
+export function flightRange(t: Float64Array, speed: Float64Array): FlightRange {
+  const n = t.length;
+  const windowMs = GROUND_CALIBRATION.flyingWindowS * MS_PER_SECOND;
+  const flying = (i: number): boolean => (speed[i] ?? 0) > GROUND_CALIBRATION.flyingSpeedMs;
+  const windowFrom = (i: number, step: 1 | -1): number[] => {
+    const values: number[] = [];
+    for (let j = i; j >= 0 && j < n && Math.abs((t[j] ?? 0) - (t[i] ?? 0)) <= windowMs; j += step) {
+      values.push(speed[j] ?? 0);
+    }
+    return values;
+  };
+
+  let takeoff = 0;
+  while (takeoff < n && !(medianOf(windowFrom(takeoff, 1)) > GROUND_CALIBRATION.flyingSpeedMs)) takeoff++;
+  if (takeoff >= n) return { takeoff: n - 1, landing: n - 1 };
+  while (takeoff < n - 1 && !flying(takeoff)) takeoff++;
+
+  let landing = n - 1;
+  while (landing > takeoff && !(medianOf(windowFrom(landing, -1)) > GROUND_CALIBRATION.flyingSpeedMs)) landing--;
+  while (landing > takeoff && !flying(landing)) landing--;
+  return { takeoff, landing };
+}
+
+/** Точки, где пилот стоит: минута перед взлётом ('start') или после посадки ('end'). */
+export function groundWindow(t: Float64Array, range: FlightRange, side: 'start' | 'end'): number[] {
+  const windowMs = GROUND_CALIBRATION.groundWindowS * MS_PER_SECOND;
+  const indices: number[] = [];
+  if (side === 'start') {
+    const edge = t[range.takeoff] ?? Number.NaN;
+    for (let i = 0; i <= range.takeoff; i++) if (edge - (t[i] ?? Number.NaN) <= windowMs) indices.push(i);
+  } else {
+    const edge = t[range.landing] ?? Number.NaN;
+    for (let i = range.landing; i < t.length; i++) if ((t[i] ?? Number.NaN) - edge <= windowMs) indices.push(i);
+  }
+  return indices;
+}
+
+/**
+ * Где сцене спрашивать высоту рельефа. exact — каждая точка: окна поправок и
+ * плавного перехода у взлёта и посадки. sparse — остальная ходьба вне полёта,
+ * не чаще раза в terrainSampleStepS; промежутки заполняет fillTerrain.
+ */
+export function terrainSampleIndices(t: Float64Array, range: FlightRange): { exact: number[]; sparse: number[] } {
+  const transitionMs = GROUND_CALIBRATION.transitionS * MS_PER_SECOND;
+  const takeoffMs = t[range.takeoff] ?? Number.NaN;
+  const landingMs = t[range.landing] ?? Number.NaN;
+  const exactSet = new Set<number>([...groundWindow(t, range, 'start'), ...groundWindow(t, range, 'end')]);
+  for (let i = range.takeoff; i <= range.landing; i++) {
+    const tMs = t[i] ?? Number.NaN;
+    if (tMs - takeoffMs <= transitionMs || landingMs - tMs <= transitionMs) exactSet.add(i);
+  }
+
+  const stepMs = GROUND_CALIBRATION.terrainSampleStepS * MS_PER_SECOND;
+  const sparse: number[] = [];
+  let lastMs = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < t.length; i++) {
+    if ((i >= range.takeoff && i <= range.landing) || exactSet.has(i)) continue;
+    const tMs = t[i] ?? Number.NaN;
+    if (tMs - lastMs >= stepMs) {
+      sparse.push(i);
+      lastMs = tMs;
+    }
+  }
+  return { exact: [...exactSet].sort((a, b) => a - b), sparse };
+}
+
+/**
+ * Рельеф между редкими точками ходьбы: линейно по времени между соседними
+ * известными; с одной стороны — ближайшая. Только вне полёта (до взлёта
+ * и после посадки) — через полёт не тянется.
+ */
+export function fillTerrain(t: Float64Array, terrain: Float64Array, range: FlightRange): Float64Array {
+  const filled = Float64Array.from(terrain);
+  const fillZone = (from: number, to: number): void => {
+    const known: number[] = [];
+    for (let i = from; i <= to; i++) if (Number.isFinite(terrain[i] ?? Number.NaN)) known.push(i);
+    if (known.length === 0) return;
+    let next = 0; // первая известная точка правее i
+    for (let i = from; i <= to; i++) {
+      while (next < known.length && (known[next] ?? Infinity) <= i) next++;
+      if (Number.isFinite(filled[i] ?? Number.NaN)) continue;
+      const left = known[next - 1];
+      const right = known[next];
+      if (left !== undefined && right !== undefined) {
+        const w = ((t[i] ?? 0) - (t[left] ?? 0)) / ((t[right] ?? 0) - (t[left] ?? 0));
+        filled[i] = (terrain[left] ?? 0) + ((terrain[right] ?? 0) - (terrain[left] ?? 0)) * w;
+      } else {
+        filled[i] = terrain[left ?? right ?? i] ?? Number.NaN;
+      }
+    }
+  };
+  fillZone(0, range.takeoff);
+  fillZone(range.landing, t.length - 1);
+  return filled;
 }
 
 /**
