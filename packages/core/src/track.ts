@@ -13,7 +13,7 @@ export interface TrackPoint {
   lon: number;
   /** Барометрическая высота (QNE/ISA), м. */
   altBaro: number | null;
-  /** GNSS-высота, м. */
+  /** GNSS-высота над эллипсоидом WGS84, м (парсер пересчитывает из геоида). */
   altGnss: number | null;
   /** 3D-фикс. */
   valid: boolean;
@@ -36,7 +36,7 @@ export interface TrackColumns {
   lon: Float64Array;
   /** Барометрическая высота (QNE/ISA), м; NaN — нет. */
   altBaro: Float64Array;
-  /** GNSS-высота, м; NaN — нет. */
+  /** GNSS-высота над эллипсоидом WGS84, м (парсер пересчитывает из геоида); NaN — нет. */
   altGnss: Float64Array;
   /** 1 — 3D-фикс, 0 — 2D. */
   valid: Uint8Array;
@@ -46,6 +46,14 @@ export interface TrackColumns {
   siu: Float64Array;
 }
 
+/**
+ * Датум GNSS-высоты в исходном файле. После парсера altGnss всегда над
+ * эллипсоидом WGS84 (CLAUDE.md), датум остаётся в meta для диагностики.
+ * assumed-geoid — датум не объявлен, принят по CIVL Section 7H §3.2.1.
+ */
+export const GNSS_ALTITUDE_DATUMS = ['ellipsoid', 'geoid', 'assumed-geoid', 'none'] as const;
+export type GnssAltitudeDatum = (typeof GNSS_ALTITUDE_DATUMS)[number];
+
 /** Откуда дата: заголовок IGC, имя файла или время самих точек (GPX, KML). */
 export const DATE_SOURCES = ['header', 'filename', 'fix_time'] as const;
 export type DateSource = (typeof DATE_SOURCES)[number];
@@ -54,6 +62,8 @@ export interface TrackMeta {
   /** Дата первого фикса, UTC, `YYYY-MM-DD`; null — не найдена, спросить пользователя. */
   date: string | null;
   dateSource: DateSource | null;
+  /** Датум GNSS-высоты в файле; заполняет парсер. */
+  gnssAltitudeDatum?: GnssAltitudeDatum;
   pilot?: string;
   glider?: string;
   gliderId?: string;
