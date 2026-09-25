@@ -5,7 +5,14 @@ import { LocaleSwitch } from '../i18n/LocaleSwitch';
 import { useLocaleStore, useT } from '../i18n/locale';
 import { flightHash, HEALTH_HASH } from '../routing';
 import { subscribeFlightStatus } from './flight-events';
-import { hintMessage, processingErrorMessage, rejectionMessage, statusLabel, uploadErrorMessage } from './messages';
+import {
+  hintMessage,
+  processingErrorMessage,
+  rejectionMessage,
+  retentionMessage,
+  statusLabel,
+  uploadErrorMessage,
+} from './messages';
 import { ACCEPT_ATTRIBUTE, checkTrackFile, uploadTrack } from './upload-track';
 
 /**
@@ -148,6 +155,9 @@ export function UploadPage() {
             <p className="mt-4 text-sm text-accent">{t('upload.browse')}</p>
           </label>
         )}
+
+        {/* ТЗ §11.2: анонимная загрузка живёт ограниченный срок — пилот знает об этом заранее. */}
+        <p className="mt-3 text-center text-xs text-secondary">{retentionMessage(t, locale)}</p>
 
         {phase.kind === 'error' && (
           <div className="mt-4 flex items-center justify-between gap-4">

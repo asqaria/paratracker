@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { useLocaleStore } from '../i18n/locale';
 import { messages } from '../i18n/messages';
+import { retentionMessage } from './messages';
 import { ACCEPT_ATTRIBUTE } from './upload-track';
 import { UploadPage } from './UploadPage';
 
@@ -17,6 +18,10 @@ describe('UploadPage', () => {
     expect(html).toContain(messages[locale]['upload.title']);
     expect(html).toContain('50');
     expect(html).toContain(`lang="${locale}"`);
+  });
+
+  it('предупреждает о сроке хранения анонимной загрузки (ТЗ §11.2)', () => {
+    expect(html).toContain(retentionMessage((key) => messages[locale][key], locale));
   });
 
   it('input принимает только форматы треков', () => {

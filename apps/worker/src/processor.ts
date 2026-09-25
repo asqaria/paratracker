@@ -12,6 +12,8 @@ import type { PipelinePool } from './pool.js';
 export interface ObjectStorage {
   get(key: string): Promise<Uint8Array>;
   put(key: string, bytes: Uint8Array, contentType: string): Promise<void>;
+  /** Идемпотентно: отсутствующий ключ — не ошибка (так ведёт себя S3). */
+  delete(key: string): Promise<void>;
 }
 
 export interface FlightRepository {

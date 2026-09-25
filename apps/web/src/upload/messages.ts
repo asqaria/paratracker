@@ -1,4 +1,4 @@
-import { PARSER, type FlightErrorCode, type FlightStatus } from '@skyline/core';
+import { PARSER, RETENTION, type FlightErrorCode, type FlightStatus, type Locale } from '@skyline/core';
 
 import { fill } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
@@ -19,6 +19,20 @@ const megabytes = (bytes: number): string => String(Math.round(bytes / MEGABYTE)
 /** Подсказка под дропзоной: форматы и порог размера. */
 export const hintMessage = (t: Translate): string =>
   fill(t('upload.hint'), { max: megabytes(PARSER.maxFileBytes) });
+
+/** Категории Intl.PluralRules, для которых есть перевод; «zero» и «two» в ru и en не встречаются. */
+const RETENTION_KEYS: Record<string, MessageKey> = {
+  one: 'upload.retention.one',
+  few: 'upload.retention.few',
+  many: 'upload.retention.many',
+  other: 'upload.retention.other',
+};
+
+/** ТЗ §11.2: пилот предупреждён, сколько живёт анонимная загрузка. Склонение — по правилам языка. */
+export function retentionMessage(t: Translate, locale: Locale, days: number = RETENTION.anonymousDays): string {
+  const key = RETENTION_KEYS[new Intl.PluralRules(locale).select(days)] ?? 'upload.retention.other';
+  return fill(t(key), { days: String(days) });
+}
 
 export function rejectionMessage(t: Translate, rejection: UploadRejection): string {
   if (rejection.reason === 'empty') return t('upload.error.empty');

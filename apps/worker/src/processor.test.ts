@@ -23,6 +23,10 @@ function fakeStorage(objects: Map<string, Uint8Array>): ObjectStorage {
       objects.set(key, bytes);
       return Promise.resolve();
     },
+    delete: async (key) => {
+      objects.delete(key);
+      return Promise.resolve();
+    },
   };
 }
 

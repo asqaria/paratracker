@@ -1,4 +1,4 @@
-import { FLIGHT_STATUSES, PARSER } from '@skyline/core';
+import { FLIGHT_STATUSES, PARSER, RETENTION } from '@skyline/core';
 import { describe, expect, it } from 'vitest';
 
 import { messages } from '../i18n/messages';
@@ -6,6 +6,7 @@ import {
   hintMessage,
   processingErrorMessage,
   rejectionMessage,
+  retentionMessage,
   statusLabel,
   uploadErrorMessage,
   type Translate,
@@ -22,6 +23,24 @@ describe('hintMessage', () => {
     // Порог берётся из ТЗ §3.3 через core: перевод про число не знает.
     expect(messages.ru['upload.hint']).toContain('{max}');
     expect(PARSER.maxFileBytes).toBe(50_000_000);
+  });
+});
+
+describe('retentionMessage', () => {
+  it('срок хранения анонимной загрузки — из constants (ТЗ §11.2)', () => {
+    expect(RETENTION.anonymousDays).toBe(30);
+    expect(retentionMessage(ru, 'ru')).toBe('Без регистрации полёт хранится 30 дней');
+    expect(retentionMessage(en, 'en')).toBe('Without an account, the flight is kept for 30 days');
+  });
+
+  it.each([
+    [1, 'ru', 'Без регистрации полёт хранится 1 день'],
+    [21, 'ru', 'Без регистрации полёт хранится 21 день'],
+    [3, 'ru', 'Без регистрации полёт хранится 3 дня'],
+    [14, 'ru', 'Без регистрации полёт хранится 14 дней'],
+    [1, 'en', 'Without an account, the flight is kept for 1 day'],
+  ] as const)('%i дн., %s — склонение по правилам языка', (days, locale, expected) => {
+    expect(retentionMessage(locale === 'ru' ? ru : en, locale, days)).toBe(expected);
   });
 });
 

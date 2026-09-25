@@ -5,7 +5,7 @@ import {
   type FlightStatus,
   type SourceFormat,
 } from '@skyline/core';
-import { eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, lt } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import { flights } from '../schema.js';
@@ -105,6 +105,32 @@ export async function deleteFlights(db: Database, ids: readonly string[]): Promi
     .where(inArray(flights.id, [...ids]))
     .returning({ id: flights.id });
   return deleted.length;
+}
+
+/** Просроченная анонимная загрузка: что удалить из хранилища вместе со строкой. */
+export interface ExpiredFlight {
+  id: string;
+  rawObjectKey: string;
+  /** null — полёт не дошёл до упаковки .track. */
+  trackObjectKey: string | null;
+}
+
+/**
+ * Анонимные полёты, загруженные раньше `before` (ТЗ §11.2, TTL 30 дней),
+ * старые первыми, не больше `limit`. Опирается на частичный индекс
+ * flights_anonymous_created_idx — полёты пилотов его не раздувают.
+ */
+export async function listExpiredAnonymousFlights(
+  db: Database,
+  before: Date,
+  limit: number,
+): Promise<ExpiredFlight[]> {
+  return db
+    .select({ id: flights.id, rawObjectKey: flights.rawObjectKey, trackObjectKey: flights.trackObjectKey })
+    .from(flights)
+    .where(and(isNull(flights.userId), lt(flights.createdAt, before)))
+    .orderBy(asc(flights.createdAt))
+    .limit(limit);
 }
 
 /** Восстановительный проход воркера: всё, что застряло в pending, parsing или analyzing. */
