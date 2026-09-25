@@ -66,15 +66,45 @@ export function shortestTurn(fromDeg: number, toDeg: number): number {
   return delta > HALF_TURN_DEG ? delta - FULL_TURN_DEG : delta;
 }
 
+/** Собственная частота пружины: при ω = 2/τ за τ проходится ~60 % пути. */
+const SPRING_OMEGA_PER_TAU = 2;
 /**
- * Шаг сглаживания курса. previous = null — первый кадр, берём цель как есть.
- * elapsedS — сколько секунд трека прошло за кадр (зависит от множителя часов).
+ * Коэффициенты приближения e^(−x) ≈ 1/(1 + x + 0.48x² + 0.235x³) из SmoothDamp
+ * (Game Programming Gems 4, гл. 1.10): устойчиво на любом шаге кадра.
  */
-export function smoothHeading(previous: number | null, targetDeg: number, elapsedS: number): number {
-  if (previous === null || Number.isNaN(previous)) return targetDeg;
-  if (Number.isNaN(targetDeg)) return previous;
-  const k = Math.min(1, Math.max(0, elapsedS / CHASE_SMOOTHING_TAU_S));
-  return previous + shortestTurn(previous, targetDeg) * k;
+const DECAY_X2 = 0.48;
+const DECAY_X3 = 0.235;
+
+export interface HeadingState {
+  headingDeg: number;
+  /** Скорость поворота, °/с экранного времени. */
+  rateDegS: number;
+}
+
+/**
+ * Поворот камеры к курсу — критически демпфированная пружина (как SmoothDamp
+ * в игровых движках): скорость поворота набирается плавно и цель не
+ * проскакивается. Экспоненциальное сглаживание, которое было здесь раньше,
+ * задавало скорость сразу, в первый же кадр: при скачке курса камера срывалась
+ * с места рывком.
+ * Время реакции — CHASE_SMOOTHING_TAU_S: за τ проходит ~60 % пути, как у
+ * экспоненты с тем же τ. Курс не определён (NaN) — плавно тормозит на месте.
+ */
+export function springHeading(previous: HeadingState | null, targetDeg: number, elapsedS: number): HeadingState {
+  if (previous === null || !Number.isFinite(previous.headingDeg)) {
+    return { headingDeg: Number.isFinite(targetDeg) ? targetDeg : 0, rateDegS: 0 };
+  }
+  if (!(elapsedS > 0)) return previous;
+  const omega = SPRING_OMEGA_PER_TAU / CHASE_SMOOTHING_TAU_S;
+  const x = omega * elapsedS;
+  const decay = 1 / (1 + x + DECAY_X2 * x * x + DECAY_X3 * x * x * x);
+  const target = Number.isFinite(targetDeg) ? previous.headingDeg + shortestTurn(previous.headingDeg, targetDeg) : previous.headingDeg;
+  const change = previous.headingDeg - target;
+  const temp = (previous.rateDegS + omega * change) * elapsedS;
+  return {
+    headingDeg: target + (change + temp) * decay,
+    rateDegS: (previous.rateDegS - omega * temp) * decay,
+  };
 }
 
 /** Курс, если его нет ни в одной точке трека: камера смотрит на север. */

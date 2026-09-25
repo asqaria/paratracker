@@ -10,7 +10,7 @@ import {
   MAX_FRAME_S,
   nearestHeading,
   shortestTurn,
-  smoothHeading,
+  springHeading,
 } from './camera-modes';
 
 describe('режимы камеры', () => {
@@ -62,28 +62,6 @@ describe('shortestTurn', () => {
   });
 });
 
-describe('smoothHeading', () => {
-  it('первый кадр берёт курс как есть', () => {
-    expect(smoothHeading(null, 123, 1)).toBe(123);
-  });
-
-  it('за τ проходит большую часть пути, но не перескакивает', () => {
-    const step = smoothHeading(0, 100, CHASE_SMOOTHING_TAU_S / 2);
-    expect(step).toBeCloseTo(50, 9);
-    expect(smoothHeading(0, 100, CHASE_SMOOTHING_TAU_S)).toBeCloseTo(100, 9);
-    // Даже при огромном шаге времени — не дальше цели.
-    expect(smoothHeading(0, 100, 100)).toBeCloseTo(100, 9);
-  });
-
-  it('идёт коротким путём через 360°', () => {
-    expect(smoothHeading(350, 10, CHASE_SMOOTHING_TAU_S)).toBeCloseTo(370, 9);
-  });
-
-  it('курс не определён — держим прежний', () => {
-    expect(smoothHeading(42, Number.NaN, 1)).toBe(42);
-  });
-});
-
 describe('nearestHeading — курс для камеры, когда пилот стоит', () => {
   const nan = Number.NaN;
 
@@ -103,5 +81,54 @@ describe('nearestHeading — курс для камеры, когда пилот
   it('курса нет во всём треке — север, а не NaN', () => {
     expect(nearestHeading(Float64Array.from([nan, nan]), 1)).toBe(0);
     expect(nearestHeading(new Float64Array(0), 0)).toBe(0);
+  });
+});
+
+describe('springHeading — поворот камеры без рывка на старте', () => {
+  const FRAME_S = 1 / 60;
+  const settle = (from: number, to: number, seconds: number) => {
+    let state = springHeading(null, from, FRAME_S);
+    const rates: number[] = [];
+    for (let f = 0; f < seconds * 60; f++) {
+      state = springHeading(state, to, FRAME_S);
+      rates.push(state.rateDegS);
+    }
+    return { state, rates };
+  };
+
+  it('первый кадр — сразу цель, без вращения', () => {
+    expect(springHeading(null, 123, FRAME_S)).toEqual({ headingDeg: 123, rateDegS: 0 });
+  });
+
+  it('скачок цели на 90°: скорость поворота растёт плавно, а не прыжком за кадр', () => {
+    const { rates } = settle(0, 90, 1);
+    // Экспоненциальное сглаживание за первый кадр сразу крутило бы на 90/τ = 45 °/с.
+    expect(Math.abs(rates[0] ?? 0)).toBeLessThan(2);
+    const jumps = rates.slice(1).map((rate, i) => Math.abs(rate - (rates[i] ?? rate)));
+    expect(Math.max(...jumps)).toBeLessThan(2);
+  });
+
+  it('доходит до цели за несколько τ и не проскакивает её', () => {
+    const { state, rates } = settle(0, 90, 4 * CHASE_SMOOTHING_TAU_S);
+    expect(state.headingDeg).toBeCloseTo(90, 0);
+    expect(Math.min(...rates)).toBeGreaterThanOrEqual(-1e-9);
+  });
+
+  it('идёт коротким путём через 360°', () => {
+    const { state } = settle(350, 10, 4 * CHASE_SMOOTHING_TAU_S);
+    expect(shortestTurn(10, state.headingDeg)).toBeCloseTo(0, 0);
+    expect(state.headingDeg).toBeGreaterThan(350);
+  });
+
+  it('курс не определён — продолжает плавно, не дёргаясь', () => {
+    const moving = { headingDeg: 40, rateDegS: 10 };
+    const next = springHeading(moving, Number.NaN, FRAME_S);
+    expect(next.headingDeg).toBeGreaterThan(40);
+    expect(next.rateDegS).toBeLessThanOrEqual(10);
+  });
+
+  it('нулевой шаг кадра — состояние не меняется', () => {
+    const moving = { headingDeg: 40, rateDegS: 10 };
+    expect(springHeading(moving, 90, 0)).toEqual(moving);
   });
 });

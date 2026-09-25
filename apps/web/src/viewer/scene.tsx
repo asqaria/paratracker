@@ -46,12 +46,14 @@ import {
   type CameraAdjust,
 } from './camera-input';
 import { travelCourse } from './camera-course';
+import { cameraTarget, easeHalfWidth, targetHalfWidthS } from './camera-target';
 import {
   CAMERA_POSES,
   DEFAULT_CAMERA_MODE,
   frameSeconds,
   nearestHeading,
-  smoothHeading,
+  springHeading,
+  type HeadingState,
   type CameraMode,
 } from './camera-modes';
 import type { DecodedTrack } from './decode-track';
@@ -236,7 +238,7 @@ export function Scene({ track, showGlow = false }: SceneProps) {
   const viewerRef = useRef<Viewer | null>(null);
   const clockRef = useRef<FlightClock | null>(null);
   const cameraModeRef = useRef<CameraMode>(DEFAULT_CAMERA_MODE);
-  const smoothHeadingRef = useRef<number | null>(null);
+  const smoothHeadingRef = useRef<HeadingState | null>(null);
   const adjustRef = useRef<CameraAdjust | null>(adjustFor(DEFAULT_CAMERA_MODE));
 
   // Конфиг читается один раз и не роняет рендер: без переменных окружения
@@ -415,6 +417,7 @@ export function Scene({ track, showGlow = false }: SceneProps) {
         // только при смене точки, иначе перерисовка шла бы 60 раз в секунду.
         let lastIndex = -1;
         let lastFrameMs: number | null = null;
+        let halfWidthS: number | null = null;
         const onPreRender = (): void => {
           const frameNowMs = performance.now();
           const elapsedS = frameSeconds(lastFrameMs, frameNowMs);
@@ -430,18 +433,24 @@ export function Scene({ track, showGlow = false }: SceneProps) {
           const modePose = CAMERA_POSES[mode];
           const adjust = adjustRef.current;
           if (mode === 'free' || !modePose || !adjust || !viewer) return;
-          const position = flightClock.position.getValue(viewer.clock.currentTime);
-          if (!position) return;
+          // Камера смотрит не на сырую точку пилота, а на сглаженную траекторию
+          // (camera-target.ts): у сырой скорость скачет на каждом фиксе — кадр
+          // дёргался. Окно — в долях секунды экрана, поэтому растёт со скоростью.
+          halfWidthS = easeHalfWidth(halfWidthS, targetHalfWidthS(viewer.clock.multiplier), elapsedS);
+          const aim = cameraTarget(shown, current, halfWidthS);
+          if (![aim.lat, aim.lon, aim.alt].every(Number.isFinite)) return;
+          const position = Cartesian3.fromDegrees(aim.lon, aim.lat, aim.alt);
 
           // Сглаживается только курс полёта; поправка мыши применяется сразу.
           // Курс — направление перемещения за окно (camera-course.ts): в термике
-          // он держит снос, а не обходит круг. Нет его (стоим, крутим без сноса) —
-          // держим прежний; на первом кадре — ближайший курс из трека.
+          // он держит снос, а не обходит круг. Поворот к нему — пружиной, без
+          // рывка на старте. Курса нет (стоим, крутим без сноса) — камера плавно
+          // тормозит; на первом кадре — ближайший курс из трека.
           const course = modePose.headingDeg ?? travelCourse(track, current);
           const previous = smoothHeadingRef.current;
-          const target = Number.isNaN(course) ? (previous ?? nearestHeading(track.heading, index)) : course;
-          smoothHeadingRef.current = smoothHeading(previous, target, elapsedS);
-          const pose = poseFor(mode, adjust, smoothHeadingRef.current);
+          const target = Number.isNaN(course) && previous === null ? nearestHeading(track.heading, index) : course;
+          smoothHeadingRef.current = springHeading(previous, target, elapsedS);
+          const pose = poseFor(mode, adjust, smoothHeadingRef.current.headingDeg);
           // NaN в lookAt останавливает рендер Cesium целиком — лучше пропустить кадр.
           if (![pose.headingDeg, pose.pitchDeg, pose.rangeM].every(Number.isFinite)) return;
           viewer.camera.lookAt(
