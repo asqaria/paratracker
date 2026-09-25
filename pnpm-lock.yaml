@@ -190,6 +190,9 @@ importers:
       '@skyline/core':
         specifier: workspace:*
         version: link:../core
+      egm96-universal:
+        specifier: 1.1.1
+        version: 1.1.1
       fflate:
         specifier: ^0.8.3
         version: 0.8.3
@@ -1586,6 +1589,9 @@ packages:
   earcut@3.0.2:
     resolution: {integrity: sha512-X7hshQbLyMJ/3RPhyObLARM2sNxxmRALLKx1+NVFFnQ9gKzmCrxm9+uLIAdBcvc8FNLpctqlQ2V6AE92Ol9UDQ==}
 
+  egm96-universal@1.1.1:
+    resolution: {integrity: sha512-rHOKjWBcT2SQ1SqATOt3FdVVEkd6+n4Q+j0IDivVc/yqS0SmQ+LLUbNdCRuS6C0aibv9UXxqOyAGIyyg4E22Qg==}
+
   enhanced-resolve@5.25.1:
     resolution: {integrity: sha512-nGXts5znJzmWPu+mIE9izCOzdg63oJca2mDzGWWTth7sr4aCToKcoyFVBQwN75Ij5Pf6p510EwkTqViTRzDV+w==}
     engines: {node: '>=10.13.0'}
@@ -2200,6 +2206,9 @@ packages:
   reusify@1.1.0:
     resolution: {integrity: sha512-g6QUff04oZpHs0eG5p83rFLhHeV00ug/Yf9nZM6fLeUrPguBTkTQOdpAWWspMh55TZfVQDPaN3NQJfbVRAxdIw==}
     engines: {iojs: '>=1.0.0', node: '>=0.10.0'}
+
+  rfc4648@1.5.4:
+    resolution: {integrity: sha512-rRg/6Lb+IGfJqO05HZkN50UtY7K/JhxJag1kP23+zyMfrvoB0B7RWv06MbOzoc79RgCdNTiUaNsTT1AJZ7Z+cg==}
 
   rfdc@1.4.1:
     resolution: {integrity: sha512-q1b3N5QkRUWUl7iyylaaj3kOpIT0N2i9MqIEQXP73GVsN9cw3fdx8X63cEmWhJGi2PPCF23Ijp7ktmd39rawIA==}
@@ -3563,6 +3572,10 @@ snapshots:
 
   earcut@3.0.2: {}
 
+  egm96-universal@1.1.1:
+    dependencies:
+      rfc4648: 1.5.4
+
   enhanced-resolve@5.25.1:
     dependencies:
       graceful-fs: 4.2.11
@@ -4196,6 +4209,8 @@ snapshots:
   ret@0.5.0: {}
 
   reusify@1.1.0: {}
+
+  rfc4648@1.5.4: {}
 
   rfdc@1.4.1: {}
 
