@@ -1,0 +1,30 @@
+# Фронт Skyline внутри своего контейнера. HTTPS и домен — на внешнем прокси
+# (на сервере — Caddy проекта GateApp), здесь только HTTP на :80.
+{
+	admin off
+	auto_https off
+}
+
+:80 {
+	encode gzip
+
+	# API и поток статусов обработки (SSE): без буферизации, иначе события
+	# прогресса приходят пачкой в конце. Имя skyline-api, а не api: web сидит ещё
+	# и в сети внешнего прокси, где имя api может принадлежать соседнему проекту.
+	handle /api/* {
+		reverse_proxy skyline-api:3000 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		root * /srv
+		# Файлы с хешем в имени не меняются — кешируются надолго; index.html — нет,
+		# иначе после деплоя браузер держал бы старую версию.
+		@hashed path /assets/*
+		header @hashed Cache-Control "public, max-age=31536000, immutable"
+		@index path / /index.html
+		header @index Cache-Control "no-cache"
+		file_server
+	}
+}
