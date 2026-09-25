@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { GEO, type ParsedTrack, type ParseResult, type TrackColumns } from '@skyline/core';
+import { GEO, type FlightSummary, type ParsedTrack, type ParseResult, type TrackColumns } from '@skyline/core';
 import { parseGpx, parseIgc } from '@skyline/parsing';
 
 /** Помощники тестов analysis: синтетические колонки и фикстуры. Из сборки исключены. */
@@ -30,6 +30,8 @@ interface Expectation {
   date: string;
   samples: { first: { timeUtcSeconds: number } };
   trajectory: Trajectory;
+  /** Сводка по записанным в файл точкам; null — у генератора формата её нет. */
+  summary: FlightSummary | null;
 }
 
 const expectations = JSON.parse(readFileSync(new URL('expected.json', FIXTURES), 'utf8')) as Record<string, Expectation>;

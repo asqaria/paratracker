@@ -52,6 +52,15 @@ const ru = {
   'viewer.altitude': 'Высота',
   'viewer.vario': 'Варио',
   'viewer.groundSpeed': 'Скорость',
+  'viewer.summary': 'Сводка полёта',
+  'viewer.summary.duration': 'Длительность',
+  'viewer.summary.maxAlt': 'Макс. высота',
+  'viewer.summary.distance': 'Дистанция',
+  'viewer.summary.maxGain': 'Макс. набор',
+  'unit.metres': '{value} м',
+  'unit.kilometres': '{value} км',
+  'unit.minutes': '{minutes} мин',
+  'unit.hoursMinutes': '{hours} ч {minutes} мин',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -109,6 +118,15 @@ const en: Messages = {
   'viewer.altitude': 'Altitude',
   'viewer.vario': 'Vario',
   'viewer.groundSpeed': 'Speed',
+  'viewer.summary': 'Flight summary',
+  'viewer.summary.duration': 'Duration',
+  'viewer.summary.maxAlt': 'Max altitude',
+  'viewer.summary.distance': 'Distance',
+  'viewer.summary.maxGain': 'Max gain',
+  'unit.metres': '{value} m',
+  'unit.kilometres': '{value} km',
+  'unit.minutes': '{minutes} min',
+  'unit.hoursMinutes': '{hours} h {minutes} min',
 };
 
 export const messages: Record<Locale, Messages> = { ru, en };

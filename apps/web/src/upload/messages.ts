@@ -1,5 +1,6 @@
 import { PARSER, type FlightErrorCode, type FlightStatus } from '@skyline/core';
 
+import { fill } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { UploadError, type UploadRejection } from './upload-track';
 
@@ -12,10 +13,6 @@ export type Translate = (key: MessageKey) => string;
 
 /** Мегабайт как единица показа: внутри системы байты (CLAUDE.md, «Единицы»). */
 export const MEGABYTE = 1_000_000;
-
-/** В i18n нет интерполяции, а порог не должен жить внутри перевода. */
-const fill = (template: string, values: Record<string, string>): string =>
-  template.replace(/\{(\w+)\}/g, (whole: string, name: string) => values[name] ?? whole);
 
 const megabytes = (bytes: number): string => String(Math.round(bytes / MEGABYTE));
 
