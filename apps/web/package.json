@@ -11,6 +11,7 @@
     "test": "vitest run --config ../../vitest.config.ts --project @skyline/web"
   },
   "dependencies": {
+    "@skyline/analysis": "workspace:*",
     "@skyline/core": "workspace:*",
     "@skyline/track-format": "workspace:*",
     "@tanstack/react-query": "^5.102.8",

@@ -6,4 +6,5 @@ export { dropLowQualityFixes, type QualityLimits, type QualityResult } from './q
 export { resample, type ResampledTrack, type ResampleOptions } from './resample.js';
 export { analysisLevelFor, medianFixIntervalS } from './sampling.js';
 export { savitzkyGolay, savitzkyGolayCoefficients, type SmoothingOptions } from './savitzky-golay.js';
+export { summarizeFlight, type SummaryColumns } from './summary.js';
 export { verticalSpeed, type VerticalSpeedOptions } from './vertical-speed.js';

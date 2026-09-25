@@ -176,6 +176,8 @@ function buildIgc(cfg) {
   }
 
   const points = [];
+  // Без округления toFixed(9) — по ним считается эталон сводки (summaryOf).
+  const exact = [];
   let t = startSec;
 
   for (let i = 0; i < count; i++) {
@@ -215,6 +217,12 @@ function buildIgc(cfg) {
       altGnss: Math.round(altBase + gnssOffset),
       valid: valid === 'A'
     });
+    exact.push({
+      timeUtcSeconds: t,
+      lat: la.value,
+      lon: lo.value,
+      alt: noBaro ? Math.round(altBase + gnssOffset) : Math.round(altBase)
+    });
 
     t += step;
   }
@@ -232,6 +240,7 @@ function buildIgc(cfg) {
   return {
     content: Buffer.from(lines.join('\r\n') + '\r\n', 'latin1'),
     points,
+    exact,
     date: `${year}-${mm}-${dd}`,
     dateHeaderRaw: dateHeader[0],
     altitudeSource: noBaro ? 'gnss' : 'baro',
@@ -738,6 +747,45 @@ const CASES = {
    ─────────────────────────────────────────────────────────────────────────── */
 mkdirSync(OUT, { recursive: true });
 
+/* ───────────────────────────────────────────────────────────────────────────
+   Эталон сводки полёта (задача 1.13) — по тем точкам, что реально записаны
+   в файл, как их обязан получить парсер. Тест прогоняет summarizeFlight по
+   разобранному треку и сверяет с этим до 1e-9.
+   ─────────────────────────────────────────────────────────────────────────── */
+/** = GEO.meanEarthRadiusM из packages/core: гаверсинус там и здесь один и тот же. */
+const MEAN_EARTH_RADIUS_M = 6_371_008.8;
+/** = CLEAN.maxInterpolationGapS: через разрыв дистанция не набегает. */
+const MAX_INTERPOLATION_GAP_S = 30;
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const r = Math.PI / 180;
+  const a = Math.sin(((lat2 - lat1) * r) / 2) ** 2 +
+            Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(((lon2 - lon1) * r) / 2) ** 2;
+  return 2 * MEAN_EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+function summaryOf(points) {
+  let distanceTrackM = 0;
+  let maxAltM = -Infinity;
+  let maxGainM = 0;
+  let minAlt = Infinity;
+  for (const [i, p] of points.entries()) {
+    const prev = points[i - 1];
+    if (prev && p.timeUtcSeconds - prev.timeUtcSeconds <= MAX_INTERPOLATION_GAP_S) {
+      distanceTrackM += haversine(prev.lat, prev.lon, p.lat, p.lon);
+    }
+    maxAltM = Math.max(maxAltM, p.alt);
+    minAlt = Math.min(minAlt, p.alt);
+    maxGainM = Math.max(maxGainM, p.alt - minAlt);
+  }
+  return {
+    durationS: points[points.length - 1].timeUtcSeconds - points[0].timeUtcSeconds,
+    maxAltM,
+    distanceTrackM,
+    maxGainM
+  };
+}
+
 const expected = {};
 const readme = [
   '# Эталонные фикстуры треков: IGC, GPX, KML, KMZ',
@@ -789,7 +837,8 @@ for (const [name, spec] of Object.entries(CASES)) {
       minAlt: hasAltitude ? Math.min(...altitudes) : null,
       maxAlt: hasAltitude ? Math.max(...altitudes) : null
     },
-    trajectory: TRAJECTORY
+    trajectory: TRAJECTORY,
+    summary: r.exact ? summaryOf(r.exact) : null
   };
 
   readme.push(`| \`${name}\` | ${spec.what} | ${spec.checks} |`);

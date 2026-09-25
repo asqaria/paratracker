@@ -27,6 +27,7 @@ const track = (): DecodedTrack => {
     gSpeed: Float64Array.from(index, () => 11.6),
     heading: Float64Array.from(index, () => 180),
     flags: new Uint8Array(POINT_COUNT),
+    summary: { durationS: POINT_COUNT - 1, maxAltM: 2440, distanceTrackM: 55, maxGainM: 40 },
   };
 };
 

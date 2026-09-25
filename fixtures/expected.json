@@ -65,6 +65,12 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
+    },
+    "summary": {
+      "durationS": 959,
+      "maxAltM": 3190,
+      "distanceTrackM": 17100.02521953381,
+      "maxGainM": 840
     }
   },
   "no-baro.igc": {
@@ -133,6 +139,12 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
+    },
+    "summary": {
+      "durationS": 479,
+      "maxAltM": 2818,
+      "distanceTrackM": 7269.0135360963195,
+      "maxGainM": 420
     }
   },
   "midnight.igc": {
@@ -201,6 +213,12 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
+    },
+    "summary": {
+      "durationS": 1499,
+      "maxAltM": 3713,
+      "distanceTrackM": 30636.19422481868,
+      "maxGainM": 1363
     }
   },
   "gaps.igc": {
@@ -269,6 +287,12 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
+    },
+    "summary": {
+      "durationS": 1529,
+      "maxAltM": 3188,
+      "distanceTrackM": 14427.34512863325,
+      "maxGainM": 838
     }
   },
   "south-west.igc": {
@@ -337,6 +361,12 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
+    },
+    "summary": {
+      "durationS": 599,
+      "maxAltM": 3428,
+      "distanceTrackM": 12143.277914316726,
+      "maxGainM": 628
     }
   },
   "date-modern.igc": {
@@ -405,6 +435,12 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
+    },
+    "summary": {
+      "durationS": 479,
+      "maxAltM": 2770,
+      "distanceTrackM": 7269.0135360963195,
+      "maxGainM": 420
     }
   },
   "lad-lod.igc": {
@@ -473,6 +509,12 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
+    },
+    "summary": {
+      "durationS": 479,
+      "maxAltM": 2770,
+      "distanceTrackM": 7264.849155139678,
+      "maxGainM": 420
     }
   },
   "sparse-10s.igc": {
@@ -541,6 +583,12 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
+    },
+    "summary": {
+      "durationS": 1990,
+      "maxAltM": 2698,
+      "distanceTrackM": 3862.6372065417145,
+      "maxGainM": 348
     }
   },
   "v-fixes.igc": {
@@ -609,6 +657,12 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
+    },
+    "summary": {
+      "durationS": 479,
+      "maxAltM": 2770,
+      "distanceTrackM": 7269.0135360963195,
+      "maxGainM": 420
     }
   },
   "negative-alt.igc": {
@@ -677,6 +731,12 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
+    },
+    "summary": {
+      "durationS": 359,
+      "maxAltM": -2460,
+      "distanceTrackM": 5980.119238563596,
+      "maxGainM": 420
     }
   },
   "extensions-full.igc": {
@@ -745,6 +805,12 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
+    },
+    "summary": {
+      "durationS": 479,
+      "maxAltM": 2770,
+      "distanceTrackM": 7269.0135360963195,
+      "maxGainM": 420
     }
   },
   "broken-lines.igc": {
@@ -813,6 +879,12 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
+    },
+    "summary": {
+      "durationS": 479,
+      "maxAltM": 2770,
+      "distanceTrackM": 7269.0135360963195,
+      "maxGainM": 420
     }
   },
   "baseline.gpx": {
@@ -881,7 +953,8 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
-    }
+    },
+    "summary": null
   },
   "no-ele.gpx": {
     "description": "Телефон не записал высоту: ни у одной точки нет <ele>.",
@@ -949,7 +1022,8 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
-    }
+    },
+    "summary": null
   },
   "time-offset.gpx": {
     "description": "Время с часовым поясом (+05:00) и долями секунды (.500) — так пишут многие телефонные трекеры.",
@@ -1017,7 +1091,8 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
-    }
+    },
+    "summary": null
   },
   "segments.gpx": {
     "description": "Два <trkseg> с разрывом 90 секунд между ними.",
@@ -1085,7 +1160,8 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
-    }
+    },
+    "summary": null
   },
   "fix-2d.gpx": {
     "description": "Каждая десятая точка — <fix>2d</fix>; у всех точек <sat>7</sat>.",
@@ -1153,7 +1229,8 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
-    }
+    },
+    "summary": null
   },
   "broken.gpx": {
     "description": "Битые точки посреди трека (широта 95°, нет времени, время не ISO), текстовый мусор между точками и файл, оборванный посреди последней точки.",
@@ -1221,7 +1298,8 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
-    }
+    },
+    "summary": null
   },
   "gx-track.kml": {
     "description": "Google Earth KML с <gx:Track>: списки <when> и <gx:coord>, altitudeMode absolute.",
@@ -1289,7 +1367,8 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
-    }
+    },
+    "summary": null
   },
   "multitrack.kml": {
     "description": "<gx:MultiTrack> из двух сегментов с разрывом 90 с, записанных в документ в обратном порядке, и рядом метка с LineString того же пути без времени.",
@@ -1357,7 +1436,8 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
-    }
+    },
+    "summary": null
   },
   "linestring-timespan.kml": {
     "description": "Старый прибор: только <LineString> без времени у точек, у метки <TimeSpan> (после геометрии).",
@@ -1425,7 +1505,8 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
-    }
+    },
+    "summary": null
   },
   "gx-track.kmz": {
     "description": "KMZ — zip-архив (deflate) с doc.kml внутри; doc.kml лежит не первым файлом.",
@@ -1493,6 +1574,7 @@
       "glideGroundSpeedMs": 10.751744045,
       "glideTrackDeg": 80.362461887,
       "metresPerDegreeLat": 111320
-    }
+    },
+    "summary": null
   }
 }

@@ -28,3 +28,7 @@ export function useT(): (key: MessageKey) => string {
   const locale = useLocaleStore((state) => state.locale);
   return useCallback((key) => messages[locale][key], [locale]);
 }
+
+/** Подстановка {name} в перевод: числа и пороги не должны жить внутри строк i18n. */
+export const fill = (template: string, values: Record<string, string>): string =>
+  template.replace(/\{(\w+)\}/g, (whole: string, name: string) => values[name] ?? whole);

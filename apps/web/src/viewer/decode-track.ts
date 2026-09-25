@@ -1,3 +1,5 @@
+import { summarizeFlight } from '@skyline/analysis';
+import type { FlightSummary } from '@skyline/core';
 import { readTrack } from '@skyline/track-format';
 
 /**
@@ -18,21 +20,25 @@ export interface DecodedTrack {
   /** Курс, градусы — по нему ведётся камера Chase (ТЗ §7.4). */
   heading: Float64Array;
   flags: Uint8Array;
+  /** Сводка полёта (задача 1.13) — считается тут же, в потоке декодирования. */
+  summary: FlightSummary;
 }
 
 export function decodeTrack(buffer: ArrayBuffer): DecodedTrack {
   const file = readTrack(buffer);
   const count = file.pointCount;
+  const alt = file.alt ?? new Float64Array(count).fill(Number.NaN);
   return {
     pointCount: count,
     t: file.t,
     lat: file.lat,
     lon: file.lon,
-    alt: file.alt ?? new Float64Array(count).fill(Number.NaN),
+    alt,
     vSpeed: file.vSpeed ?? new Float64Array(count).fill(Number.NaN),
     gSpeed: file.gSpeed ?? new Float64Array(count).fill(Number.NaN),
     heading: file.heading ?? new Float64Array(count).fill(Number.NaN),
     flags: file.flags ?? new Uint8Array(count),
+    summary: summarizeFlight({ t: file.t, lat: file.lat, lon: file.lon, alt }),
   };
 }
 

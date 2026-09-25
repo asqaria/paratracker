@@ -72,6 +72,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@skyline/analysis':
+        specifier: workspace:*
+        version: link:../../packages/analysis
       '@skyline/core':
         specifier: workspace:*
         version: link:../../packages/core

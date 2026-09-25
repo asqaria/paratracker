@@ -18,6 +18,15 @@ const track = (pointCount: number): ArrayBuffer => {
 };
 
 describe('decodeTrack', () => {
+  it('считает сводку полёта здесь же, в потоке декодирования', () => {
+    const { summary } = decodeTrack(track(5));
+
+    expect(summary.durationS).toBe(4);
+    expect(summary.maxAltM).toBeCloseTo(2354, 6);
+    expect(summary.maxGainM).toBeCloseTo(4, 6);
+    expect(summary.distanceTrackM).toBeGreaterThan(0);
+  });
+
   it('отдаёт колонки типизированными массивами', () => {
     const decoded = decodeTrack(track(5));
 

@@ -42,6 +42,7 @@ import {
   type ImagerySource,
   type ViewerConfig,
 } from './providers';
+import { SummaryPanel } from './SummaryPanel';
 import { TimelinePanel } from './TimelinePanel';
 import { buildTrackGeometry } from './track-geometry';
 import { useHotkeys } from './use-hotkeys';
@@ -344,11 +345,14 @@ export function Scene({ track, showGlow = false }: SceneProps) {
     <div className="relative h-dvh w-full">
       <div ref={container} className="h-full w-full" data-testid="cesium-container" />
 
-      {error !== null && (
-        <p role="alert" className="absolute left-4 top-4 rounded bg-glass px-3 py-2 text-danger">
-          {error}
-        </p>
-      )}
+      <div className="absolute left-4 top-4 flex flex-col gap-2">
+        <SummaryPanel summary={track.summary} />
+        {error !== null && (
+          <p role="alert" className="rounded bg-glass px-3 py-2 text-danger">
+            {error}
+          </p>
+        )}
+      </div>
 
       <div className="absolute right-4 top-4 flex flex-col gap-2 rounded-xl border border-subtle bg-glass p-3 text-sm backdrop-blur-xl">
         <span className="text-secondary">{t('viewer.imagery')}</span>
