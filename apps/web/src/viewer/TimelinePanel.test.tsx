@@ -83,7 +83,7 @@ describe('TimelinePanel', () => {
   it('даёт все скорости и режимы камеры из ТЗ', () => {
     const html = render(START_MS, false);
     for (const speed of [1, 2, 4, 8, 16, 60]) expect(html).toContain(`×${speed}`);
-    for (const mode of ['chase', 'free', 'cockpit', 'top'] as const) {
+    for (const mode of ['chase', 'side', 'free', 'cockpit', 'top'] as const) {
       expect(html).toContain(messages[locale][`viewer.camera.${mode}`]);
     }
   });
@@ -95,7 +95,7 @@ describe('TimelinePanel', () => {
 
     expect(html).toMatch(new RegExp(`<button[^>]*aria-label="${speed}: ×4"`));
     expect(html).toMatch(new RegExp(`<select[^>]*aria-label="${camera}"`));
-    for (const mode of ['chase', 'free', 'cockpit', 'top'] as const) {
+    for (const mode of ['chase', 'side', 'free', 'cockpit', 'top'] as const) {
       expect(html).toMatch(new RegExp(`<option value="${mode}"`));
     }
     expect(html).toMatch(/<option value="chase" selected="">/);

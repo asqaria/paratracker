@@ -6,15 +6,17 @@ import {
   CAMERA_POSES,
   CHASE_SMOOTHING_TAU_S,
   DEFAULT_CAMERA_MODE,
+  frameSeconds,
+  MAX_FRAME_S,
   nearestHeading,
   shortestTurn,
   smoothHeading,
 } from './camera-modes';
 
 describe('режимы камеры', () => {
-  it('Фаза 1: четыре режима, цифры 1–4 в порядке ТЗ §7.5', () => {
-    expect(CAMERA_MODES).toEqual(['chase', 'free', 'cockpit', 'top']);
-    expect(CAMERA_HOTKEY_ORDER).toEqual(['chase', 'free', 'cockpit', 'top']);
+  it('пять режимов, цифры 1–5 в порядке ТЗ §7.5: Side — сразу за Chase', () => {
+    expect(CAMERA_MODES).toEqual(['chase', 'side', 'free', 'cockpit', 'top']);
+    expect(CAMERA_HOTKEY_ORDER).toEqual(['chase', 'side', 'free', 'cockpit', 'top']);
     expect(CAMERA_MODES).toContain(DEFAULT_CAMERA_MODE);
   });
 
@@ -23,6 +25,28 @@ describe('режимы камеры', () => {
     expect(CAMERA_POSES.chase).toMatchObject({ headingDeg: null, pitchDeg: -14, rangeM: 90 });
     expect(CAMERA_POSES.cockpit?.rangeM).toBeLessThan(CAMERA_POSES.chase?.rangeM ?? 0);
     expect(CAMERA_POSES.top).toMatchObject({ headingDeg: 0 });
+  });
+
+  it('Side — сбоку от курса, почти горизонтально, дальше Chase: виден профиль полёта', () => {
+    const side = CAMERA_POSES.side;
+    expect(side).toMatchObject({ headingDeg: null, courseOffsetDeg: -90 });
+    expect(side?.rangeM).toBeGreaterThan(CAMERA_POSES.chase?.rangeM ?? Number.POSITIVE_INFINITY);
+    expect(side?.pitchDeg).toBeGreaterThan(CAMERA_POSES.chase?.pitchDeg ?? 0);
+  });
+});
+
+describe('frameSeconds — шаг сглаживания в секундах экрана', () => {
+  it('разница между кадрами, мс → с', () => {
+    expect(frameSeconds(1000, 1016)).toBeCloseTo(0.016, 9);
+  });
+
+  it('первый кадр и часы назад — ноль, а не скачок', () => {
+    expect(frameSeconds(null, 1000)).toBe(0);
+    expect(frameSeconds(1000, 900)).toBe(0);
+  });
+
+  it('вкладка была в фоне — шаг ограничен, камера не прыгает сразу к цели', () => {
+    expect(frameSeconds(0, 60_000)).toBe(MAX_FRAME_S);
   });
 });
 

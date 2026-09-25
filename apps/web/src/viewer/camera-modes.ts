@@ -3,17 +3,19 @@
  * при смене цифр правится и §7.4 ТЗ.
  */
 
-export const CAMERA_MODES = ['chase', 'free', 'cockpit', 'top'] as const;
+export const CAMERA_MODES = ['chase', 'side', 'free', 'cockpit', 'top'] as const;
 export type CameraMode = (typeof CAMERA_MODES)[number];
 
 export const DEFAULT_CAMERA_MODE: CameraMode = 'chase';
 
-/** Порядок горячих клавиш 1–4 (ТЗ §7.5). */
-export const CAMERA_HOTKEY_ORDER: readonly CameraMode[] = ['chase', 'free', 'cockpit', 'top'];
+/** Порядок горячих клавиш 1–5 (ТЗ §7.5): Side — рядом с Chase, это два основных вида. */
+export const CAMERA_HOTKEY_ORDER: readonly CameraMode[] = ['chase', 'side', 'free', 'cockpit', 'top'];
 
 export interface CameraPose {
   /** Курс: null — брать сглаженный курс полёта. */
   headingDeg: number | null;
+  /** Поворот от курса полёта, градусы: −90 — камера слева, смотрит поперёк курса. */
+  courseOffsetDeg?: number;
   pitchDeg: number;
   /** Дистанция до пилота, м. */
   rangeM: number;
@@ -22,6 +24,12 @@ export interface CameraPose {
 /** null — режим без слежения: камера свободна. */
 export const CAMERA_POSES: Record<CameraMode, CameraPose | null> = {
   chase: { headingDeg: null, pitchDeg: -14, rangeM: 90 },
+  /**
+   * Вид сбоку: профиль полёта — наборы и глайды. Камера слева от курса,
+   * пилот летит по экрану слева направо; почти горизонтально и дальше Chase,
+   * чтобы в кадр влезал круг термика целиком (радиус 30–60 м).
+   */
+  side: { headingDeg: null, courseOffsetDeg: -90, pitchDeg: -6, rangeM: 320 },
   cockpit: { headingDeg: null, pitchDeg: -6, rangeM: 12 },
   top: { headingDeg: 0, pitchDeg: -89, rangeM: 1400 },
   free: null,
@@ -29,9 +37,25 @@ export const CAMERA_POSES: Record<CameraMode, CameraPose | null> = {
 
 /**
  * ТЗ §7.4: экспоненциальное сглаживание курса, τ ≈ 2 с. Без него камера
- * в спирали дёргается и укачивает. τ подобран на прототипе.
+ * в спирали дёргается и укачивает. τ подобран на прототипе. Секунды — экранные,
+ * а не полётные: иначе на ×16 и ×60 сглаживание пропадало (шаг кадра рос
+ * вместе с множителем), и на телефоне с 30 FPS камера вела себя иначе.
  */
 export const CHASE_SMOOTHING_TAU_S = 2;
+
+/**
+ * Потолок шага кадра, с. После фоновой вкладки или долгого кадра разница
+ * времени — секунды: без потолка камера одним кадром прыгала бы к цели.
+ */
+export const MAX_FRAME_S = 0.1;
+
+const MS_PER_S = 1000;
+
+/** Экранное время между кадрами, с: performance.now() предыдущего и текущего кадра. */
+export function frameSeconds(previousMs: number | null, nowMs: number): number {
+  if (previousMs === null || !(nowMs > previousMs)) return 0;
+  return Math.min(MAX_FRAME_S, (nowMs - previousMs) / MS_PER_S);
+}
 
 const FULL_TURN_DEG = 360;
 const HALF_TURN_DEG = 180;
