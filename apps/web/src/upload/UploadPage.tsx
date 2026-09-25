@@ -94,7 +94,7 @@ export function UploadPage() {
 
   return (
     <main lang={locale} className="grid min-h-dvh place-items-center p-6">
-      <section className="w-full max-w-xl rounded-2xl border border-subtle bg-glass p-6 backdrop-blur-xl">
+      <section className="w-full max-w-xl rounded-2xl glass p-6">
         <header className="mb-6 flex items-center justify-between">
           <h1 className="text-lg font-semibold">{t('app.name')}</h1>
           <LocaleSwitch />
@@ -105,7 +105,7 @@ export function UploadPage() {
             <p role="status" className="text-lg">
               {phase.kind === 'uploading' ? t('upload.uploading') : statusLabel(t, phase.status)}
             </p>
-            <p className="mt-1 font-numeric text-xs text-secondary">{phase.fileName}</p>
+            <p className="mt-1 numeric text-xs text-secondary">{phase.fileName}</p>
 
             {/* Полоса прогресса определённая только когда конвейер сообщил долю. */}
             <div
@@ -121,7 +121,7 @@ export function UploadPage() {
               />
             </div>
             {percent !== null && (
-              <p className="mt-2 font-numeric tabular-nums text-sm text-secondary">{`${percent}%`}</p>
+              <p className="mt-2 numeric text-sm text-secondary">{`${percent}%`}</p>
             )}
           </div>
         ) : (

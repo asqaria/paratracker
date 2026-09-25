@@ -14,12 +14,12 @@ export function VarioLegend() {
     <figure
       role="img"
       aria-label={t('viewer.varioLegend.description')}
-      className="w-48 rounded-xl border border-subtle bg-glass px-3 py-2 backdrop-blur-xl"
+      className="w-48 rounded-xl glass px-3 py-2"
     >
       <figcaption className="mb-1.5 text-xs text-secondary">{t('viewer.varioLegend')}</figcaption>
       <div className="rounded-full" style={{ height: BAR_HEIGHT_PX, background: legendGradient() }} />
       {/* Подписи — на истинных позициях шкалы; крайние прижаты к краям полосы. */}
-      <div className="relative mt-1 font-numeric text-xs tabular-nums text-secondary" style={{ height: LABELS_HEIGHT_PX }}>
+      <div className="relative mt-1 numeric text-xs text-secondary" style={{ height: LABELS_HEIGHT_PX }}>
         {legendTicks(locale).map((tick, index, ticks) => (
           <span
             key={tick.vSpeed}

@@ -22,6 +22,7 @@ import {
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { documentColorTokens } from '../design/tokens';
 import { useT } from '../i18n/locale';
 import { CAMERA_POSES, DEFAULT_CAMERA_MODE, smoothHeading, type CameraMode } from './camera-modes';
 import type { DecodedTrack } from './decode-track';
@@ -192,7 +193,7 @@ export function Scene({ track, showGlow = false }: SceneProps) {
               }),
               appearance: new PolylineMaterialAppearance({
                 material: Material.fromType('PolylineGlow', {
-                  color: Color.fromCssColorString('#4DA3FF').withAlpha(GLOW_INTENSITY),
+                  color: Color.fromCssColorString(documentColorTokens().accent).withAlpha(GLOW_INTENSITY),
                   glowPower: 0.2,
                 }),
               }),
@@ -349,13 +350,13 @@ export function Scene({ track, showGlow = false }: SceneProps) {
       <div className="absolute left-4 top-4 flex flex-col gap-2">
         <SummaryPanel summary={track.summary} />
         {error !== null && (
-          <p role="alert" className="rounded bg-glass px-3 py-2 text-danger">
+          <p role="alert" className="glass rounded-xl px-3 py-2 text-danger">
             {error}
           </p>
         )}
       </div>
 
-      <div className="absolute right-4 top-4 flex flex-col gap-2 rounded-xl border border-subtle bg-glass p-3 text-sm backdrop-blur-xl">
+      <div className="absolute right-4 top-4 flex flex-col gap-2 rounded-xl glass p-3 text-sm">
         <span className="text-secondary">{t('viewer.imagery')}</span>
         <div role="group" aria-label={t('viewer.imagery')} className="flex gap-1">
           {sources.map((source) => (
@@ -370,7 +371,7 @@ export function Scene({ track, showGlow = false }: SceneProps) {
             </button>
           ))}
         </div>
-        <span className="font-numeric tabular-nums text-secondary">
+        <span className="numeric text-secondary">
           {t('viewer.points')}: {track.pointCount}
         </span>
       </div>

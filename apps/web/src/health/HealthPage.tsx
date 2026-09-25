@@ -12,7 +12,7 @@ function CheckRow({ label, up, detail }: { label: string; up: boolean; detail?: 
     <li className="flex items-center justify-between gap-4 py-3">
       <span className="text-secondary">{label}</span>
       <span className="flex items-center gap-2">
-        {detail && <span className="font-numeric tabular-nums text-secondary">{detail}</span>}
+        {detail && <span className="numeric text-secondary">{detail}</span>}
         <span className={up ? 'text-accent' : 'text-danger'}>{t(up ? 'health.up' : 'health.down')}</span>
       </span>
     </li>
@@ -29,7 +29,7 @@ export function HealthPage() {
 
   return (
     <main lang={locale} className="grid min-h-dvh place-items-center p-6">
-      <section className="w-full max-w-md rounded-2xl border border-subtle bg-glass p-6 backdrop-blur-xl">
+      <section className="w-full max-w-md rounded-2xl glass p-6">
         <header className="mb-6 flex items-center justify-between">
           <h1 className="text-lg font-semibold">{t('app.name')}</h1>
           <LocaleSwitch />

@@ -32,7 +32,7 @@ export function FlightViewerPage({ trackUrl }: FlightViewerPageProps) {
         <p role="alert" className="text-danger">
           {t('viewer.error')}
         </p>
-        <p className="font-numeric text-xs text-secondary">{track.message}</p>
+        <p className="numeric text-xs text-secondary">{track.message}</p>
       </div>
     );
   }

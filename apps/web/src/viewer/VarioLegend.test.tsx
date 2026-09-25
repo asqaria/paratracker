@@ -25,6 +25,6 @@ describe('VarioLegend', () => {
 
   it('все подписи шкалы, моноширинные табличные', () => {
     for (const tick of legendTicks(locale)) expect(html).toContain(`>${tick.label}<`);
-    expect(html).toContain('tabular-nums');
+    expect(html.match(/class="([^"]*)"/g)?.some((c) => c.split(/[" ]/).includes('numeric'))).toBe(true);
   });
 });
