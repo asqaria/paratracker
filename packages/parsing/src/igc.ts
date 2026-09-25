@@ -1,5 +1,6 @@
 import { IGC, TIME, type DateSource, type ParsedTrack, type ParseResult, type TrackMeta } from '@skyline/core';
 
+import { applyGnssDatum, igcAltitudeDatum } from './altitude-datum.js';
 import { checkCalendarDate, isoDate, type DateCheck } from './dates.js';
 import { decodeLatin1, inputSize, stripBom } from './text.js';
 import {
@@ -313,6 +314,7 @@ export function parseIgc(input: string | Uint8Array, options: ParseOptions): Par
   const meta: TrackMeta = { date: null, dateSource: null };
 
   let dateHeader: { value: string; line: number } | null = null;
+  let altitudeDatumHeader: { value: string; line: number } | null = null;
   let extensions: Extension[] = [];
   let signature = '';
   let dayOffset = 0;
@@ -350,6 +352,9 @@ export function parseIgc(input: string | Uint8Array, options: ParseOptions): Par
           dateHeader ??= { value, line: lineNumber };
         } else if (subtype === 'DTM') {
           if (!isWgs84(value)) warnings.add('unexpected_datum', lineNumber);
+        } else if (subtype === 'ALG') {
+          // HFALG:GEO и HFALGALTGPS:GEO — значение после двоеточия. Первый заголовок побеждает, как у HFDTE.
+          altitudeDatumHeader ??= { value, line: lineNumber };
         } else if (subtype in HEADER_FIELDS) {
           setOnce(meta, HEADER_FIELDS[subtype as keyof typeof HEADER_FIELDS], value);
         }
@@ -378,6 +383,10 @@ export function parseIgc(input: string | Uint8Array, options: ParseOptions): Par
   // ТЗ §3.3: все 00000 — прибор высоту не пишет; настоящий трек не лежит ровно на нуле.
   if (points.altBaro.every((alt) => alt === 0)) points.altBaro.fill(Number.NaN);
   if (points.altGnss.every((alt) => alt === 0)) points.altGnss.fill(Number.NaN);
+  // После проверки нулей: иначе «высоты нет» превратилось бы в высоту геоида.
+  const altitudeDatum = igcAltitudeDatum(altitudeDatumHeader?.value ?? null);
+  if (!altitudeDatum.recognized) warnings.add('unknown_altitude_datum', altitudeDatumHeader?.line);
+  meta.gnssAltitudeDatum = applyGnssDatum(points, altitudeDatum.datum);
   const altitudeSource = summarizeAltitudes(points, warnings);
 
   const date = resolveDate(dateHeader, options, warnings);

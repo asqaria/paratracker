@@ -21,6 +21,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
 
+import { meanSeaLevel } from 'egm96-universal';
+
 const OUT = process.argv[2] || 'fixtures';
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -149,7 +151,8 @@ function buildIgc(cfg) {
     origin, count, startSec, step = 1,
     dateHeader, noBaro = false, negativeAlt = false,
     extraDigits = 0, gnssOffset = 48,
-    vFixEvery = 0, gaps = [], junkAt = [], extensions = []
+    vFixEvery = 0, gaps = [], junkAt = [], extensions = [],
+    algHeader = null
   } = cfg;
 
   const lines = [];
@@ -160,6 +163,7 @@ function buildIgc(cfg) {
   lines.push('HFGIDGLIDERID:FIXTURE');
   lines.push('HFDTM100GPSDATUM:WGS-1984');
   lines.push('HFFTYFRTYPE:Skyline,Fixture');
+  if (algHeader) lines.push(algHeader);
 
   // I-запись: расширения B-записи
   let iRecord = null;
@@ -221,7 +225,8 @@ function buildIgc(cfg) {
       timeUtcSeconds: t,
       lat: la.value,
       lon: lo.value,
-      alt: noBaro ? Math.round(altBase + gnssOffset) : Math.round(altBase)
+      alt: noBaro ? toEllipsoid(Math.round(altBase + gnssOffset), la.value, lo.value, gnssDatumOf('igc', algHeader))
+                  : Math.round(altBase)
     });
 
     t += step;
@@ -243,6 +248,7 @@ function buildIgc(cfg) {
     exact,
     date: `${year}-${mm}-${dd}`,
     dateHeaderRaw: dateHeader[0],
+    algHeader,
     altitudeSource: noBaro ? 'gnss' : 'baro',
     iRecord,
     // Пустая строка — не ошибка, предупреждения она не заслуживает.
@@ -566,6 +572,22 @@ const CASES = {
            dateHeader: ['HFDTE150726'], noBaro: true }
   },
 
+  'alg-geo-phone.igc': {
+    what: 'Телефон (XCTrack): HFALG:GEO, баро нет — высота над геоидом, как в реальных треках пилотов.',
+    checks: 'GNSS-высота переводится в эллипсоид: h = H + N (EGM96). Трек не висит над рельефом на высоту геоида.',
+    build: buildIgc,
+    cfg: { origin: ALMATY, count: 120, startSec: 9 * 3600,
+           dateHeader: ['HFDTE150726'], noBaro: true, algHeader: 'HFALG:GEO' }
+  },
+
+  'alg-ell.igc': {
+    what: 'Логгер объявляет эллипсоид: HFALGALTGPS:ELL (как требует IGC FR Specification).',
+    checks: 'Высота остаётся как есть — пересчёт только для геоида.',
+    build: buildIgc,
+    cfg: { origin: ALMATY, count: 120, startSec: 9 * 3600,
+           dateHeader: ['HFDTE150726'], algHeader: 'HFALGALTGPS:ELL' }
+  },
+
   'midnight.igc': {
     what: 'Полёт через полночь UTC: старт 23:50, финиш после 00:10 следующих суток.',
     checks: 'Время следующей B-записи МЕНЬШЕ предыдущей → +1 сутки. Без этого вся вторая половина трека уедет на день назад.',
@@ -786,6 +808,27 @@ function summaryOf(points) {
   };
 }
 
+/* ───────────────────────────────────────────────────────────────────────────
+   Датум GNSS-высоты — как в парсере (packages/parsing/src/altitude-datum.ts):
+   IGC без HFALG, GEO, MSL, NKN — геоид (CIVL 7H §3.2.1); ELL — эллипсоид;
+   NIL — высоты нет. Эталон altGnss — над эллипсоидом WGS84: h = H + N(lat, lon)
+   по EGM96, по неокруглённым координатам фикса. Независимая проверка самой
+   модели — packages/parsing/src/geoid.test.ts (узлы NGA).
+   ─────────────────────────────────────────────────────────────────────────── */
+function gnssDatumOf(format, algHeader) {
+  if (format !== 'igc') return 'ellipsoid'; // GPX и KML — задача 4
+  const code = (algHeader?.split(':')[1] ?? '').trim().toUpperCase();
+  if (code === 'ELL') return 'ellipsoid';
+  if (code === 'NIL') return 'none';
+  if (code === 'GEO' || code === 'MSL') return 'geoid';
+  return 'assumed-geoid';
+}
+
+function toEllipsoid(altGnss, lat, lon, datum) {
+  if (altGnss === null || datum === 'none') return null;
+  return datum === 'ellipsoid' ? altGnss : altGnss + meanSeaLevel(lat, lon);
+}
+
 const expected = {};
 const readme = [
   '# Эталонные фикстуры треков: IGC, GPX, KML, KMZ',
@@ -808,11 +851,18 @@ for (const [name, spec] of Object.entries(CASES)) {
   writeFileSync(join(OUT, name), r.content);
 
   const points = r.points;
+  const format = name.split('.').pop();
+  const declared = gnssDatumOf(format, r.algHeader);
+  // Координаты для N — неокруглённые: у IGC из r.exact, у GPX/KML текст в файле и есть значение.
+  const coordsAt = (i) => (r.exact ? r.exact[i] : points[i]);
+  const ellipsoidal = points.map((p, i) => toEllipsoid(p.altGnss, coordsAt(i).lat, coordsAt(i).lon, declared));
+  const datum = ellipsoidal.some((a) => a !== null) ? declared : 'none';
+  const sample = (p) => ({ ...p, altGnss: ellipsoidal[p.index] });
   const last = points[points.length - 1];
   const mid = points[Math.floor(points.length / 2)];
   const steps = points.slice(1).map((p, i) => p.timeUtcSeconds - points[i].timeUtcSeconds)
                       .sort((a, b) => a - b);
-  const altitudes = points.map(p => p.altGnss);
+  const altitudes = ellipsoidal;
   const hasAltitude = altitudes.every(a => a !== null);
 
   expected[name] = {
@@ -823,12 +873,13 @@ for (const [name, spec] of Object.entries(CASES)) {
     date: r.date,
     dateHeaderRaw: r.dateHeaderRaw ?? null,
     altitudeSource: r.altitudeSource,
+    gnssAltitudeDatum: datum,
     iRecord: r.iRecord ?? null,
     medianFixIntervalSeconds: steps[Math.floor(steps.length / 2)],
     maxFixIntervalSeconds: steps[steps.length - 1],
     invalidFixCount: points.filter(p => !p.valid).length,
     minWarnings: r.minWarnings,
-    samples: { first: points[0], middle: mid, last },
+    samples: { first: sample(points[0]), middle: sample(mid), last: sample(last) },
     bounds: {
       minLat: +Math.min(...points.map(p => p.lat)).toFixed(9),
       maxLat: +Math.max(...points.map(p => p.lat)).toFixed(9),

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { pointAt, type DateSource, type ParsedTrack, type ParseResult } from '@skyline/core';
+import { pointAt, type DateSource, type GnssAltitudeDatum, type ParsedTrack, type ParseResult } from '@skyline/core';
 import { expect, it } from 'vitest';
 
 /**
@@ -12,6 +12,8 @@ const FIXTURES = new URL('../../../../fixtures/', import.meta.url);
 
 /** Эталоны сверяются с допуском 1e-9, а не «примерно» (CLAUDE.md). */
 export const TOLERANCE_DEG = 1e-9;
+/** То же для высот, м: эталон altGnss — над эллипсоидом, посчитан генератором по EGM96. */
+export const TOLERANCE_M = 1e-9;
 
 /** Фикстуры датированы до 22.11.2026 (south-west.igc) — «сейчас» должно быть позже. */
 export const NOW = Date.UTC(2027, 0, 1);
@@ -34,6 +36,7 @@ export interface FixtureExpectation {
   date: string;
   dateHeaderRaw: string | null;
   altitudeSource: 'baro' | 'gnss';
+  gnssAltitudeDatum: GnssAltitudeDatum;
   iRecord: string | null;
   medianFixIntervalSeconds: number;
   maxFixIntervalSeconds: number;
@@ -77,6 +80,16 @@ export function expectDegrees(actual: number, wanted: number, label: string): vo
   expect(Math.abs(actual - wanted), `${label}: ${actual} vs ${wanted}`).toBeLessThanOrEqual(TOLERANCE_DEG);
 }
 
+/** Высота в метрах против эталона: null — высоты нет, иначе допуск TOLERANCE_M. */
+export function expectMetres(actual: number | null, expected: number | null): void {
+  if (expected === null) {
+    expect(actual).toBeNull();
+    return;
+  }
+  expect(actual).not.toBeNull();
+  expect(Math.abs((actual ?? Number.NaN) - expected)).toBeLessThanOrEqual(TOLERANCE_M);
+}
+
 /** Регистрирует контрольные проверки внутри текущего describe. */
 export function defineFixtureChecks(track: ParsedTrack, exp: FixtureExpectation, dateSource: DateSource): void {
   const { points } = track;
@@ -93,6 +106,8 @@ export function defineFixtureChecks(track: ParsedTrack, exp: FixtureExpectation,
 
   it('дата', () => {
     expect(track.meta).toMatchObject({ date: exp.date, dateSource });
+    // GPX и KML заполняют датум в задаче 4 плана высот; до неё сверяется только IGC.
+    if (exp.format === 'igc') expect(track.meta.gnssAltitudeDatum).toBe(exp.gnssAltitudeDatum);
   });
 
   it.each(['first', 'middle', 'last'] as const)('контрольная точка %s', (key) => {
@@ -103,7 +118,7 @@ export function defineFixtureChecks(track: ParsedTrack, exp: FixtureExpectation,
     expectDegrees(point.lat, sample.lat, 'lat');
     expectDegrees(point.lon, sample.lon, 'lon');
     expect(point.altBaro).toBe(sample.altBaro);
-    expect(point.altGnss).toBe(sample.altGnss);
+    expectMetres(point.altGnss, sample.altGnss);
     expect(point.valid).toBe(sample.valid);
   });
 
@@ -115,8 +130,8 @@ export function defineFixtureChecks(track: ParsedTrack, exp: FixtureExpectation,
     if (exp.bounds.minAlt === null || exp.bounds.maxAlt === null) {
       expect(points.altGnss.every(Number.isNaN)).toBe(true);
     } else {
-      expect(Math.min(...points.altGnss)).toBe(exp.bounds.minAlt);
-      expect(Math.max(...points.altGnss)).toBe(exp.bounds.maxAlt);
+      expectMetres(Math.min(...points.altGnss), exp.bounds.minAlt);
+      expectMetres(Math.max(...points.altGnss), exp.bounds.maxAlt);
     }
   });
 
