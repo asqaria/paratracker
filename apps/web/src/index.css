@@ -1,7 +1,18 @@
 @import 'tailwindcss';
 
-/* Дизайн-токены, ТЗ §8.4. Тёмная тема по умолчанию (§8.1). */
-@theme {
+/*
+ * Шрифты — свои файлы, не CDN: браузер пилота не ходит к сторонним сервисам.
+ * В CSS пакетов — unicode-range: скачиваются только нужные наборы (латиница, кириллица).
+ */
+@import '@fontsource-variable/inter/wght.css';
+@import '@fontsource/jetbrains-mono/400.css';
+
+/*
+ * Дизайн-токены, ТЗ §8.4. Тёмная тема по умолчанию (§8.1).
+ * static: переменные попадают в :root всегда, а не только когда их использует
+ * класс, — их читают canvas графика и сцена Cesium (design/tokens.ts).
+ */
+@theme static {
   --color-void: #0a0e14;
   --color-glass: rgb(16 22 32 / 0.72);
   --color-subtle: rgb(255 255 255 / 0.08);
@@ -13,6 +24,27 @@
 
   --font-ui: 'Inter Variable', system-ui, sans-serif;
   --font-numeric: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Стеклянные панели поверх сцены (§8.1 п.1, §8.4: backdrop-blur 20px). */
+  --blur-glass: 20px;
+  --shadow-glass: 0 8px 32px rgb(0 0 0 / 0.45);
+}
+
+/* Стеклянная панель: фон, граница, размытие сцены под ней и тень — всегда вместе. */
+@utility glass {
+  background-color: var(--color-glass);
+  border: 1px solid var(--color-subtle);
+  backdrop-filter: blur(var(--blur-glass));
+  box-shadow: var(--shadow-glass);
+}
+
+/*
+ * Цифры: моноширинный шрифт и табличные цифры вместе (§8.4) — иначе значения
+ * «прыгают» при проигрывании. font-numeric отдельно не ставится.
+ */
+@utility numeric {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
 }
 
 @layer base {

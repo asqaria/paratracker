@@ -35,7 +35,7 @@ describe('SummaryPanel', () => {
   });
 
   it('цифры моноширинные табличные (ТЗ §8.4)', () => {
-    expect(html).toContain('tabular-nums');
+    expect(html.match(/class="([^"]*)"/g)?.some((c) => c.split(/[" ]/).includes('numeric'))).toBe(true);
   });
 
   it('панель подписана для скринридера', () => {

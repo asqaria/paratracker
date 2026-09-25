@@ -1,6 +1,7 @@
 import {
   ArcType,
   BoundingSphere,
+  CameraEventType,
   Cartesian3,
   CesiumTerrainProvider,
   Color,
@@ -8,6 +9,7 @@ import {
   GeometryInstance,
   HeadingPitchRange,
   ImageryLayer,
+  KeyboardEventModifier,
   Material,
   Math as CesiumMath,
   Matrix4,
@@ -15,6 +17,7 @@ import {
   PolylineGeometry,
   PolylineMaterialAppearance,
   Primitive,
+  Transforms,
   UrlTemplateImageryProvider,
   Viewer,
   WebMapTileServiceImageryProvider,
@@ -22,7 +25,19 @@ import {
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { documentColorTokens } from '../design/tokens';
 import { useT } from '../i18n/locale';
+import {
+  FREE_CAMERA,
+  hprFromOffset,
+  initialAdjust,
+  orbitAroundPilot,
+  orbitBy,
+  poseFor,
+  wheelZoomInPx,
+  zoomBy,
+  type CameraAdjust,
+} from './camera-input';
 import { CAMERA_POSES, DEFAULT_CAMERA_MODE, smoothHeading, type CameraMode } from './camera-modes';
 import type { DecodedTrack } from './decode-track';
 import { setupFlightClock, type FlightClock } from './flight-clock';
@@ -74,6 +89,19 @@ const SHADOW_ALPHA = 0.42;
 const SHADOW_WIDTH_PX = 2;
 /** Кадров в секунду, на которые рассчитан шаг сглаживания курса (прототип). */
 const ASSUMED_FPS = 60;
+/** Основная кнопка мыши (PointerEvent.button): ею облетают пилота. */
+const PRIMARY_BUTTON = 0;
+
+/** Поправки мыши для следящего режима; у Free их нет — там управляет Cesium. */
+const adjustFor = (mode: CameraMode): CameraAdjust | null => (mode === 'free' ? null : initialAdjust(mode));
+
+/**
+ * Штатное управление Cesium — только в Free. В следящих режимах камеру ставит
+ * кадр, и ввод Cesium он бы перезаписывал: мышь там меняет поправки (camera-input).
+ */
+function applyCameraInputs(viewer: Viewer, mode: CameraMode): void {
+  viewer.scene.screenSpaceCameraController.enableInputs = mode === 'free';
+}
 
 function createImageryProvider(source: ImagerySource): ImageryLayer {
   if (source.kind === 'wmts') {
@@ -99,6 +127,7 @@ export function Scene({ track, showGlow = false }: SceneProps) {
   const clockRef = useRef<FlightClock | null>(null);
   const cameraModeRef = useRef<CameraMode>(DEFAULT_CAMERA_MODE);
   const smoothHeadingRef = useRef<number | null>(null);
+  const adjustRef = useRef<CameraAdjust | null>(adjustFor(DEFAULT_CAMERA_MODE));
 
   // Конфиг читается один раз и не роняет рендер: без переменных окружения
   // пользователь должен увидеть причину, а не пустой экран.
@@ -156,6 +185,21 @@ export function Scene({ track, showGlow = false }: SceneProps) {
         viewerRef.current = viewer;
 
         const scene = viewer.scene;
+        const controller = scene.screenSpaceCameraController;
+        controller.zoomFactor = FREE_CAMERA.zoomFactor;
+        controller.inertiaZoom = FREE_CAMERA.inertiaZoom;
+        controller.inertiaSpin = FREE_CAMERA.inertiaSpin;
+        controller.inertiaTranslate = FREE_CAMERA.inertiaTranslate;
+        controller.minimumZoomDistance = FREE_CAMERA.minimumZoomDistanceM;
+        // Ctrl + левая кнопка в Free — облёт пилота (обработчик ниже), а не
+        // штатный наклон вокруг центра экрана. Наклон остаётся на средней
+        // кнопке, Ctrl + правой и жесте двумя пальцами.
+        controller.tiltEventTypes = [
+          CameraEventType.MIDDLE_DRAG,
+          CameraEventType.PINCH,
+          { eventType: CameraEventType.RIGHT_DRAG, modifier: KeyboardEventModifier.CTRL },
+        ];
+        applyCameraInputs(viewer, cameraModeRef.current);
         scene.globe.depthTestAgainstTerrain = true;
         scene.globe.enableLighting = true;
         scene.debugShowFramesPerSecond = import.meta.env.DEV;
@@ -192,7 +236,7 @@ export function Scene({ track, showGlow = false }: SceneProps) {
               }),
               appearance: new PolylineMaterialAppearance({
                 material: Material.fromType('PolylineGlow', {
-                  color: Color.fromCssColorString('#4DA3FF').withAlpha(GLOW_INTENSITY),
+                  color: Color.fromCssColorString(documentColorTokens().accent).withAlpha(GLOW_INTENSITY),
                   glowPower: 0.2,
                 }),
               }),
@@ -242,18 +286,22 @@ export function Scene({ track, showGlow = false }: SceneProps) {
             setTimeMs(current);
           }
 
-          const pose = CAMERA_POSES[cameraModeRef.current];
-          if (!pose || !viewer) return;
+          const mode = cameraModeRef.current;
+          const modePose = CAMERA_POSES[mode];
+          const adjust = adjustRef.current;
+          if (mode === 'free' || !modePose || !adjust || !viewer) return;
           const position = flightClock.position.getValue(viewer.clock.currentTime);
           if (!position) return;
 
-          const target = pose.headingDeg ?? (track.heading[index] ?? Number.NaN);
+          // Сглаживается только курс полёта; поправка мыши применяется сразу.
+          const target = modePose.headingDeg ?? (track.heading[index] ?? Number.NaN);
           const elapsedS = Math.abs(viewer.clock.multiplier) / ASSUMED_FPS;
           smoothHeadingRef.current = smoothHeading(smoothHeadingRef.current, target, elapsedS);
+          const pose = poseFor(mode, adjust, smoothHeadingRef.current);
           viewer.camera.lookAt(
             position,
             new HeadingPitchRange(
-              CesiumMath.toRadians(smoothHeadingRef.current),
+              CesiumMath.toRadians(pose.headingDeg),
               CesiumMath.toRadians(pose.pitchDeg),
               pose.rangeM,
             ),
@@ -295,13 +343,98 @@ export function Scene({ track, showGlow = false }: SceneProps) {
   useEffect(() => {
     cameraModeRef.current = cameraMode;
     smoothHeadingRef.current = null;
+    adjustRef.current = adjustFor(cameraMode);
     const viewer = viewerRef.current;
     if (!viewer) return;
+    applyCameraInputs(viewer, cameraMode);
     // При выходе из слежения обязательно снять трансформацию камеры, иначе
     // свободное вращение пойдёт вокруг старой точки (ТЗ §7.4).
     if (CAMERA_POSES[cameraMode] === null) viewer.camera.lookAtTransform(Matrix4.IDENTITY);
     viewer.scene.requestRender();
   }, [cameraMode]);
+
+  /**
+   * Мышь в следящих режимах: колесо — дистанция до пилота, перетаскивание —
+   * облёт вокруг него. В Free всё штатное от Cesium, кроме Ctrl + левой
+   * кнопки: она облетает пилота, как в Chase.
+   */
+  useEffect(() => {
+    const element = container.current;
+    if (!element) return undefined;
+    let drag: { x: number; y: number; kind: 'follow' | 'free-orbit' } | null = null;
+
+    const follow = (): Exclude<CameraMode, 'free'> | null => {
+      const mode = cameraModeRef.current;
+      return mode === 'free' || !adjustRef.current ? null : mode;
+    };
+    const redraw = (): void => viewerRef.current?.scene.requestRender();
+
+    const onWheel = (event: WheelEvent): void => {
+      const mode = follow();
+      if (!mode || !adjustRef.current) return;
+      event.preventDefault();
+      adjustRef.current = zoomBy(adjustRef.current, mode, wheelZoomInPx(event));
+      redraw();
+    };
+    /** Облёт пилота в Free: камера остаётся свободной, меняется только её место. */
+    const orbitPilot = (dx: number, dy: number): void => {
+      const viewer = viewerRef.current;
+      const pilot = viewer ? clockRef.current?.position.getValue(viewer.clock.currentTime) : undefined;
+      if (!viewer || !pilot) return;
+      const toLocal = Matrix4.inverseTransformation(Transforms.eastNorthUpToFixedFrame(pilot), new Matrix4());
+      const local = Matrix4.multiplyByPoint(toLocal, viewer.camera.positionWC, new Cartesian3());
+      const next = orbitAroundPilot(hprFromOffset({ east: local.x, north: local.y, up: local.z }), dx, dy);
+      viewer.camera.lookAt(
+        pilot,
+        new HeadingPitchRange(CesiumMath.toRadians(next.headingDeg), CesiumMath.toRadians(next.pitchDeg), next.rangeM),
+      );
+      viewer.camera.lookAtTransform(Matrix4.IDENTITY);
+    };
+
+    const onPointerDown = (event: PointerEvent): void => {
+      if (event.button !== PRIMARY_BUTTON) return;
+      if (follow()) {
+        drag = { x: event.clientX, y: event.clientY, kind: 'follow' };
+      } else if (cameraModeRef.current === 'free' && event.ctrlKey) {
+        drag = { x: event.clientX, y: event.clientY, kind: 'free-orbit' };
+      }
+      // Свой захват указателя не ставим: Cesium уже захватил его на canvas.
+      // Перехват на контейнер уводил pointerup мимо canvas — Cesium считал
+      // кнопку зажатой и тащил камеру после отпускания. События с canvas
+      // всплывают сюда и так.
+    };
+    const onPointerMove = (event: PointerEvent): void => {
+      if (!drag) return;
+      const dx = event.clientX - drag.x;
+      const dy = event.clientY - drag.y;
+      drag = { ...drag, x: event.clientX, y: event.clientY };
+      const mode = follow();
+      if (drag.kind === 'follow' && mode && adjustRef.current) {
+        adjustRef.current = orbitBy(adjustRef.current, mode, dx, dy);
+      } else if (drag.kind === 'free-orbit' && cameraModeRef.current === 'free') {
+        orbitPilot(dx, dy);
+      } else {
+        return;
+      }
+      redraw();
+    };
+    const onPointerUp = (): void => {
+      drag = null;
+    };
+
+    element.addEventListener('wheel', onWheel, { passive: false });
+    element.addEventListener('pointerdown', onPointerDown);
+    element.addEventListener('pointermove', onPointerMove);
+    element.addEventListener('pointerup', onPointerUp);
+    element.addEventListener('pointercancel', onPointerUp);
+    return () => {
+      element.removeEventListener('wheel', onWheel);
+      element.removeEventListener('pointerdown', onPointerDown);
+      element.removeEventListener('pointermove', onPointerMove);
+      element.removeEventListener('pointerup', onPointerUp);
+      element.removeEventListener('pointercancel', onPointerUp);
+    };
+  }, []);
 
   const seekTo = useCallback((next: number) => {
     const clamped = Math.max(timeline.startMs, Math.min(timeline.endMs, next));
@@ -349,13 +482,13 @@ export function Scene({ track, showGlow = false }: SceneProps) {
       <div className="absolute left-4 top-4 flex flex-col gap-2">
         <SummaryPanel summary={track.summary} />
         {error !== null && (
-          <p role="alert" className="rounded bg-glass px-3 py-2 text-danger">
+          <p role="alert" className="glass rounded-xl px-3 py-2 text-danger">
             {error}
           </p>
         )}
       </div>
 
-      <div className="absolute right-4 top-4 flex flex-col gap-2 rounded-xl border border-subtle bg-glass p-3 text-sm backdrop-blur-xl">
+      <div className="absolute right-4 top-4 flex flex-col gap-2 rounded-xl glass p-3 text-sm">
         <span className="text-secondary">{t('viewer.imagery')}</span>
         <div role="group" aria-label={t('viewer.imagery')} className="flex gap-1">
           {sources.map((source) => (
@@ -370,7 +503,7 @@ export function Scene({ track, showGlow = false }: SceneProps) {
             </button>
           ))}
         </div>
-        <span className="font-numeric tabular-nums text-secondary">
+        <span className="numeric text-secondary">
           {t('viewer.points')}: {track.pointCount}
         </span>
       </div>

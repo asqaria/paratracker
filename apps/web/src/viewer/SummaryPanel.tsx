@@ -25,14 +25,14 @@ export function SummaryPanel({ summary }: SummaryPanelProps) {
   return (
     <section
       aria-label={t('viewer.summary')}
-      className="rounded-xl border border-subtle bg-glass p-3 text-sm backdrop-blur-xl"
+      className="rounded-xl glass p-3 text-sm"
     >
       {/* Цифры — моноширинные с табличными цифрами (ТЗ §8.4). */}
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
         {ITEMS.map((item) => (
           <div key={item.key} className="flex flex-col">
             <dt className="text-xs text-secondary">{t(item.label)}</dt>
-            <dd className="font-numeric text-base tabular-nums">{formatted[item.key]}</dd>
+            <dd className="numeric text-base">{formatted[item.key]}</dd>
           </div>
         ))}
       </dl>

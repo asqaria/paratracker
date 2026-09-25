@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 
+import { documentColorTokens, withAlpha } from '../design/tokens';
 import { useLocaleStore, useT } from '../i18n/locale';
 import { buildChartGeometry } from './altitude-chart';
 import { CAMERA_MODES, type CameraMode } from './camera-modes';
@@ -35,8 +36,9 @@ export interface TimelinePanelProps {
 }
 
 const CHART_HEIGHT_PX = 96;
-const FILL_TOP = 'rgba(77, 163, 255, 0.26)';
-const FILL_BOTTOM = 'rgba(77, 163, 255, 0)';
+/** Заливка под графиком — акцентный токен, сверху полупрозрачный, книзу в ноль. */
+const FILL_TOP_ALPHA = 0.26;
+const FILL_BOTTOM_ALPHA = 0;
 const LINE_WIDTH_PX = 2.2;
 
 export function TimelinePanel(props: TimelinePanelProps) {
@@ -80,8 +82,9 @@ export function TimelinePanel(props: TimelinePanelProps) {
       }
       context.closePath();
       const gradient = context.createLinearGradient(0, 0, 0, height);
-      gradient.addColorStop(0, FILL_TOP);
-      gradient.addColorStop(1, FILL_BOTTOM);
+      const { accent } = documentColorTokens();
+      gradient.addColorStop(0, withAlpha(accent, FILL_TOP_ALPHA));
+      gradient.addColorStop(1, withAlpha(accent, FILL_BOTTOM_ALPHA));
       context.fillStyle = gradient;
       context.fill();
 
@@ -114,7 +117,7 @@ export function TimelinePanel(props: TimelinePanelProps) {
   );
 
   return (
-    <section className="border-t border-subtle bg-glass backdrop-blur-xl">
+    <section className="glass">
       <div className="flex items-center gap-4 px-4 py-2 text-sm">
         <button
           type="button"
@@ -132,7 +135,7 @@ export function TimelinePanel(props: TimelinePanelProps) {
               type="button"
               aria-pressed={value === props.speed}
               onClick={() => props.onSpeed(value)}
-              className="rounded px-2 py-1 font-numeric text-secondary tabular-nums aria-pressed:bg-subtle aria-pressed:text-primary"
+              className="rounded px-2 py-1 numeric text-secondary aria-pressed:bg-subtle aria-pressed:text-primary"
             >
               {`×${value}`}
             </button>
@@ -154,7 +157,7 @@ export function TimelinePanel(props: TimelinePanelProps) {
         </div>
 
         {/* Цифры телеметрии — моноширинные с табличными цифрами (ТЗ §8.4). */}
-        <dl className="ml-auto flex items-center gap-4 font-numeric tabular-nums">
+        <dl className="ml-auto flex items-center gap-4 numeric">
           <div className="flex gap-1">
             <dt className="text-secondary">{t('viewer.time')}</dt>
             <dd>{elapsedClock(props.timeline, props.timeMs)}</dd>
