@@ -7,6 +7,7 @@ import {
   easeHalfWidth,
   HALF_WIDTH_EASE_TAU_S,
   targetHalfWidthS,
+  trackVelocity,
   type TargetTrack,
 } from './camera-target';
 
@@ -131,5 +132,29 @@ describe('easeHalfWidth — смена скорости не дёргает ка
 
   it('первый кадр — сразу нужное окно', () => {
     expect(easeHalfWidth(null, 8, 0)).toBe(8);
+  });
+});
+
+describe('trackVelocity — скорость по сглаженной траектории', () => {
+  it('прямой полёт: скорость по осям точно', () => {
+    const glide = trackOf(120, (s) => ({ east: 10 * s, north: 3 * s, up: -1.2 * s }));
+    const v = trackVelocity(glide, at(40.3), 3);
+    // Трек здесь переводится в градусы по 111 320 м/°, код — по сфере 6371 км:
+    // разница моделей Земли ~0,1 %, поэтому допуск относительный.
+    expect(Math.abs((v?.eastMs ?? 0) / 10 - 1)).toBeLessThan(0.002);
+    expect(Math.abs((v?.northMs ?? 0) / 3 - 1)).toBeLessThan(0.002);
+    expect(v?.upMs).toBeCloseTo(-1.2, 6);
+  });
+
+  it('шум GPS ±3 м почти не влияет на боковую скорость', () => {
+    const noisy = trackOf(120, (s) => ({ east: 10 * s, north: s % 2 === 0 ? 3 : -3, up: 0 }));
+    for (let s = 20; s < 100; s += 0.37) {
+      expect(Math.abs(trackVelocity(noisy, at(s), 3)?.northMs ?? Number.NaN)).toBeLessThan(1.5);
+    }
+  });
+
+  it('пустой трек — null', () => {
+    const empty = { t: new Float64Array(), lat: new Float64Array(), lon: new Float64Array(), alt: new Float64Array() };
+    expect(trackVelocity(empty, at(0), 3)).toBeNull();
   });
 });
