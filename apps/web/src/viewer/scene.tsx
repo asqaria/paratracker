@@ -14,12 +14,14 @@ import {
   Material,
   Math as CesiumMath,
   Matrix4,
+  NeverTileDiscardPolicy,
   PolylineColorAppearance,
   PolylineGeometry,
   PolylineMaterialAppearance,
   Primitive,
   sampleTerrainMostDetailed,
   type TerrainProvider,
+  type TileProviderError,
   Transforms,
   UrlTemplateImageryProvider,
   Viewer,
@@ -183,6 +185,16 @@ function applyCameraInputs(viewer: Viewer, mode: CameraMode): void {
   viewer.scene.screenSpaceCameraController.enableInputs = mode === 'free';
 }
 
+/**
+ * HTTP-статус упавшего тайла. Cesium кладёт в `error` RequestErrorEvent со
+ * `statusCode`; у сетевого сбоя статуса нет — undefined.
+ */
+function httpStatusOf(error: TileProviderError): number | undefined {
+  const cause: unknown = error.error;
+  if (typeof cause !== 'object' || cause === null || !('statusCode' in cause)) return undefined;
+  return typeof cause.statusCode === 'number' ? cause.statusCode : undefined;
+}
+
 function createImageryProvider(source: ImagerySource): ImageryLayer {
   if (source.kind === 'wmts') {
     return new ImageryLayer(
@@ -197,7 +209,16 @@ function createImageryProvider(source: ImagerySource): ImageryLayer {
       }),
     );
   }
-  return new ImageryLayer(new UrlTemplateImageryProvider({ url: source.url, maximumLevel: source.maximumLevel }));
+  return new ImageryLayer(
+    new UrlTemplateImageryProvider({
+      url: source.url,
+      maximumLevel: source.maximumLevel,
+      // Политика «ничего не отбрасывать» заставляет Cesium грузить тайл через
+      // XHR во всех браузерах — только так в ошибке есть HTTP-статус (httpStatusOf),
+      // и 404 «тайла нет» отличим от отказа подложки. Без неё Safari грузит <img>.
+      tileDiscardPolicy: new NeverTileDiscardPolicy(),
+    }),
+  );
 }
 
 export function Scene({ track, showGlow = false }: SceneProps) {
@@ -579,8 +600,8 @@ export function Scene({ track, showGlow = false }: SceneProps) {
     // Для Sentinel-2 отката нет: откатываться некуда, пусть будет видно.
     if (id !== 'sentinel2') {
       const tracker = tileFailureTracker();
-      stopTileWatch.current = layer.imageryProvider.errorEvent.addEventListener(() => {
-        if (tracker.failed()) switchImagery('sentinel2', t('viewer.imagery.fallback'));
+      stopTileWatch.current = layer.imageryProvider.errorEvent.addEventListener((error: TileProviderError) => {
+        if (tracker.failed(httpStatusOf(error))) switchImagery('sentinel2', t('viewer.imagery.fallback'));
       });
     }
     viewer.scene.requestRender();

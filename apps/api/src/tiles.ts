@@ -20,7 +20,7 @@ export interface TileRoutesDeps {
   fetchImpl?: typeof fetch;
 }
 
-const HTTP = { badRequest: 400, serviceUnavailable: 503, badGateway: 502 } as const;
+const HTTP = { badRequest: 400, notFound: 404, serviceUnavailable: 503, badGateway: 502 } as const;
 const MAX_ZOOM = 23;
 const TILE_TIMEOUT_S = 10;
 const MS_PER_SECOND = 1000;
@@ -70,6 +70,14 @@ export function registerTileRoutes(app: FastifyInstance, deps: TileRoutesDeps): 
     } catch (error) {
       request.log.warn({ err: error, z, y, x }, 'esri tile request failed');
       return sendProblem(reply, problem(HTTP.badGateway, { detail: 'Imagery provider is unavailable' }));
+    }
+
+    // 404 — у Esri нет съёмки этого тайла (детальные зумы покрыты неровно):
+    // клиент оставит родительский тайл. Это не отказ провайдера, 502 здесь
+    // заставил бы фронт откатиться на Sentinel-2.
+    if (upstream.status === HTTP.notFound) {
+      request.log.debug({ z, y, x }, 'esri tile absent');
+      return sendProblem(reply, problem(HTTP.notFound, { detail: 'No imagery for this tile' }));
     }
 
     if (!upstream.ok) {

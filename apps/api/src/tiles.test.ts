@@ -68,6 +68,15 @@ describe('GET /api/v1/tiles/esri/:z/:y/:x', () => {
       expect(response.headers['content-type']).toContain(PROBLEM_CONTENT_TYPE);
     }
   });
+
+  it('у Esri нет тайла на этом зуме (404) — 404, а не 502: подложка жива', async () => {
+    const app = appWith({
+      fetchImpl: vi.fn<typeof fetch>(() => Promise.resolve(new Response('', { status: 404 }))),
+    });
+    const response = await app.inject({ method: 'GET', url: '/api/v1/tiles/esri/18/96190/186750' });
+    expect(response.statusCode).toBe(404);
+    expect(response.headers['content-type']).toContain(PROBLEM_CONTENT_TYPE);
+  });
 });
 
 describe('GET /api/v1/imagery', () => {

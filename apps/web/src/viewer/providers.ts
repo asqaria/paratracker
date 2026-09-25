@@ -130,11 +130,24 @@ export function availableImagery(
  */
 export const IMAGERY_FALLBACK_AFTER_ERRORS = 8;
 
-/** Счётчик ошибок тайлов активной подложки: true — ровно один раз, на пороге. */
-export function tileFailureTracker(threshold: number = IMAGERY_FALLBACK_AFTER_ERRORS): { failed(): boolean } {
+/**
+ * HTTP-статус «тайла здесь нет». У Esri World Imagery покрытие детальных зумов
+ * неровное: над Казахстаном z18 местами отсутствует, и прокси честно отдаёт 404.
+ * Это не отказ подложки — Cesium оставляет на экране родительский тайл.
+ */
+export const TILE_ABSENT_STATUS = 404;
+
+/**
+ * Счётчик ошибок тайлов активной подложки: true — ровно один раз, на пороге.
+ * `status` — HTTP-статус ответа; без статуса (сеть, CORS) — тоже отказ.
+ */
+export function tileFailureTracker(threshold: number = IMAGERY_FALLBACK_AFTER_ERRORS): {
+  failed(status?: number): boolean;
+} {
   let failures = 0;
   return {
-    failed: () => {
+    failed: (status?: number) => {
+      if (status === TILE_ABSENT_STATUS) return false;
       failures += 1;
       return failures === threshold;
     },

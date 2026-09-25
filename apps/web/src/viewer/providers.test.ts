@@ -96,4 +96,25 @@ describe('tileFailureTracker — откат на Sentinel-2 при потоке 
     expect(IMAGERY_FALLBACK_AFTER_ERRORS).toBeGreaterThan(1);
     expect(tileFailureTracker().failed()).toBe(false);
   });
+
+  it('404 — тайла на этом зуме нет (Esri без съёмки z18), подложку не срывает', () => {
+    const tracker = tileFailureTracker();
+    const fired = Array.from({ length: IMAGERY_FALLBACK_AFTER_ERRORS * 3 }, () => tracker.failed(404));
+    expect(fired.some(Boolean)).toBe(false);
+  });
+
+  it('403, 429, 5xx и сетевой сбой без статуса — отказ подложки', () => {
+    const tracker = tileFailureTracker();
+    const statuses = [403, 429, 500, 502, undefined, 503, 401, 504];
+    expect(statuses).toHaveLength(IMAGERY_FALLBACK_AFTER_ERRORS);
+    const fired = statuses.map((status) => tracker.failed(status));
+    expect(fired.indexOf(true)).toBe(IMAGERY_FALLBACK_AFTER_ERRORS - 1);
+  });
+
+  it('404 вперемешку с отказами не сдвигает порог', () => {
+    const tracker = tileFailureTracker();
+    const fired = Array.from({ length: IMAGERY_FALLBACK_AFTER_ERRORS }, () => [tracker.failed(404), tracker.failed(503)]).flat();
+    expect(fired.filter(Boolean)).toHaveLength(1);
+    expect(fired.at(-1)).toBe(true);
+  });
 });
