@@ -44,6 +44,7 @@ import {
 } from './providers';
 import { SummaryPanel } from './SummaryPanel';
 import { TimelinePanel } from './TimelinePanel';
+import { VarioLegend } from './VarioLegend';
 import { buildTrackGeometry } from './track-geometry';
 import { useHotkeys } from './use-hotkeys';
 
@@ -380,6 +381,9 @@ export function Scene({ track, showGlow = false }: SceneProps) {
         а она обязательна по лицензиям и не скрывается (ТЗ §4.4, §11.3).
       */}
       <div className="absolute bottom-0 left-0 right-0">
+        <div className="px-4 pb-2">
+          <VarioLegend />
+        </div>
         <p className="bg-void/70 px-3 py-1 text-xs text-secondary">
           {attribution.map((entry, index) => (
             <span key={entry.text}>
