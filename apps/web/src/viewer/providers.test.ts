@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { imagerySourceById, imagerySources, readViewerConfig, terrainSource } from './providers';
+import {
+  availableImagery,
+  IMAGERY_FALLBACK_AFTER_ERRORS,
+  imagerySourceById,
+  imagerySources,
+  readViewerConfig,
+  terrainSource,
+  tileFailureTracker,
+} from './providers';
 
 const ENV = {
   VITE_TERRAIN_URL: 'https://terrain.example/cesium-mesh/ellipsoid',
@@ -57,5 +65,35 @@ describe('конфиг провайдеров', () => {
     expect(entries.map((attribution) => attribution[0]?.label)).toEqual(['terrain', 'imagery', 'imagery']);
     // Текст провайдеров — дословный по лицензиям, без русских вставок.
     expect(entries.flat().map((entry) => entry.text).join(' ')).not.toMatch(/[А-Яа-яЁё]/);
+  });
+});
+
+describe('availableImagery — кнопки только для настроенных подложек', () => {
+  const sources = imagerySources(readViewerConfig(ENV));
+
+  it('сервер подтвердил Esri — обе кнопки', () => {
+    expect(availableImagery(sources, { esri: true }).map((s) => s.id)).toEqual(['sentinel2', 'esri']);
+  });
+
+  it('ключа на сервере нет — только Sentinel-2', () => {
+    expect(availableImagery(sources, { esri: false }).map((s) => s.id)).toEqual(['sentinel2']);
+  });
+
+  it('ответа ещё нет или запрос упал — только Sentinel-2, без синего шара', () => {
+    expect(availableImagery(sources, undefined).map((s) => s.id)).toEqual(['sentinel2']);
+  });
+});
+
+describe('tileFailureTracker — откат на Sentinel-2 при потоке ошибок тайлов', () => {
+  it('срабатывает ровно один раз, на пороге', () => {
+    const tracker = tileFailureTracker();
+    const fired = Array.from({ length: IMAGERY_FALLBACK_AFTER_ERRORS + 3 }, () => tracker.failed());
+    expect(fired.indexOf(true)).toBe(IMAGERY_FALLBACK_AFTER_ERRORS - 1);
+    expect(fired.filter(Boolean)).toHaveLength(1);
+  });
+
+  it('единичная ошибка тайла подложку не срывает', () => {
+    expect(IMAGERY_FALLBACK_AFTER_ERRORS).toBeGreaterThan(1);
+    expect(tileFailureTracker().failed()).toBe(false);
   });
 });

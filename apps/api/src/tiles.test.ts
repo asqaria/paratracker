@@ -1,4 +1,4 @@
-import { PROBLEM_CONTENT_TYPE } from '@skyline/core';
+import { ImageryCapabilities, PROBLEM_CONTENT_TYPE } from '@skyline/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { buildApp } from './app.js';
@@ -67,5 +67,31 @@ describe('GET /api/v1/tiles/esri/:z/:y/:x', () => {
       expect(response.statusCode).toBe(502);
       expect(response.headers['content-type']).toContain(PROBLEM_CONTENT_TYPE);
     }
+  });
+});
+
+describe('GET /api/v1/imagery', () => {
+  it('ключ и адрес Esri настроены — esri: true', async () => {
+    const response = await appWith({}).inject({ method: 'GET', url: '/api/v1/imagery' });
+
+    expect(response.statusCode).toBe(200);
+    expect(ImageryCapabilities.parse(response.json())).toEqual({ esri: true });
+    // Настройка меняется только перезапуском API — минута кэша безопасна.
+    expect(response.headers['cache-control']).toBe('public, max-age=60');
+  });
+
+  it.each([
+    ['нет ключа', { apiKey: null }],
+    ['нет адреса', { tileUrlTemplate: null }],
+  ])('%s — esri: false, кнопки Esri быть не должно', async (_, deps) => {
+    const response = await appWith(deps).inject({ method: 'GET', url: '/api/v1/imagery' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ esri: false });
+  });
+
+  it('ключ наружу не уходит', async () => {
+    const response = await appWith({}).inject({ method: 'GET', url: '/api/v1/imagery' });
+    expect(response.body).not.toContain('secret-key');
   });
 });
