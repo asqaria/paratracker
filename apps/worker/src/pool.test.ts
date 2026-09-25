@@ -18,6 +18,14 @@ const MAX_MAIN_THREAD_LAG_MS = 200;
  * Старт потока в окно не входит — таймер заводится после ready.
  */
 const TIMEOUT_TEST_S = 0.3;
+/**
+ * Лимит vitest для этого теста. По умолчанию 5 с, а тест гоняет настоящие потоки
+ * и 18.5 МБ входа: локально ≈0.85 с (генерация 0.13 с, снятие по таймауту 0.52 с,
+ * восстановление 0.19 с), на медленном раннере CI — 5.03 с, и он падал по
+ * общему лимиту, хотя таймаут пула и восстановление отработали. Проверяется
+ * поведение, а не скорость: запас в ~6 раз от худшего замера в CI.
+ */
+const TIMEOUT_TEST_LIMIT_MS = 30_000;
 
 let pool: PipelinePool | undefined;
 afterEach(async () => {
@@ -101,5 +109,5 @@ describe('пул worker_threads', () => {
 
     const next = await pool.run({ sourceFormat: 'igc', bytes: readFixture('baseline.igc'), now: NOW });
     expect(next.ok, `code: ${next.ok ? '' : next.errorCode}`).toBe(true);
-  });
+  }, TIMEOUT_TEST_LIMIT_MS);
 });
