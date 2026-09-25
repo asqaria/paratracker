@@ -58,6 +58,9 @@
 
 ```sh
 # 1. Образы. VITE_* вшиваются во фронт при сборке — значения из .env разработки.
+#    Git Bash на Windows переписывает '/api/...' в 'C:/Program Files/Git/api/...' —
+#    без этой переменной Esri во фронте получит битый адрес.
+export MSYS_NO_PATHCONV=1
 ARGS="--build-arg VITE_TERRAIN_URL=https://terrain.reearth.land/cesium-mesh/ellipsoid \
   --build-arg VITE_IMAGERY_WMTS_URL='https://tiles.maps.eox.at/wmts/1.0.0/{layer}/default/WGS84/{TileMatrix}/{TileRow}/{TileCol}.jpg' \
   --build-arg VITE_IMAGERY_WMTS_LAYER=s2cloudless-2025 \
@@ -84,7 +87,10 @@ ssh ... 'docker compose -f /root/projects/skyline/docker-compose.prod.yml ps'
 ssh ... 'docker stats --no-stream'                      # память в пределах лимитов
 ```
 
-Загрузить трек через https://skyline.gateapp.kz и открыть в просмотрщике.
+Загрузить трек через https://skyline.gateapp.kz и **открыть в просмотрщике**: главная
+страница грузится и без конфига сцены, ошибка «Missing viewer configuration» видна
+только в 3D. Конфиг во фронте не пуст, если в turbo.json у build объявлено `"env": ["VITE_*"]`
+(строгий режим Turbo иначе не пропускает переменные в сборку).
 
 ## Логи, откат, бэкап
 
