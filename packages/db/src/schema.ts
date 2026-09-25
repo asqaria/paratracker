@@ -149,6 +149,10 @@ export const flights = pgTable(
     index('flights_track_simplified_gist').using('gist', t.trackSimplified),
     index('flights_user_started_idx').on(t.userId, t.startedAt.desc()),
     index('flights_takeoff_site_local_date_idx').on(t.takeoffSiteId, t.localDate.desc()),
+    // Уборка анонимных загрузок по TTL (ТЗ §11.2): только строки без пользователя.
+    index('flights_anonymous_created_idx')
+      .on(t.createdAt)
+      .where(sql`${t.userId} IS NULL`),
     index('flights_public_started_idx')
       .on(t.privacy, t.startedAt.desc())
       .where(sql`${t.privacy} = 'public'`),

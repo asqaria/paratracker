@@ -17,5 +17,17 @@ export const PIPELINE_MEMORY_LIMIT_MB = 512;
  */
 export const QUEUE_SWEEP_INTERVAL_S = 30;
 
+/**
+ * Как часто убирать просроченные анонимные загрузки (ТЗ §11.2). Срок — сутки,
+ * опоздание на час пилоту незаметно, а лишних запросов к базе нет.
+ */
+export const RETENTION_SWEEP_INTERVAL_S = 3600;
+
+/**
+ * Полётов за один запрос уборки: после долгого простоя проход не держит
+ * тысячи строк и ключей в памяти разом, а идёт пачками.
+ */
+export const RETENTION_BATCH_SIZE = 100;
+
 /** Ключ .track в объектном хранилище (ТЗ §5.2 шаг 9). */
 export const trackObjectKey = (flightId: string): string => `tracks/${flightId}.track`;

@@ -2,7 +2,9 @@ import {
   createChannelListener,
   createDatabase,
   findFlight,
+  deleteFlights,
   FLIGHT_QUEUED_CHANNEL,
+  listExpiredAnonymousFlights,
   listUnfinishedFlights,
   markFlightFailed,
   markFlightProcessing,
@@ -12,10 +14,17 @@ import {
 import { pino } from 'pino';
 
 import { loadConfig } from './config.js';
-import { PIPELINE_MEMORY_LIMIT_MB, PIPELINE_TIMEOUT_S, QUEUE_SWEEP_INTERVAL_S } from './constants.js';
+import {
+  PIPELINE_MEMORY_LIMIT_MB,
+  PIPELINE_TIMEOUT_S,
+  QUEUE_SWEEP_INTERVAL_S,
+  RETENTION_BATCH_SIZE,
+  RETENTION_SWEEP_INTERVAL_S,
+} from './constants.js';
 import { createPipelinePool } from './pool.js';
 import { createFlightProcessor } from './processor.js';
 import { createFlightQueue } from './queue.js';
+import { createRetentionSweep } from './retention.js';
 import { createObjectStorage, createStorageClient } from './storage.js';
 
 /**
@@ -75,17 +84,41 @@ async function requeueUnfinished(): Promise<void> {
   if (stuck.length > 0) logger.info({ count: stuck.length }, 'requeued unfinished flights');
 }
 
+const retention = createRetentionSweep({
+  repository: {
+    listExpired: (before, limit) => listExpiredAnonymousFlights(database.db, before, limit),
+    delete: (ids) => deleteFlights(database.db, ids),
+  },
+  storage,
+  now: () => Date.now(),
+  batchSize: RETENTION_BATCH_SIZE,
+  onError: (error, flightId) => logger.error({ err: error, flightId }, 'expired flight cleanup failed'),
+});
+
+/** ТЗ §11.2: анонимные загрузки старше срока хранения — из S3 и из базы. */
+async function sweepExpired(): Promise<void> {
+  const { deleted, failed } = await retention.run();
+  if (deleted > 0 || failed > 0) logger.info({ deleted, failed }, 'expired anonymous flights swept');
+}
+
 await listener.start();
 await requeueUnfinished();
 const sweep = setInterval(() => {
   void requeueUnfinished().catch((error: unknown) => logger.error({ err: error }, 'requeue sweep failed'));
 }, QUEUE_SWEEP_INTERVAL_S * MS_PER_SECOND);
 
+const logSweepFailure = (error: unknown): void => logger.error({ err: error }, 'retention sweep failed');
+void sweepExpired().catch(logSweepFailure);
+const retentionTimer = setInterval(() => {
+  void sweepExpired().catch(logSweepFailure);
+}, RETENTION_SWEEP_INTERVAL_S * MS_PER_SECOND);
+
 logger.info({ concurrency: config.WORKER_CONCURRENCY }, 'worker started');
 
 const shutdown = (signal: NodeJS.Signals): void => {
   logger.info({ signal }, 'shutting down');
   clearInterval(sweep);
+  clearInterval(retentionTimer);
   void (async () => {
     try {
       await listener.stop();

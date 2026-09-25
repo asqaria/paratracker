@@ -1,0 +1,1 @@
+CREATE INDEX "flights_anonymous_created_idx" ON "flights" USING btree ("created_at") WHERE "flights"."user_id" IS NULL;
