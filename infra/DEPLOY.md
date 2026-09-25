@@ -16,7 +16,7 @@
 
 ```
 браузер ──https──▶ Caddy GateApp :443 ──▶ skyline-web:80 (сеть gateapp_default)
-                                            ├─ /api/* ──▶ api:3000 ──▶ postgres, minio
+                                            ├─ /api/* ──▶ skyline-api:3000 ──▶ postgres, minio
                                             └─ статика фронта
                           worker ◀── NOTIFY ── api      (обработка треков)
 ```
