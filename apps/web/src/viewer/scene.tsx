@@ -45,7 +45,17 @@ import {
   zoomBy,
   type CameraAdjust,
 } from './camera-input';
-import { CAMERA_POSES, DEFAULT_CAMERA_MODE, nearestHeading, smoothHeading, type CameraMode } from './camera-modes';
+import { travelCourse } from './camera-course';
+import { cameraTarget, easeHalfWidth, targetHalfWidthS } from './camera-target';
+import {
+  CAMERA_POSES,
+  DEFAULT_CAMERA_MODE,
+  frameSeconds,
+  nearestHeading,
+  springHeading,
+  type HeadingState,
+  type CameraMode,
+} from './camera-modes';
 import type { DecodedTrack } from './decode-track';
 import { setupFlightClock, type FlightClock } from './flight-clock';
 import {
@@ -104,8 +114,6 @@ const GLOW_WIDTH_PX = 12;
 const GLOW_INTENSITY = 0.25;
 const SHADOW_ALPHA = 0.42;
 const SHADOW_WIDTH_PX = 2;
-/** Кадров в секунду, на которые рассчитан шаг сглаживания курса (прототип). */
-const ASSUMED_FPS = 60;
 /** Основная кнопка мыши (PointerEvent.button): ею облетают пилота. */
 const PRIMARY_BUTTON = 0;
 
@@ -230,7 +238,7 @@ export function Scene({ track, showGlow = false }: SceneProps) {
   const viewerRef = useRef<Viewer | null>(null);
   const clockRef = useRef<FlightClock | null>(null);
   const cameraModeRef = useRef<CameraMode>(DEFAULT_CAMERA_MODE);
-  const smoothHeadingRef = useRef<number | null>(null);
+  const smoothHeadingRef = useRef<HeadingState | null>(null);
   const adjustRef = useRef<CameraAdjust | null>(adjustFor(DEFAULT_CAMERA_MODE));
 
   // Конфиг читается один раз и не роняет рендер: без переменных окружения
@@ -308,9 +316,12 @@ export function Scene({ track, showGlow = false }: SceneProps) {
         controller.inertiaSpin = FREE_CAMERA.inertiaSpin;
         controller.inertiaTranslate = FREE_CAMERA.inertiaTranslate;
         controller.minimumZoomDistance = FREE_CAMERA.minimumZoomDistanceM;
-        // Ctrl + левая кнопка в Free — облёт пилота (обработчик ниже), а не
-        // штатный наклон вокруг центра экрана. Наклон остаётся на средней
-        // кнопке, Ctrl + правой и жесте двумя пальцами.
+        // Free: левая кнопка и один палец — облёт пилота (обработчик ниже), как
+        // в Chase; штатное «тащить глобус» Cesium уехало на правую кнопку. На
+        // телефоне иначе вокруг пилота было не повернуть: Ctrl там нет.
+        // Зум — колесо и щипок; наклон — средняя кнопка, Ctrl + правая и два пальца.
+        controller.rotateEventTypes = [CameraEventType.RIGHT_DRAG];
+        controller.zoomEventTypes = [CameraEventType.WHEEL, CameraEventType.PINCH];
         controller.tiltEventTypes = [
           CameraEventType.MIDDLE_DRAG,
           CameraEventType.PINCH,
@@ -405,7 +416,12 @@ export function Scene({ track, showGlow = false }: SceneProps) {
         // Кадровый обработчик: время → HUD и камера. Состояние React обновляется
         // только при смене точки, иначе перерисовка шла бы 60 раз в секунду.
         let lastIndex = -1;
+        let lastFrameMs: number | null = null;
+        let halfWidthS: number | null = null;
         const onPreRender = (): void => {
+          const frameNowMs = performance.now();
+          const elapsedS = frameSeconds(lastFrameMs, frameNowMs);
+          lastFrameMs = frameNowMs;
           const current = flightClock.currentTimeMs();
           const index = indexAt(track.t, current);
           if (index !== lastIndex) {
@@ -417,14 +433,24 @@ export function Scene({ track, showGlow = false }: SceneProps) {
           const modePose = CAMERA_POSES[mode];
           const adjust = adjustRef.current;
           if (mode === 'free' || !modePose || !adjust || !viewer) return;
-          const position = flightClock.position.getValue(viewer.clock.currentTime);
-          if (!position) return;
+          // Камера смотрит не на сырую точку пилота, а на сглаженную траекторию
+          // (camera-target.ts): у сырой скорость скачет на каждом фиксе — кадр
+          // дёргался. Окно — в долях секунды экрана, поэтому растёт со скоростью.
+          halfWidthS = easeHalfWidth(halfWidthS, targetHalfWidthS(viewer.clock.multiplier), elapsedS);
+          const aim = cameraTarget(shown, current, halfWidthS);
+          if (![aim.lat, aim.lon, aim.alt].every(Number.isFinite)) return;
+          const position = Cartesian3.fromDegrees(aim.lon, aim.lat, aim.alt);
 
           // Сглаживается только курс полёта; поправка мыши применяется сразу.
-          const target = modePose.headingDeg ?? nearestHeading(track.heading, index);
-          const elapsedS = Math.abs(viewer.clock.multiplier) / ASSUMED_FPS;
-          smoothHeadingRef.current = smoothHeading(smoothHeadingRef.current, target, elapsedS);
-          const pose = poseFor(mode, adjust, smoothHeadingRef.current);
+          // Курс — направление перемещения за окно (camera-course.ts): в термике
+          // он держит снос, а не обходит круг. Поворот к нему — пружиной, без
+          // рывка на старте. Курса нет (стоим, крутим без сноса) — камера плавно
+          // тормозит; на первом кадре — ближайший курс из трека.
+          const course = modePose.headingDeg ?? travelCourse(track, current);
+          const previous = smoothHeadingRef.current;
+          const target = Number.isNaN(course) && previous === null ? nearestHeading(track.heading, index) : course;
+          smoothHeadingRef.current = springHeading(previous, target, elapsedS);
+          const pose = poseFor(mode, adjust, smoothHeadingRef.current.headingDeg);
           // NaN в lookAt останавливает рендер Cesium целиком — лучше пропустить кадр.
           if (![pose.headingDeg, pose.pitchDeg, pose.rangeM].every(Number.isFinite)) return;
           viewer.camera.lookAt(
@@ -484,8 +510,8 @@ export function Scene({ track, showGlow = false }: SceneProps) {
 
   /**
    * Мышь в следящих режимах: колесо — дистанция до пилота, перетаскивание —
-   * облёт вокруг него. В Free всё штатное от Cesium, кроме Ctrl + левой
-   * кнопки: она облетает пилота, как в Chase.
+   * облёт вокруг него. В Free левая кнопка и один палец тоже облетают пилота,
+   * остальное (правая — сдвиг, колесо и щипок — зум) штатное от Cesium.
    */
   useEffect(() => {
     const element = container.current;
@@ -528,6 +554,7 @@ export function Scene({ track, showGlow = false }: SceneProps) {
     };
 
     const onPointerDown = (event: PointerEvent): void => {
+      // Облёт в Free — кроме Shift + левой: это у Cesium «оглядеться».
       if (event.pointerType === 'touch') {
         touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
         if (touches.size >= 2) {
@@ -540,7 +567,7 @@ export function Scene({ track, showGlow = false }: SceneProps) {
       if (event.button !== PRIMARY_BUTTON) return;
       if (follow()) {
         drag = { x: event.clientX, y: event.clientY, kind: 'follow' };
-      } else if (cameraModeRef.current === 'free' && event.ctrlKey) {
+      } else if (cameraModeRef.current === 'free' && !event.shiftKey) {
         drag = { x: event.clientX, y: event.clientY, kind: 'free-orbit' };
       }
       // Свой захват указателя не ставим: Cesium уже захватил его на canvas.

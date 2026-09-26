@@ -3,17 +3,19 @@
  * при смене цифр правится и §7.4 ТЗ.
  */
 
-export const CAMERA_MODES = ['chase', 'free', 'cockpit', 'top'] as const;
+export const CAMERA_MODES = ['chase', 'side', 'free', 'cockpit', 'top'] as const;
 export type CameraMode = (typeof CAMERA_MODES)[number];
 
 export const DEFAULT_CAMERA_MODE: CameraMode = 'chase';
 
-/** Порядок горячих клавиш 1–4 (ТЗ §7.5). */
-export const CAMERA_HOTKEY_ORDER: readonly CameraMode[] = ['chase', 'free', 'cockpit', 'top'];
+/** Порядок горячих клавиш 1–5 (ТЗ §7.5): Side — рядом с Chase, это два основных вида. */
+export const CAMERA_HOTKEY_ORDER: readonly CameraMode[] = ['chase', 'side', 'free', 'cockpit', 'top'];
 
 export interface CameraPose {
   /** Курс: null — брать сглаженный курс полёта. */
   headingDeg: number | null;
+  /** Поворот от курса полёта, градусы: −90 — камера слева, смотрит поперёк курса. */
+  courseOffsetDeg?: number;
   pitchDeg: number;
   /** Дистанция до пилота, м. */
   rangeM: number;
@@ -22,6 +24,12 @@ export interface CameraPose {
 /** null — режим без слежения: камера свободна. */
 export const CAMERA_POSES: Record<CameraMode, CameraPose | null> = {
   chase: { headingDeg: null, pitchDeg: -14, rangeM: 90 },
+  /**
+   * Вид сбоку: профиль полёта — наборы и глайды. Камера слева от курса,
+   * пилот летит по экрану слева направо; почти горизонтально и дальше Chase,
+   * чтобы в кадр влезал круг термика целиком (радиус 30–60 м).
+   */
+  side: { headingDeg: null, courseOffsetDeg: -90, pitchDeg: -6, rangeM: 320 },
   cockpit: { headingDeg: null, pitchDeg: -6, rangeM: 12 },
   top: { headingDeg: 0, pitchDeg: -89, rangeM: 1400 },
   free: null,
@@ -29,9 +37,25 @@ export const CAMERA_POSES: Record<CameraMode, CameraPose | null> = {
 
 /**
  * ТЗ §7.4: экспоненциальное сглаживание курса, τ ≈ 2 с. Без него камера
- * в спирали дёргается и укачивает. τ подобран на прототипе.
+ * в спирали дёргается и укачивает. τ подобран на прототипе. Секунды — экранные,
+ * а не полётные: иначе на ×16 и ×60 сглаживание пропадало (шаг кадра рос
+ * вместе с множителем), и на телефоне с 30 FPS камера вела себя иначе.
  */
 export const CHASE_SMOOTHING_TAU_S = 2;
+
+/**
+ * Потолок шага кадра, с. После фоновой вкладки или долгого кадра разница
+ * времени — секунды: без потолка камера одним кадром прыгала бы к цели.
+ */
+export const MAX_FRAME_S = 0.1;
+
+const MS_PER_S = 1000;
+
+/** Экранное время между кадрами, с: performance.now() предыдущего и текущего кадра. */
+export function frameSeconds(previousMs: number | null, nowMs: number): number {
+  if (previousMs === null || !(nowMs > previousMs)) return 0;
+  return Math.min(MAX_FRAME_S, (nowMs - previousMs) / MS_PER_S);
+}
 
 const FULL_TURN_DEG = 360;
 const HALF_TURN_DEG = 180;
@@ -42,15 +66,45 @@ export function shortestTurn(fromDeg: number, toDeg: number): number {
   return delta > HALF_TURN_DEG ? delta - FULL_TURN_DEG : delta;
 }
 
+/** Собственная частота пружины: при ω = 2/τ за τ проходится ~60 % пути. */
+const SPRING_OMEGA_PER_TAU = 2;
 /**
- * Шаг сглаживания курса. previous = null — первый кадр, берём цель как есть.
- * elapsedS — сколько секунд трека прошло за кадр (зависит от множителя часов).
+ * Коэффициенты приближения e^(−x) ≈ 1/(1 + x + 0.48x² + 0.235x³) из SmoothDamp
+ * (Game Programming Gems 4, гл. 1.10): устойчиво на любом шаге кадра.
  */
-export function smoothHeading(previous: number | null, targetDeg: number, elapsedS: number): number {
-  if (previous === null || Number.isNaN(previous)) return targetDeg;
-  if (Number.isNaN(targetDeg)) return previous;
-  const k = Math.min(1, Math.max(0, elapsedS / CHASE_SMOOTHING_TAU_S));
-  return previous + shortestTurn(previous, targetDeg) * k;
+const DECAY_X2 = 0.48;
+const DECAY_X3 = 0.235;
+
+export interface HeadingState {
+  headingDeg: number;
+  /** Скорость поворота, °/с экранного времени. */
+  rateDegS: number;
+}
+
+/**
+ * Поворот камеры к курсу — критически демпфированная пружина (как SmoothDamp
+ * в игровых движках): скорость поворота набирается плавно и цель не
+ * проскакивается. Экспоненциальное сглаживание, которое было здесь раньше,
+ * задавало скорость сразу, в первый же кадр: при скачке курса камера срывалась
+ * с места рывком.
+ * Время реакции — CHASE_SMOOTHING_TAU_S: за τ проходит ~60 % пути, как у
+ * экспоненты с тем же τ. Курс не определён (NaN) — плавно тормозит на месте.
+ */
+export function springHeading(previous: HeadingState | null, targetDeg: number, elapsedS: number): HeadingState {
+  if (previous === null || !Number.isFinite(previous.headingDeg)) {
+    return { headingDeg: Number.isFinite(targetDeg) ? targetDeg : 0, rateDegS: 0 };
+  }
+  if (!(elapsedS > 0)) return previous;
+  const omega = SPRING_OMEGA_PER_TAU / CHASE_SMOOTHING_TAU_S;
+  const x = omega * elapsedS;
+  const decay = 1 / (1 + x + DECAY_X2 * x * x + DECAY_X3 * x * x * x);
+  const target = Number.isFinite(targetDeg) ? previous.headingDeg + shortestTurn(previous.headingDeg, targetDeg) : previous.headingDeg;
+  const change = previous.headingDeg - target;
+  const temp = (previous.rateDegS + omega * change) * elapsedS;
+  return {
+    headingDeg: target + (change + temp) * decay,
+    rateDegS: (previous.rateDegS - omega * temp) * decay,
+  };
 }
 
 /** Курс, если его нет ни в одной точке трека: камера смотрит на север. */

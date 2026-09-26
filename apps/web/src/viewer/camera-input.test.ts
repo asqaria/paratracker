@@ -25,7 +25,7 @@ describe('пределы следящих режимов', () => {
   });
 
   it('стартовая поза каждого режима — внутри его пределов', () => {
-    for (const mode of ['chase', 'cockpit', 'top'] as const) {
+    for (const mode of ['chase', 'side', 'cockpit', 'top'] as const) {
       const pose = CAMERA_POSES[mode];
       const limits = CAMERA_LIMITS[mode];
       expect(pose?.rangeM).toBeGreaterThanOrEqual(limits.minRangeM);
@@ -103,6 +103,16 @@ describe('poseFor — поза кадра с поправками пилота',
   it('курс полёта + смещение, наклон и дистанция из поправок', () => {
     const adjust = { rangeM: 40, pitchDeg: -30, headingOffsetDeg: 25 };
     expect(poseFor('chase', adjust, 100)).toEqual({ headingDeg: 125, pitchDeg: -30, rangeM: 40 });
+  });
+
+  it('Side — курс полёта минус 90°: камера слева от пилота, он летит слева направо', () => {
+    expect(poseFor('side', initialAdjust('side'), 100).headingDeg).toBe(10);
+  });
+
+  it('Side вращается и зумится, как Chase', () => {
+    const side = initialAdjust('side');
+    expect(orbitBy(side, 'side', 100, 0).headingOffsetDeg).not.toBe(0);
+    expect(zoomBy(side, 'side', WHEEL_NOTCH).rangeM).toBeLessThan(side.rangeM);
   });
 
   it('Top — курс режима (север), а не полёта', () => {

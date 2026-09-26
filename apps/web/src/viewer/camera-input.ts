@@ -19,6 +19,8 @@ export interface CameraLimits {
 export const CAMERA_LIMITS: Record<FollowMode, CameraLimits> = {
   /** ТЗ §7.4: 5–200 м колесом. Наклон — не под пилота и не в зенит. */
   chase: { minRangeM: 5, maxRangeM: 200, minPitchDeg: -80, maxPitchDeg: -2 },
+  /** Сбоку: от одного виража до всего набора; сверху не круче 60°, иначе это уже Top. */
+  side: { minRangeM: 50, maxRangeM: 2000, minPitchDeg: -60, maxPitchDeg: 0 },
   /** Вид «из кабины»: близко к пилоту, взгляд вниз не круче 45°. */
   cockpit: { minRangeM: 5, maxRangeM: 50, minPitchDeg: -45, maxPitchDeg: 0 },
   /** Вид сверху: от одного термика до всего перехода; наклон фиксирован. */
@@ -100,7 +102,8 @@ export function poseFor(
   adjust: CameraAdjust,
   flightHeadingDeg: number,
 ): { headingDeg: number; pitchDeg: number; rangeM: number } {
-  const base = CAMERA_POSES[mode]?.headingDeg ?? flightHeadingDeg;
+  const pose = CAMERA_POSES[mode];
+  const base = pose?.headingDeg ?? flightHeadingDeg + (pose?.courseOffsetDeg ?? 0);
   return { headingDeg: base + adjust.headingOffsetDeg, pitchDeg: adjust.pitchDeg, rangeM: adjust.rangeM };
 }
 
