@@ -4,9 +4,7 @@ import {
   JulianDate,
   LagrangePolynomialApproximation,
   SampledPositionProperty,
-  VelocityOrientationProperty,
   type Clock,
-  type Entity,
   type Viewer,
 } from 'cesium';
 
@@ -21,12 +19,10 @@ import { DEFAULT_PLAYBACK_SPEED, timelineOf, type TrackTimeline } from './playba
 
 /** Степень интерполяции из ТЗ §7.4 — подобрана на прототипе. */
 const INTERPOLATION_DEGREE = 2;
-const GLIDER_POINT_SIZE_PX = 13;
 
 export interface FlightClock {
   timeline: TrackTimeline;
   position: SampledPositionProperty;
-  glider: Entity;
   /** Текущее время часов в UNIX мс. */
   currentTimeMs(): number;
   setTimeMs(timeMs: number): void;
@@ -59,20 +55,9 @@ export function setupFlightClock(viewer: Viewer, track: DecodedTrack): FlightClo
   clock.multiplier = DEFAULT_PLAYBACK_SPEED;
   clock.shouldAnimate = false;
 
-  const glider = viewer.entities.add({
-    position,
-    orientation: new VelocityOrientationProperty(position),
-    point: {
-      pixelSize: GLIDER_POINT_SIZE_PX,
-      // Точка пилота видна поверх рельефа: иначе она прячется за склоном.
-      disableDepthTestDistance: Number.POSITIVE_INFINITY,
-    },
-  });
-
   return {
     timeline,
     position,
-    glider,
     currentTimeMs: () => JulianDate.toDate(viewer.clock.currentTime).getTime(),
     setTimeMs: (timeMs) => {
       viewer.clock.currentTime = toJulian(timeMs);
