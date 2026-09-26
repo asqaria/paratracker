@@ -15,7 +15,7 @@ export function VarioLegend() {
       role="img"
       aria-label={t('viewer.varioLegend.description')}
       data-panel="legend"
-      className="w-48 rounded-xl glass px-3 py-2 compact:w-40 compact:px-2 compact:py-1"
+      className="w-48 rounded-xl glass px-3 py-2 compact:w-full compact:border-0 compact:bg-transparent compact:p-1 compact:shadow-none compact:backdrop-blur-none"
     >
       <figcaption className="mb-1.5 text-xs text-secondary compact:mb-1 compact:text-2xs">{t('viewer.varioLegend')}</figcaption>
       <div className="rounded-full" style={{ height: BAR_HEIGHT_PX, background: legendGradient() }} />

@@ -45,3 +45,18 @@ export function SummaryPanel({ summary, bare = false }: SummaryPanelProps) {
     </section>
   );
 }
+
+/**
+ * Сводка одной строкой — на ручке свёрнутой шторки: «4 ч 48 мин · 176,8 км ·
+ * 3505 м». Четыре подписанные цифры занимали целую строку экрана телефона.
+ */
+export function SummaryLine({ summary }: SummaryPanelProps) {
+  const t = useT();
+  const locale = useLocaleStore((state) => state.locale);
+  const formatted = formatSummary(summary, locale, t);
+  return (
+    <span data-panel="sheet-line" className="numeric text-xs text-primary">
+      {[formatted.duration, formatted.distance, formatted.maxAlt].join(' · ')}
+    </span>
+  );
+}

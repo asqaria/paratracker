@@ -7,7 +7,7 @@ import { sheetHeights, snapAfterDrag, toggleSnap, type SheetSnap } from './botto
  * Шторка на телефоне (ТЗ §8.3): три положения — свёрнута, половина, весь экран.
  * Ручку тянут пальцем; отпустили — встаёт в ближайшее положение или, при
  * рывке, в следующее по направлению. Тап по ручке — свёрнута ↔ половина.
- * summary видна всегда (свёрнутая шторка), children — ниже, с прокруткой.
+ * summary — строка на самой ручке (видна всегда), children — ниже, с прокруткой.
  */
 
 export interface BottomSheetProps {
@@ -107,11 +107,11 @@ export function BottomSheet({ summary, children, defaultSnap = 'peek' }: BottomS
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className="flex min-h-11 w-full shrink-0 touch-none items-center justify-center"
+        className="flex min-h-11 w-full shrink-0 touch-none flex-col items-center justify-center gap-1.5"
       >
         <span aria-hidden="true" className="h-1 w-10 rounded-full bg-secondary/60" />
+        {summary}
       </button>
-      <div className="shrink-0 px-2 pb-2">{summary}</div>
       {/* Свёрнута и не тянется — содержимое скрыто: иначе снизу выглядывал край первой кнопки. */}
       <div
         aria-hidden={!expanded && dragHeight === null}
