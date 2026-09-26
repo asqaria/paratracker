@@ -12,7 +12,7 @@ import {
   TranslationRotationScale,
   Transforms,
   type Entity,
-  type SampledPositionProperty,
+  type PositionProperty,
   type Viewer,
 } from 'cesium';
 
@@ -106,7 +106,7 @@ function nodeTransformations(
  */
 export function addGlider(
   viewer: Viewer,
-  position: SampledPositionProperty,
+  position: PositionProperty,
   attitudeAt: (timeMs: number) => GliderAttitude,
   poseAt: (timeMs: number) => GliderPose,
 ): Entity {

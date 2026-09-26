@@ -3,7 +3,7 @@ import { asc, eq, sql, type AnyColumn } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 import type { Database } from '../client.js';
-import { flights, glides, gliders, sites, thermals } from '../schema.js';
+import { flights, glides, gliders, sites, thermals, users } from '../schema.js';
 import { GLIDER_COLUMNS, type GliderRef } from './gliders.js';
 import type { SiteRecord } from './sites.js';
 
@@ -38,6 +38,8 @@ export interface FlightDetailsRecord {
   gliderRaw: string | null;
   /** XC-очки (задача 3.1); null — не посчитаны. */
   xc: XcScore | null;
+  /** Имя пилота (задача 3.12): профиль, логин, заголовок IGC — что есть первым. */
+  pilotName: string | null;
 }
 
 export interface ThermalRecord {
@@ -114,8 +116,10 @@ export async function findFlightDetails(db: Database, id: string): Promise<Fligh
       glider: GLIDER_COLUMNS,
       gliderRaw: flights.gliderRaw,
       xc: flights.xcTurnpoints,
+      pilotName: sql<string | null>`coalesce(${users.displayName}, ${users.username}::text, ${flights.pilotNameRaw})`,
     })
     .from(flights)
+    .leftJoin(users, eq(users.id, flights.userId))
     .leftJoin(takeoffSites, eq(takeoffSites.id, flights.takeoffSiteId))
     .leftJoin(landingSites, eq(landingSites.id, flights.landingSiteId))
     .leftJoin(gliders, eq(gliders.id, flights.gliderId))

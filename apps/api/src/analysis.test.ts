@@ -53,6 +53,7 @@ const details = (overrides: Partial<FlightDetailsRecord> = {}): FlightDetailsRec
   landingSite: null,
   glider: { id: GLIDER_ID, manufacturer: 'Ozone', model: 'Rush 6', size: 'ML' },
   gliderRaw: 'OZONE Rush6',
+  pilotName: 'Иван Петров',
   xc: XC,
   ...overrides,
 });
@@ -133,6 +134,7 @@ describe('GET /api/v1/flights/:id', () => {
       glider: { id: GLIDER_ID, label: 'Ozone Rush 6 ML' },
       gliderRaw: 'OZONE Rush6',
       xc: XC,
+      pilotName: 'Иван Петров',
       // Аноним смотрит анонимный полёт — править нечего.
       canEdit: false,
       privacy: 'unlisted',

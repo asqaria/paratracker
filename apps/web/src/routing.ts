@@ -1,3 +1,5 @@
+import { refsFromQuery, type FlightRef } from './compare/compare-refs';
+
 /**
  * Минимальная маршрутизация по хэшу до появления роутера (ТЗ §8.2):
  * # или #/ — лендинг с дропзоной, #/flight/{id} — просмотрщик по .track
@@ -23,6 +25,9 @@ const SHARE_HASH = /^#\/s\/([\w-]{8,64})$/;
  * сервер видит путь и разрешает встраивать в чужие сайты только его.
  */
 const EMBED_PATH = /^\/embed\/([\w-]{8,64})\/?$/;
+
+/** Сравнение треков (задача 3.12): #/compare?f=… — состав в адресе (compare-refs.ts). */
+const COMPARE_HASH = /^#\/compare(?:\?(.*))?$/;
 
 /** Адрес iframe для чужого сайта. */
 export const embedPath = (token: string): string => `/embed/${token}`;
@@ -53,6 +58,8 @@ export type Route =
   | { kind: 'shared'; token: string }
   /** Встроенный в чужой сайт просмотрщик (задача 3.9): облегчённый, без входа. */
   | { kind: 'embed'; token: string }
+  /** Сравнение треков (задача 3.12). */
+  | { kind: 'compare'; refs: FlightRef[] }
   /** flightId null — демо-трек: его нет в API, аналитики к нему нет. */
   | { kind: 'flight'; flightId: string | null; trackUrl: string; review?: true };
 
@@ -66,6 +73,8 @@ export function routeFromHash(hash: string): Route {
   if (hash === HEALTH_HASH) return { kind: 'health' };
   if (hash === LOGBOOK_HASH) return { kind: 'logbook' };
   if (hash === SETTINGS_HASH) return { kind: 'settings' };
+  const compare = COMPARE_HASH.exec(hash);
+  if (compare) return { kind: 'compare', refs: refsFromQuery(compare[1] ?? '') };
   const share = SHARE_HASH.exec(hash)?.[1];
   if (share !== undefined) return { kind: 'shared', token: share };
   if (hash === AUTH_FAILED_HASH) return { kind: 'landing', authFailed: true };

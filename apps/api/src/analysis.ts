@@ -51,6 +51,7 @@ function toDetails(flight: FlightDetailsRecord, viewerId: string | null): Flight
     glider: flight.glider ? { id: flight.glider.id, label: gliderLabel(flight.glider) } : null,
     gliderRaw: flight.gliderRaw,
     xc: flight.xc,
+    pilotName: flight.pilotName,
     canEdit: viewerId !== null && viewerId === flight.userId,
     privacy: flight.privacy,
   });
