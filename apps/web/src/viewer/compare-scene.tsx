@@ -13,6 +13,7 @@ import {
   VerticalOrigin,
 } from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
+import { raceGaps, type RaceTrack } from '@skyline/analysis';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { useLocaleStore, useT } from '../i18n/locale';
@@ -25,6 +26,8 @@ import {
   alignmentOffsets,
   compareTimeline,
   defaultAlignment,
+  elapsedLabel,
+  gapLabel,
   type CompareAlignment,
   type CompareTrackTimes,
 } from './compare-timeline';
@@ -78,8 +81,6 @@ const LABEL_OFFSET_PX = -34;
 const LABEL_OUTLINE_PX = 3;
 /** Перелёт камеры к «все в кадре». */
 const OVERVIEW_FLIGHT_S = 1;
-const SECONDS_PER_MINUTE = 60;
-const MINUTES_PER_HOUR = 60;
 
 /** Всё, что сцена знает о треке после построения. */
 interface SceneFlight {
@@ -90,16 +91,6 @@ interface SceneFlight {
   vertexTimes: Float64Array;
   position: SampledPositionProperty;
   positions: Cartesian3[];
-}
-
-/** Время трека → «+1:23:45» от взлёта первого (режим «по взлёту»). */
-function elapsedLabel(ms: number): string {
-  const sign = ms < 0 ? '−' : '+';
-  const total = Math.round(Math.abs(ms) / MS_PER_SECOND);
-  const h = Math.floor(total / (SECONDS_PER_MINUTE * MINUTES_PER_HOUR));
-  const m = Math.floor(total / SECONDS_PER_MINUTE) % MINUTES_PER_HOUR;
-  const s = total % SECONDS_PER_MINUTE;
-  return `${sign}${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 /** Цвет CSS → RGBA-байты для вершин линии. */
@@ -416,6 +407,25 @@ export function CompareScene({ flights, onRemove, toolbar }: CompareSceneProps) 
   );
   useHotkeys(hotkeys);
 
+  // Гонка (задача 3.12б): кто впереди — по треку пилота под камерой (или первого), отставание — от лидера.
+  const raceTracks = useMemo<RaceTrack[]>(
+    () => flights.map(({ track }) => ({ t: track.t, lat: track.lat, lon: track.lon, range: flightRange(track.t, track.gSpeed) })),
+    [flights],
+  );
+  const gaps = useMemo(
+    () =>
+      raceGaps(
+        raceTracks.map((track, i) => {
+          const localMs = timeMs - (offsets[i] ?? 0);
+          const at = indexAt(track.t, localMs);
+          return { track, offsetMs: offsets[i] ?? 0, localMs, lat: track.lat[at] ?? Number.NaN, lon: track.lon[at] ?? Number.NaN };
+        }),
+        followed ?? 0,
+        timeMs,
+      ),
+    [raceTracks, offsets, followed, timeMs],
+  );
+
   const firstZone = flights[0]?.timezone ?? 'UTC';
   const anchorMs = (times[0]?.takeoffMs ?? Number.NaN) + (offsets[0] ?? 0);
   const clockLabel =
@@ -459,6 +469,7 @@ export function CompareScene({ flights, onRemove, toolbar }: CompareSceneProps) 
                     <span className="block truncate text-primary">{flight.label}</span>
                     <span className="block truncate text-xs text-secondary">{flight.detail}</span>
                   </span>
+                  <RaceGap gapMs={gaps[i] ?? null} leader={i === gaps.indexOf(0)} />
                   <PilotReadout track={flight.track} localMs={timeMs - (offsets[i] ?? 0)} />
                 </button>
                 <button
@@ -507,6 +518,20 @@ export function CompareScene({ flights, onRemove, toolbar }: CompareSceneProps) 
     </div>
   );
 
+}
+
+/**
+ * Отставание от лидера: у лидера — «лидер», не на маршруте или не взлетел —
+ * ничего. Идущие вровень с лидером — «+0:00»: лидер один.
+ */
+function RaceGap({ gapMs, leader }: { gapMs: number | null; leader: boolean }) {
+  const t = useT();
+  if (gapMs === null) return null;
+  return (
+    <span data-race-gap className={`numeric shrink-0 text-xs ${leader ? 'text-accent' : 'text-primary'}`}>
+      {leader ? t('compare.leader') : gapLabel(gapMs)}
+    </span>
+  );
 }
 
 /** Высота и варио пилота сейчас; до начала трека — «на старте», после — «сел». */
