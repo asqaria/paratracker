@@ -16,7 +16,8 @@ import {
   type Viewer,
 } from 'cesium';
 
-import { PARAGLIDER_MODEL_PATH, type GliderAttitude } from './glider-attitude';
+import type { GliderAttitude } from './glider-attitude';
+import paragliderModelUrl from './models/paraglider.glb?url';
 import {
   FLAT_GROUND,
   GLIDER_NODES,
@@ -168,7 +169,8 @@ export function addGlider(
     position: lifted,
     orientation,
     model: {
-      uri: `${import.meta.env.BASE_URL}${PARAGLIDER_MODEL_PATH}`,
+      // Адрес с хешем содержимого: новая модель после выкладки видна сразу, без очистки кэша.
+      uri: paragliderModelUrl,
       // Не мельче 48 px — только в воздухе. Cesium увеличивает модель вокруг
       // точки подвеса, а на земле крыло и ноги ниже неё: издалека они уходили
       // в склон пропорционально увеличению. На земле — настоящий размер.

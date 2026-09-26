@@ -23,8 +23,11 @@
 		# иначе после деплоя браузер держал бы старую версию.
 		@hashed path /assets/*
 		header @hashed Cache-Control "public, max-age=31536000, immutable"
-		@index path / /index.html
-		header @index Cache-Control "no-cache"
+		# Остальное без хеша (index.html, демо-трек, файлы Cesium) — с проверкой
+		# свежести по ETag: без Cache-Control браузер сам решал, сколько держать
+		# старую версию после выкладки.
+		@unhashed not path /assets/*
+		header @unhashed Cache-Control "no-cache"
 		file_server
 	}
 }
