@@ -16,6 +16,7 @@ import {
   FLIGHT_STATUS_CHANNEL,
   insertFlight,
   listGlides,
+  listSameDayFlights,
   listLogbook,
   listLogbookMap,
   listGliders,
@@ -128,6 +129,7 @@ const app = buildApp({
     details: (id) => findFlightDetails(database.db, id),
     thermals: (flightId) => listThermals(database.db, flightId),
     glides: (flightId) => listGlides(database.db, flightId),
+    sameDay: (flightId, viewerId) => listSameDayFlights(database.db, flightId, viewerId),
   },
   sharePage: {
     find: (token) => findSharePreview(database.db, token),

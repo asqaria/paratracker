@@ -2,12 +2,13 @@ import {
   FlightDetailsResponse,
   gliderLabel,
   GlidesResponse,
+  SameDayResponse,
   thermalStrength,
   ThermalsResponse,
   WindResponse,
   type WindDto,
 } from '@skyline/core';
-import type { FlightDetailsRecord, GlideRecord, ThermalRecord } from '@skyline/db';
+import type { FlightDetailsRecord, GlideRecord, SameDayRecord, ThermalRecord } from '@skyline/db';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
@@ -22,6 +23,8 @@ import { problem, sendProblem } from './problem.js';
 export interface AnalysisRoutesDeps {
   details(id: string): Promise<FlightDetailsRecord | null>;
   thermals(flightId: string): Promise<ThermalRecord[]>;
+  /** Полёты того же дня с того же места (задача 3.12в): публичные и свои. */
+  sameDay?(flightId: string, viewerId: string | null): Promise<SameDayRecord[]>;
   glides(flightId: string): Promise<GlideRecord[]>;
 }
 
@@ -142,6 +145,21 @@ export function registerAnalysisRoutes(app: FastifyInstance, deps: AnalysisRoute
   app.get('/flights/:id/glides', async (request, reply) => {
     const flight = await readyFlightOf(request, reply);
     return flight ? reply.send(toGlides(await deps.glides(flight.id))) : reply;
+  });
+
+  /**
+   * «Ещё летали здесь в этот день» — подсказки для сравнения треков (задача 3.12в).
+   * Спросить может тот, кто видит сам полёт; в ответе — только публичное и своё.
+   */
+  app.get('/flights/:id/same-day', async (request, reply) => {
+    const flight = await flightOf(request, reply);
+    if (!flight) return reply;
+    const rows = deps.sameDay ? await deps.sameDay(flight.id, request.userId) : [];
+    return reply.send(
+      SameDayResponse.parse({
+        flights: rows.map((row) => ({ ...row, startedAt: iso(row.startedAt) })),
+      }),
+    );
   });
 
   app.get('/flights/:id/wind', async (request, reply) => {

@@ -35,7 +35,12 @@ const details = (flightId: string, pilotName: string | null) => ({
   privacy: 'unlisted',
 });
 
-async function openCompare(page: Page, hash = `#/compare?f=${A},${TOKEN}`): Promise<void> {
+/** extra — свои ответы API поверх общих: Playwright берёт последний подходящий маршрут. */
+async function openCompare(
+  page: Page,
+  hash = `#/compare?f=${A},${TOKEN}`,
+  extra: (page: Page) => Promise<unknown> = () => Promise.resolve(),
+): Promise<void> {
   await page.route(/^https?:\/\/(?!localhost)/, (route) => route.abort());
   await page.route('**/api/v1/**', (route) => route.fulfill({ status: 404, json: { status: 404 } }));
   await page.route('**/api/v1/me', (route) => route.fulfill({ status: 401, json: { status: 401 } }));
@@ -46,6 +51,7 @@ async function openCompare(page: Page, hash = `#/compare?f=${A},${TOKEN}`): Prom
   for (const track of [`**/api/v1/flights/${A}/track`, `**/api/v1/flights/${B}/track?share=${TOKEN}`]) {
     await page.route(track, (route) => route.fulfill({ body: DEMO_TRACK, contentType: 'application/octet-stream' }));
   }
+  await extra(page);
   await page.goto(`/${hash}`);
   await expect(page.locator('[data-panel="compare-list"]')).toBeVisible({ timeout: 30_000 });
 }
@@ -119,4 +125,28 @@ test('гонка: в середине полёта — один лидер, ид
   await expect(gaps).toHaveCount(2);
   await expect(gaps.nth(0)).toHaveText(/лидер|leader/);
   await expect(gaps.nth(1)).toHaveText('+0:00');
+});
+
+test('автоподбор: «ещё летали здесь в этот день» — без уже добавленных; «+» кладёт в адрес', async ({ page }) => {
+  const C = '66666666-2222-4333-8444-555555555555';
+  const suggestion = (flightId: string, pilotName: string) => ({
+    flightId,
+    pilotName,
+    startedAt: '2026-07-15T06:40:00.000Z',
+    timezone: 'Asia/Almaty',
+    airtimeS: 3000,
+    distanceTrackM: 12_300,
+    xcScore: null,
+    own: false,
+  });
+  await openCompare(page, undefined, (p) =>
+    p.route(`**/api/v1/flights/${A}/same-day`, (route) =>
+      route.fulfill({ json: { flights: [suggestion(B, 'Уже в сравнении'), suggestion(C, 'Данияр')] } }),
+    ),
+  );
+  const panel = page.locator('[data-panel="compare-same-day"]');
+  await expect(panel.getByRole('button')).toHaveCount(1);
+  await expect(panel).toContainText('Данияр');
+  await panel.getByRole('button').click();
+  await expect(page).toHaveURL(new RegExp(`#/compare\\?f=${A},${TOKEN},${C}$`));
 });

@@ -69,6 +69,7 @@ import { BottomSheet } from './BottomSheet';
 import { useCreateSite, useFlightAnalytics, useOwnGliders, usePrivacyControls, useSetFlightGlider } from './flight-analytics';
 import { SummaryLine, SummaryPanel } from './SummaryPanel';
 import { ReviewPanel } from '../review/ReviewPanel';
+import { compareHash } from '../compare/compare-refs';
 import { shareHash } from '../routing';
 import { aglProfile } from './agl';
 import { TimelinePanel } from './TimelinePanel';
@@ -703,6 +704,11 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
   useHotkeys(hotkeys);
 
   const imageryButtons = <ImageryButtons imagery={imagery} />;
+  /** Сравнить с другими (задача 3.12): этот полёт — первым; посторонний — по токену ссылки. */
+  const compareLink =
+    flightId === null || embed || review
+      ? null
+      : compareHash([share === undefined ? { kind: 'id', flightId } : { kind: 'share', token: share }]);
 
   return (
     <div className="relative h-dvh w-full">
@@ -738,6 +744,11 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
             className="glass flex items-center rounded-xl px-3 py-2 text-sm text-accent compact:min-h-11"
           >
             {t('embed.open')}
+          </a>
+        )}
+        {compareLink !== null && (
+          <a data-panel="compare-link" href={compareLink} className="glass rounded-xl px-3 py-2 text-sm text-accent compact:hidden">
+            {t('viewer.compare')}
           </a>
         )}
         <div data-panel="imagery" className="flex flex-col gap-2 rounded-xl glass p-3 text-sm compact:hidden">
@@ -781,6 +792,11 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
             <div className="flex flex-col gap-3">
               <SummaryPanel summary={track.summary} bare />
               <VarioLegend />
+              {compareLink !== null && (
+                <a href={compareLink} className="flex min-h-11 items-center text-sm text-accent">
+                  {t('viewer.compare')}
+                </a>
+              )}
               <div data-panel="sheet-imagery" className="flex items-center justify-between gap-2 text-sm">
                 <span className="text-secondary">{t('viewer.imagery')}</span>
                 {imageryButtons}

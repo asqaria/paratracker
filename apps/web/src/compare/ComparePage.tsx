@@ -1,12 +1,17 @@
-import { useQueries } from '@tanstack/react-query';
+import type { SameDayFlight } from '@skyline/core';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react';
 
+import type { Locale } from '@skyline/core';
 import { fill, useLocaleStore, useT } from '../i18n/locale';
+import type { MessageKey } from '../i18n/messages';
+import { formatDuration } from '../viewer/format-summary';
+import { kilometres } from '../viewer/units';
 import { LOGBOOK_HASH } from '../routing';
 import { compareColor } from '../viewer/compare-palette';
 import type { CompareFlight } from '../viewer/compare-scene';
 import { loadTrack } from '../viewer/use-track';
-import { fetchCompareDetails, resolveRef, trackUrl } from './compare-api';
+import { fetchCompareDetails, fetchSameDay, resolveRef, trackUrl, type ResolvedFlight } from './compare-api';
 import { COMPARE_MAX_FLIGHTS, compareHash, refFromLink, refKey, type FlightRef } from './compare-refs';
 
 /**
@@ -95,13 +100,17 @@ export function ComparePage({ refs }: { refs: FlightRef[] }) {
   }, [readyKey, locale]);
 
   const remove = (key: string): void => go(refs.filter((ref) => refKey(ref) !== key));
+  const add = (ref: FlightRef): void => go([...refs, ref]);
+  // Подсказки — по первому открывшемуся полёту: его место и день задают «здесь и в этот день».
+  const anchor = resolved.find((query) => query.data)?.data ?? null;
+  const present = new Set(resolved.flatMap((query) => (query.data ? [query.data.flightId] : [])));
   const toolbar = (
-    <CompareToolbar
-      refs={refs}
-      failed={failed}
-      onAdd={(ref) => go([...refs, ref])}
-      onRemove={remove}
-    />
+    <>
+      <CompareToolbar refs={refs} failed={failed} onAdd={add} onRemove={remove} />
+      {anchor && refs.length < COMPARE_MAX_FLIGHTS && (
+        <SameDaySuggestions anchor={anchor} present={present} onAdd={(flightId) => add({ kind: 'id', flightId })} />
+      )}
+    </>
   );
 
   if (refs.length === 0 || (!loading && flights.length === 0)) {
@@ -220,4 +229,72 @@ function CompareToolbar({
       )}
     </div>
   );
+}
+
+/**
+ * «Ещё летали здесь в этот день» (задача 3.12в): публичные полёты того же
+ * места и дня плюс свои. Уже добавленные не повторяются.
+ */
+function SameDaySuggestions({
+  anchor,
+  present,
+  onAdd,
+}: {
+  anchor: ResolvedFlight;
+  present: ReadonlySet<string>;
+  onAdd: (flightId: string) => void;
+}) {
+  const t = useT();
+  const locale = useLocaleStore((state) => state.locale);
+  const suggestions = useQuery({
+    queryKey: ['compare-same-day', anchor.flightId, anchor.share],
+    queryFn: ({ signal }) => fetchSameDay(anchor, signal),
+    staleTime: FOREVER,
+    retry: false,
+  });
+  const shown = (suggestions.data ?? []).filter((flight) => !present.has(flight.flightId));
+  if (shown.length === 0) return null;
+  return (
+    <section data-panel="compare-same-day" className="flex flex-col gap-1 border-t border-subtle pt-2 text-sm">
+      <h2 className="text-xs text-secondary">{t('compare.sameDay')}</h2>
+      <ul className="flex flex-col gap-1">
+        {shown.map((flight) => (
+          <li key={flight.flightId}>
+            <button
+              type="button"
+              onClick={() => onAdd(flight.flightId)}
+              aria-label={`${t('compare.addFlight')}: ${suggestionLabel(flight, t)}`}
+              className="flex w-full items-center gap-2 rounded px-1 py-1 text-left hover:bg-subtle compact:min-h-11"
+            >
+              <span aria-hidden className="text-accent">
+                +
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-primary">
+                  {suggestionLabel(flight, t)}
+                  {flight.own && <span className="ml-1 text-xs text-secondary">· {t('compare.own')}</span>}
+                </span>
+                <span className="numeric block truncate text-xs text-secondary">{suggestionDetail(flight, locale, t)}</span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+const suggestionLabel = (flight: SameDayFlight, t: (key: MessageKey) => string): string =>
+  flight.pilotName ?? t('compare.unknownPilot');
+
+/** «12:40 · 50 мин · 12,3 км»: местное время старта, время в воздухе, дистанция. */
+function suggestionDetail(flight: SameDayFlight, locale: Locale, t: (key: MessageKey) => string): string {
+  const time = flight.startedAt
+    ? new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', timeZone: flight.timezone ?? 'UTC' }).format(
+        new Date(flight.startedAt),
+      )
+    : null;
+  const airtime = flight.airtimeS === null ? null : formatDuration(flight.airtimeS, t);
+  const distance = flight.distanceTrackM === null ? null : kilometres(flight.distanceTrackM, locale, t);
+  return [time, airtime, distance].filter((part) => part !== null).join(' · ');
 }

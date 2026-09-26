@@ -1,4 +1,4 @@
-import { FlightDetailsResponse } from '@skyline/core';
+import { FlightDetailsResponse, SameDayResponse, type SameDayFlight } from '@skyline/core';
 
 import { fetchWithSession } from '../auth/session';
 import { resolveShare, withShare } from '../sharing/sharing-api';
@@ -34,4 +34,19 @@ export async function fetchCompareDetails(
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`Flight ${flight.flightId}: HTTP ${response.status}`);
   return FlightDetailsResponse.parse(await response.json());
+}
+
+/** «Ещё летали здесь в этот день» (задача 3.12в): публичные и свои полёты того же места и дня. */
+export async function fetchSameDay(
+  flight: ResolvedFlight,
+  signal: AbortSignal,
+  fetchImpl: typeof fetch = fetch,
+): Promise<SameDayFlight[]> {
+  const response = await fetchWithSession(
+    withShare(`/api/v1/flights/${flight.flightId}/same-day`, flight.share),
+    { signal, headers: { accept: 'application/json, application/problem+json' } },
+    fetchImpl,
+  );
+  if (!response.ok) return [];
+  return SameDayResponse.parse(await response.json()).flights;
 }

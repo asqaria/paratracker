@@ -243,6 +243,11 @@ const ru = {
   'compare.loading': 'Загружаем треки…',
   'compare.slider': 'Момент полёта',
   'compare.leader': 'лидер',
+  'compare.sameDay': 'Ещё летали здесь в этот день',
+  'compare.addFlight': 'Добавить в сравнение',
+  'compare.own': 'мой',
+  'compare.unknownPilot': 'Пилот без имени',
+  'viewer.compare': 'Сравнить с другими',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -491,6 +496,11 @@ const en: Messages = {
   'compare.loading': 'Loading tracks…',
   'compare.slider': 'Flight moment',
   'compare.leader': 'leader',
+  'compare.sameDay': 'Also flew here that day',
+  'compare.addFlight': 'Add to comparison',
+  'compare.own': 'mine',
+  'compare.unknownPilot': 'Unnamed pilot',
+  'viewer.compare': 'Compare with others',
 };
 
 export const messages: Record<Locale, Messages> = { ru, en };

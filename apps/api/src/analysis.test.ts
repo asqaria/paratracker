@@ -1,6 +1,7 @@
 import {
   FlightDetailsResponse,
   GlidesResponse,
+  SameDayResponse,
   PROBLEM_CONTENT_TYPE,
   ThermalsResponse,
   WindResponse,
@@ -13,6 +14,7 @@ import { buildApp } from './app.js';
 
 /** Настоящий UUID v4: z.uuid() в Zod 4 проверяет и версию, и вариант. */
 const FLIGHT_ID = '11111111-2222-4333-8444-555555555555';
+const OTHER_ID = '55555555-2222-4333-8444-555555555555';
 const T0 = Date.UTC(2026, 6, 15, 10);
 const SITE_ID = '33333333-2222-4333-8444-555555555555';
 const GLIDER_ID = '44444444-2222-4333-8444-555555555555';
@@ -98,6 +100,19 @@ function app(flight: FlightDetailsRecord | null) {
     details: () => Promise.resolve(flight),
     thermals: () => Promise.resolve([thermal]),
     glides: () => Promise.resolve([glide, { ...glide, seq: 1, kind: 'dynamic', glideRatio: null, headingDeg: null }]),
+    sameDay: (_flightId, viewerId) =>
+      Promise.resolve([
+        {
+          flightId: OTHER_ID,
+          pilotName: 'Иван',
+          startedAt: new Date(T0 + 600_000),
+          timezone: 'Asia/Almaty',
+          airtimeS: 3000,
+          distanceTrackM: 12_000,
+          xcScore: 14.2,
+          own: viewerId !== null,
+        },
+      ]),
   };
   return buildApp({ logger: false, analysis: deps });
 }
@@ -208,5 +223,32 @@ describe('GET /api/v1/flights/:id/thermals|glides|wind', () => {
     open = app(details());
     const response = await open.inject({ method: 'GET', url: '/api/v1/flights/not-a-uuid/thermals' });
     expect(response.statusCode).toBe(400);
+  });
+});
+
+describe('GET /api/v1/flights/:id/same-day (задача 3.12в)', () => {
+  it('подсказки для сравнения: время — ISO UTC', async () => {
+    const response = await get(details(), '/same-day');
+    expect(response.statusCode).toBe(200);
+    expect(SameDayResponse.parse(response.json())).toEqual({
+      flights: [
+        {
+          flightId: OTHER_ID,
+          pilotName: 'Иван',
+          startedAt: new Date(T0 + 600_000).toISOString(),
+          timezone: 'Asia/Almaty',
+          airtimeS: 3000,
+          distanceTrackM: 12_000,
+          xcScore: 14.2,
+          own: false,
+        },
+      ],
+    });
+  });
+
+  it('полёт не виден спрашивающему — 404, подсказок нет', async () => {
+    const hidden = details({ userId: '44444444-2222-4333-8444-555555555555', privacy: 'private' });
+    expect((await get(hidden, '/same-day')).statusCode).toBe(404);
+    expect((await get(null, '/same-day')).statusCode).toBe(404);
   });
 });
