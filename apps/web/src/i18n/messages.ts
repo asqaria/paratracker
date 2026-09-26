@@ -183,6 +183,21 @@ const ru = {
   'viewer.channel.vario': 'Варио',
   'viewer.channel.speed': 'Скорость',
   'viewer.channel.agl': 'Над рельефом',
+  'review.open': 'Сверить термики',
+  'review.title': 'Сверка термиков',
+  'review.exit': 'Выйти из сверки',
+  'review.hint': 'Отметьте каждый найденный термик: ✓ — верно, ✗ — не термик. Пропущенный — «начало» и «конец» по времени проигрывания.',
+  'review.progress': 'Отмечено {done} из {total}',
+  'review.save.saved': 'Сохранено',
+  'review.save.saving': 'Сохраняю…',
+  'review.save.error': 'Не удалось сохранить',
+  'review.loadError': 'Не удалось загрузить разметку',
+  'review.confirm': 'Верно',
+  'review.reject': 'Не термик',
+  'review.missed': 'Пропущенные термики',
+  'review.missedStart': 'Начало пропущенного здесь',
+  'review.missedEnd': 'Конец здесь (с {start})',
+  'review.download': 'Скачать разметку (labels.json)',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -371,6 +386,21 @@ const en: Messages = {
   'viewer.channel.vario': 'Vario',
   'viewer.channel.speed': 'Speed',
   'viewer.channel.agl': 'Above ground',
+  'review.open': 'Review thermals',
+  'review.title': 'Thermal review',
+  'review.exit': 'Exit review',
+  'review.hint': 'Mark each detected thermal: ✓ — correct, ✗ — not a thermal. A missed one — “start” and “end” at the playback time.',
+  'review.progress': '{done} of {total} marked',
+  'review.save.saved': 'Saved',
+  'review.save.saving': 'Saving…',
+  'review.save.error': 'Could not save',
+  'review.loadError': 'Could not load the review',
+  'review.confirm': 'Correct',
+  'review.reject': 'Not a thermal',
+  'review.missed': 'Missed thermals',
+  'review.missedStart': 'Missed thermal starts here',
+  'review.missedEnd': 'Ends here (from {start})',
+  'review.download': 'Download labels (labels.json)',
 };
 
 export const messages: Record<Locale, Messages> = { ru, en };

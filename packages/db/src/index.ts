@@ -44,6 +44,7 @@ export {
   type SetFlightGliderResult,
 } from './repositories/gliders.js';
 export { readPostgisVersion } from './repositories/health.js';
+export { findThermalReview, saveThermalReview, type ThermalReviewRecord } from './repositories/reviews.js';
 export { seasonStats, type SeasonStats, type SeasonTotals } from './repositories/stats.js';
 export {
   attachNearbyFlights,

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 
 import { CIRCLE, MOTION, THERMAL, type Thermal } from '@skyline/core';
 import { describe, expect, it } from 'vitest';
@@ -203,7 +203,9 @@ describe('detectThermals — условия §6.3', () => {
   });
 });
 
-/* ── Реальный трек с разметкой владельца (fixtures/real-wind-thermals.*) ──── */
+/* ── Реальные треки с разметкой владельцев (fixtures/*.labels.json) ─────────
+   Разметку пишет страница сверки термиков (DoD фазы 2) и tools/import-review.mjs;
+   каждый размеченный трек — отдельный набор проверок, новых правок теста не нужно. */
 
 interface LabelSpan {
   start: string;
@@ -216,11 +218,15 @@ interface Labels {
   notThermals: LabelSpan[];
 }
 
-describe('detectThermals на реальном треке — против ручной разметки владельца', () => {
-  const labels = JSON.parse(
-    readFileSync(new URL('../../../fixtures/real-wind-thermals.labels.json', import.meta.url), 'utf8'),
-  ) as Labels;
-  const derived = cleanAndDerive(parseFixture('real-wind-thermals.igc'));
+const FIXTURES = new URL('../../../fixtures/', import.meta.url);
+const LABELLED = readdirSync(FIXTURES)
+  .filter((name) => name.endsWith('.labels.json'))
+  .map((name) => name.replace(/\.labels\.json$/, ''))
+  .sort();
+
+describe.each(LABELLED)('detectThermals на реальном треке %s — против ручной разметки владельца', (name) => {
+  const labels = JSON.parse(readFileSync(new URL(`${name}.labels.json`, FIXTURES), 'utf8')) as Labels;
+  const derived = cleanAndDerive(parseFixture(`${name}.igc`));
   const p = derived.points;
   const columns: ThermalColumns = { t: p.t, lat: p.lat, lon: p.lon, altitude: p.altitude, heading: p.heading, vSpeed: p.vSpeedDamped };
   const found = detectThermals(columns, detectCircles(columns, PARAGLIDER), PARAGLIDER);
@@ -239,7 +245,7 @@ describe('detectThermals на реальном треке — против ру�
     }
   });
 
-  it('пропущенный в сильном ветре 1:44:19–1:55:40 — одним термиком, границы ±30 с', () => {
+  it('пропущенный алгоритмом раньше — одним термиком, границы ±30 с', () => {
     for (const label of labels.missed) {
       const covering = found.filter((thermal) => overlapS(span(thermal), label) > 0);
       expect(covering, `${label.start}–${label.end}`).toHaveLength(1);
@@ -250,7 +256,7 @@ describe('detectThermals на реальном треке — против ру�
     }
   });
 
-  it('пара кругов в слабом пузыре — не термик', () => {
+  it('отмеченное владельцем «не термик» — не термик', () => {
     for (const label of labels.notThermals) {
       const duration = seconds(label.end) - seconds(label.start);
       const overlapped = found.filter((thermal) => overlapS(span(thermal), label) > duration / 2);

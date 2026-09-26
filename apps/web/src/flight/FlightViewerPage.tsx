@@ -15,9 +15,11 @@ export interface FlightViewerPageProps {
   flightId: string | null;
   /** Откуда брать .track: /api/v1/flights/{id}/track или демо-файл. */
   trackUrl: string;
+  /** Режим сверки термиков (DoD фазы 2). */
+  review?: boolean;
 }
 
-export function FlightViewerPage({ flightId, trackUrl }: FlightViewerPageProps) {
+export function FlightViewerPage({ flightId, trackUrl, review = false }: FlightViewerPageProps) {
   const t = useT();
   const track = useTrack(trackUrl);
 
@@ -48,7 +50,7 @@ export function FlightViewerPage({ flightId, trackUrl }: FlightViewerPageProps) 
         </p>
       }
     >
-      <Scene track={track.track} flightId={flightId} />
+      <Scene track={track.track} flightId={flightId} review={review} />
       {flightId !== null && <SaveFlightBanner flightId={flightId} />}
     </Suspense>
   );

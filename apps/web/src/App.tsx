@@ -39,7 +39,9 @@ function Screen() {
   if (route.kind === 'health') return <HealthPage />;
   if (route.kind === 'logbook') return <LogbookPage />;
   if (route.kind === 'settings') return <GlidersPage />;
-  if (route.kind === 'flight') return <FlightViewerPage flightId={route.flightId} trackUrl={route.trackUrl} />;
+  if (route.kind === 'flight') {
+    return <FlightViewerPage flightId={route.flightId} trackUrl={route.trackUrl} review={route.review === true} />;
+  }
   return <UploadPage authFailed={route.kind === 'landing' && route.authFailed === true} />;
 }
 

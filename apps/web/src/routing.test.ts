@@ -33,6 +33,16 @@ describe('routeFromHash', () => {
     }
   });
 
+  it('сверка термиков — тот же полёт в режиме сверки', () => {
+    const id = '11111111-2222-4333-8444-555555555555';
+    expect(routeFromHash(`#/flight/${id}/review`)).toEqual({
+      kind: 'flight',
+      flightId: id,
+      trackUrl: `/api/v1/flights/${id}/track`,
+      review: true,
+    });
+  });
+
   it('неудачный вход — лендинг с сообщением', () => {
     expect(routeFromHash(AUTH_FAILED_HASH)).toEqual({ kind: 'landing', authFailed: true });
   });

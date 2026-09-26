@@ -8,6 +8,7 @@ import {
   createSession,
   findFlight,
   findFlightDetails,
+  findThermalReview,
   findUserProfile,
   FLIGHT_STATUS_CHANNEL,
   insertFlight,
@@ -19,6 +20,7 @@ import {
   listThermals,
   notifyFlightQueued,
   revokeSession,
+  saveThermalReview,
   seasonStats,
   rotateSession,
   setFlightGlider,
@@ -91,6 +93,10 @@ const app = buildApp({
           update: (userId, id, input) => updateGlider(database.db, userId, id, input),
           remove: (userId, id) => deleteGlider(database.db, userId, id),
           setFlightGlider: (args) => setFlightGlider(database.db, args),
+        },
+        reviews: {
+          find: (flightId, userId) => findThermalReview(database.db, flightId, userId),
+          save: (args) => saveThermalReview(database.db, args),
         },
       }
     : {}),

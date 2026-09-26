@@ -95,6 +95,7 @@ import { AnalyticsPanel, type SelectedSegment } from './AnalyticsPanel';
 import { BottomSheet } from './BottomSheet';
 import { useCreateSite, useFlightAnalytics, useOwnGliders, useSetFlightGlider } from './flight-analytics';
 import { SummaryLine, SummaryPanel } from './SummaryPanel';
+import { ReviewPanel } from '../review/ReviewPanel';
 import { aglProfile } from './agl';
 import { TimelinePanel } from './TimelinePanel';
 import { VarioLegend } from './VarioLegend';
@@ -126,6 +127,8 @@ export interface SceneProps {
   track: DecodedTrack;
   /** id полёта в API — для аналитики; null — демо-трек, панели нет. */
   flightId?: string | null;
+  /** Режим сверки термиков владельцем (DoD фазы 2): панель сверки вместо «Аналитики». */
+  review?: boolean;
   /**
    * Свечение под треком (ТЗ §7.3). По умолчанию выключено: прозрачный примитив
    * рисуется в проходе после непрозрачного, то есть ложится ПОВЕРХ цветной линии
@@ -297,7 +300,7 @@ function createImageryProvider(source: ImagerySource): ImageryLayer {
   );
 }
 
-export function Scene({ track, flightId = null, showGlow = false }: SceneProps) {
+export function Scene({ track, flightId = null, showGlow = false, review = false }: SceneProps) {
   const t = useT();
   const container = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Viewer | null>(null);
@@ -941,7 +944,10 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
             {t('viewer.points')}: {track.pointCount}
           </span>
         </div>
-        {analytics !== null && (
+        {analytics !== null && review && flightId !== null && (
+          <ReviewPanel flightId={flightId} analytics={analytics} timeline={timeline} timeMs={timeMs} onSelect={selectSegment} />
+        )}
+        {analytics !== null && !review && (
           <AnalyticsPanel
             state={analytics}
             timeline={timeline}
@@ -976,7 +982,17 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
                 <span className="text-secondary">{t('viewer.imagery')}</span>
                 {imageryButtons}
               </div>
-              {analytics !== null && (
+              {analytics !== null && review && flightId !== null && (
+                <ReviewPanel
+                  flightId={flightId}
+                  analytics={analytics}
+                  timeline={timeline}
+                  timeMs={timeMs}
+                  onSelect={selectSegment}
+                  embedded
+                />
+              )}
+              {analytics !== null && !review && (
                 <AnalyticsPanel
                   state={analytics}
                   timeline={timeline}

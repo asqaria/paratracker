@@ -78,6 +78,13 @@
       "when": 1790447764847,
       "tag": "0010_airtime",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790450126406,
+      "tag": "0011_thermal_reviews",
+      "breakpoints": true
     }
   ]
 }
