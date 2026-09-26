@@ -7,15 +7,19 @@ export const SHEET_SNAPS = ['peek', 'half', 'full'] as const;
 export type SheetSnap = (typeof SHEET_SNAPS)[number];
 
 export const SHEET = {
-  /** Свёрнута: ручка (20 px) и строка сводки (4 цифры, ~44 px) плюс отступы. */
-  peekPx: 76,
+  /**
+   * Свёрнута: ручка (44 px — цель касания по WCAG 2.5.5, как все кнопки на
+   * телефоне) и строка сводки (~40 px) плюс отступ.
+   */
+  peekPx: 92,
   /**
    * Сверху над раскрытой шторкой остаётся место: легенда варио (она едет вместе
-   * со шторкой) и полоска сцены — видно, что под шторкой просмотрщик.
+   * со шторкой) и полоска сцены — видно, что под шторкой просмотрщик. Не больше
+   * доли доступного места: телефон лёжа (390 px в высоту) иначе не раскрывал бы
+   * шторку вовсе.
    */
   topGapPx: 96,
-  /** Половина — доля доступной высоты: сцена сверху остаётся главной. */
-  halfFraction: 0.5,
+  topGapFraction: 0.15,
   /** Быстрее, px/мс, — рывок: шторка уходит в следующее положение по направлению. */
   flickPxPerMs: 0.5,
 } as const;
@@ -29,8 +33,10 @@ export type SheetHeights = Record<SheetSnap, number>;
  */
 export function sheetHeights(availablePx: number): SheetHeights {
   const peek = SHEET.peekPx;
-  const full = Math.max(peek, Math.round(availablePx - SHEET.topGapPx));
-  const half = Math.max(peek, Math.min(full, Math.round(full * SHEET.halfFraction)));
+  const gap = Math.min(SHEET.topGapPx, availablePx * SHEET.topGapFraction);
+  const full = Math.max(peek, Math.round(availablePx - gap));
+  // Половина — посередине между свёрнутой и полной: на любом экране три разных положения.
+  const half = Math.round((peek + full) / 2);
   return { peek, half, full };
 }
 
