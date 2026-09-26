@@ -139,6 +139,65 @@ export interface FlightRange {
   landing: number;
 }
 
+/**
+ * Ветер, ТЗ §6.5. east/north — вектор, КУДА дует (м/с); dirDeg — метеорологическое
+ * направление, ОТКУДА дует, [0, 360) — единая конвенция БД, API и UI.
+ */
+export interface Wind {
+  eastMs: number;
+  northMs: number;
+  speedMs: number;
+  dirDeg: number;
+}
+
+/** Метод B на одном круге: окружность в пространстве путевых скоростей. */
+export interface CircleWind {
+  /** Номер круга в выходе detectCircles. */
+  circleIndex: number;
+  /** Середина круга, UTC, мс. */
+  timeMs: number;
+  /** Средняя высота круга, м. */
+  altitudeM: number;
+  wind: Wind;
+  /** Радиус окружности скоростей — воздушная скорость в вираже, м/с. */
+  airspeedMs: number;
+  /** Корень из среднего квадрата невязки |V − W| − Vair, м/с. */
+  residualMs: number;
+}
+
+/** Слой профиля ветра, ТЗ §6.5. */
+export interface WindBand {
+  /** [низ, верх), м над эллипсоидом. */
+  altitudeBand: [number, number];
+  windSpeedMs: number;
+  /** Метеорологическое, откуда дует. */
+  windDirDeg: number;
+  /** 0..1: число кругов в слое и согласие их оценок. */
+  confidence: number;
+  circleCount: number;
+}
+
+/** Сверка методов на термике: A — снос центров кругов, B — среднее по его кругам. */
+export interface ThermalWind {
+  /** Номер термика в выходе detectThermals. */
+  thermalIndex: number;
+  /** Метод A: снос термика, развёрнутый в «откуда дует»; null — один круг. */
+  drift: Wind | null;
+  /** Метод B по кругам термика; null — ни один круг не прошёл отбраковку. */
+  circles: Wind | null;
+  /** |A − B|, м/с; null — нет одного из методов. */
+  disagreementMs: number | null;
+}
+
+export interface WindAnalysis {
+  circles: CircleWind[];
+  /** Слои снизу вверх; только слои, где есть круги. */
+  profile: WindBand[];
+  thermals: ThermalWind[];
+  /** Средний ветер полёта (колонки wind_* в flights); null — кругов нет. */
+  flight: Wind | null;
+}
+
 /** 'dynamic' — высота почти не терялась (ТЗ §6.4): качество не определено. */
 export type GlideKind = 'glide' | 'dynamic';
 
