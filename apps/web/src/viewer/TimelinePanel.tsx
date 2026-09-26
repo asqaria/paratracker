@@ -34,6 +34,9 @@ export interface TimelinePanelProps {
   /** Весь трек или только пройденный путь. */
   trackShown: TrackShown;
   onTrackShown: (shown: TrackShown) => void;
+  /** «Занавес» под треком (ТЗ §7.2); без обработчика кнопки нет. */
+  curtainOn?: boolean;
+  onCurtainOn?: (on: boolean) => void;
   onTogglePlay: () => void;
   onSeekTo: (timeMs: number) => void;
   onSpeed: (speed: PlaybackSpeed) => void;
@@ -175,6 +178,17 @@ export function TimelinePanel(props: TimelinePanelProps) {
           {t(`viewer.trackShown.${props.trackShown}`)}
         </button>
 
+        {props.onCurtainOn && (
+          <button
+            type="button"
+            aria-pressed={props.curtainOn ?? false}
+            onClick={() => props.onCurtainOn?.(!(props.curtainOn ?? false))}
+            className="hidden min-h-11 rounded px-3 text-secondary aria-pressed:bg-subtle aria-pressed:text-primary compact:block"
+          >
+            {t('viewer.curtain')}
+          </button>
+        )}
+
         <div role="group" aria-label={t('viewer.speed')} className="flex gap-1 compact:hidden">
           {PLAYBACK_SPEEDS.map((value) => (
             <button
@@ -215,6 +229,16 @@ export function TimelinePanel(props: TimelinePanelProps) {
               {t(`viewer.trackShown.${shown}`)}
             </button>
           ))}
+          {props.onCurtainOn && (
+            <button
+              type="button"
+              aria-pressed={props.curtainOn ?? false}
+              onClick={() => props.onCurtainOn?.(!(props.curtainOn ?? false))}
+              className="rounded px-2 py-1 text-secondary aria-pressed:bg-subtle aria-pressed:text-primary"
+            >
+              {t('viewer.curtain')}
+            </button>
+          )}
         </div>
 
         {/* Цифры телеметрии — моноширинные с табличными цифрами (ТЗ §8.4). */}

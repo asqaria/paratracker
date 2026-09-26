@@ -116,4 +116,31 @@ describe('TimelinePanel', () => {
 
     expect(render(START_MS, false, 'flown')).toMatch(new RegExp(`<button[^>]*aria-label="${shown}: ${flown}"`));
   });
+
+  it('занавес: кнопка с состоянием на десктопе и на телефоне; без обработчика — нет', () => {
+    const curtain = messages[locale]['viewer.curtain'];
+    const decoded = track();
+    const html = (on: boolean): string =>
+      renderToString(
+        <TimelinePanel
+          track={decoded}
+          timeline={timelineOf(decoded.t)}
+          timeMs={START_MS}
+          playing={false}
+          speed={4}
+          cameraMode="chase"
+          trackShown="all"
+          onTrackShown={noop}
+          curtainOn={on}
+          onCurtainOn={noop}
+          onTogglePlay={noop}
+          onSeekTo={noop}
+          onSpeed={noop}
+          onCameraMode={noop}
+        />,
+      );
+    expect(html(true).match(new RegExp(`aria-pressed="true"[^>]*>${curtain}<`, 'g'))).toHaveLength(2);
+    expect(html(false).match(new RegExp(`aria-pressed="false"[^>]*>${curtain}<`, 'g'))).toHaveLength(2);
+    expect(render(START_MS, false)).not.toContain(`>${curtain}<`);
+  });
 });

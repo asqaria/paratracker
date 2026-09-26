@@ -18,6 +18,7 @@ import {
   PolylineGeometry,
   PolylineMaterialAppearance,
   Primitive,
+  sampleTerrain as sampleTerrainAtLevel,
   sampleTerrainMostDetailed,
   type TerrainProvider,
   type TileProviderError,
@@ -91,6 +92,8 @@ import { SummaryPanel } from './SummaryPanel';
 import { TimelinePanel } from './TimelinePanel';
 import { VarioLegend } from './VarioLegend';
 import { buildTrackGeometry } from './track-geometry';
+import { CURTAIN, curtainOnByDefault, curtainSamples, curtainSegmentsShown, flownSegments } from './curtain';
+import { CurtainLayer } from './curtain-layer';
 import { currentColumn, thermalColumns, type ThermalColumn } from './thermal-columns';
 import { ThermalLayer } from './thermal-layer';
 import { TrackLayer } from './track-layer';
@@ -298,6 +301,12 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<PlaybackSpeed>(DEFAULT_PLAYBACK_SPEED);
   const [cameraMode, setCameraMode] = useState<CameraMode>(DEFAULT_CAMERA_MODE);
+  // Занавес (ТЗ §7.2): на телефоне по умолчанию выключен (§5.3).
+  const [curtainOn, setCurtainOn] = useState(() =>
+    curtainOnByDefault(typeof window !== 'undefined' && window.matchMedia(COMPACT_MEDIA_QUERY).matches),
+  );
+  const curtainOnRef = useRef(curtainOn);
+  const curtainRef = useRef<CurtainLayer | null>(null);
   /** Трек сцены — откалиброванный по земле; колонны термиков строятся по нему. */
   const [sceneTrack, setSceneTrack] = useState<DecodedTrack | null>(null);
   const [columnsShown, setColumnsShown] = useState(true);
@@ -407,6 +416,24 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
           shadowPx: widths.shadowPx,
           shadowColor: new Color(0, 0, 0, SHADOW_ALPHA),
         });
+        // Занавес: низ — рельеф под прореженными точками, грубый уровень тайлов
+        // (CURTAIN.terrainLevel). Опрос идёт параллельно, трек его не ждёт.
+        const samples = curtainSamples(track.t, range);
+        const curtainColor = Color.fromCssColorString(documentColorTokens().primary);
+        void sampleTerrainAtLevel(
+          terrain,
+          CURTAIN.terrainLevel,
+          samples.map((i) => Cartographic.fromDegrees(shown.lon[i] ?? 0, shown.lat[i] ?? 0)),
+        )
+          .then((places) => places.map((place) => place.height))
+          .catch(() => samples.map(() => Number.NaN))
+          .then((ground) => {
+            if (disposed) return;
+            const curtain = new CurtainLayer(scene, shown, samples, ground, curtainSegmentsShown(samples, shown.flags), curtainColor);
+            curtain.setVisible(curtainOnRef.current);
+            curtainRef.current = curtain;
+            scene.requestRender();
+          });
         const flightClock = setupFlightClock(viewer, shown);
         clockRef.current = flightClock;
         // Пилот — модель параплана: курс по сглаженной траектории, крен в вираже.
@@ -432,8 +459,12 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
             setTimeMs(current);
           }
           layer.update(trackShownRef.current, flownVertexCount(geometry.sourceIndex, index));
+          const curtain = curtainRef.current;
+          curtain?.update(
+            trackShownRef.current === 'all' ? samples.length - 1 : flownSegments(track.t, samples, current),
+          );
           // Тень строится асинхронно: пока её куски не готовы, кадры нужны и в покое.
-          if (layer.pending) scene.requestRender();
+          if (layer.pending || curtain?.pending) scene.requestRender();
 
           const mode = cameraModeRef.current;
           const modePose = CAMERA_POSES[mode];
@@ -483,6 +514,7 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
       disposed = true;
       viewerRef.current = null;
       clockRef.current = null;
+      curtainRef.current = null;
       viewer?.destroy();
     };
   }, [track, config, sources, showGlow]);
@@ -500,6 +532,12 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
     const viewer = viewerRef.current;
     if (viewer) viewer.clock.multiplier = speed;
   }, [speed]);
+
+  useEffect(() => {
+    curtainOnRef.current = curtainOn;
+    curtainRef.current?.setVisible(curtainOn);
+    viewerRef.current?.scene.requestRender();
+  }, [curtainOn]);
 
   /** «Весь / Пройденный»: применяется в кадре (onPreRender), здесь — только перерисовка. */
   useEffect(() => {
@@ -850,6 +888,8 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
           cameraMode={cameraMode}
           trackShown={trackShown}
           onTrackShown={setTrackShown}
+          curtainOn={curtainOn}
+          onCurtainOn={setCurtainOn}
           onTogglePlay={togglePlay}
           onSeekTo={seekTo}
           onSpeed={setSpeed}
