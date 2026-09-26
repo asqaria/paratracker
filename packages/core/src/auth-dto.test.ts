@@ -10,6 +10,7 @@ describe('MeResponse', () => {
     avatarUrl: 'https://lh3.googleusercontent.com/a/photo',
     locale: 'ru',
     units: 'metric',
+    defaultPrivacy: 'unlisted',
   };
 
   it('принимает профиль текущего пользователя', () => {
@@ -42,6 +43,11 @@ describe('safeReturnTo', () => {
     for (const value of ['https://evil.example', '//evil.example', '/\evil.example', 'javascript:alert(1)', '#/x y']) {
       expect(safeReturnTo(value)).toBe('#/');
     }
+  });
+
+  it('профиль с точкой в имени — можно; «..» — нет', () => {
+    expect(safeReturnTo('#/u/turar.i')).toBe('#/u/turar.i');
+    expect(safeReturnTo('#/u/../x')).toBe('#/');
   });
 
   it('без значения — главная', () => {

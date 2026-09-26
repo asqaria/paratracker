@@ -3,6 +3,7 @@ import { and, desc, eq, gte, isNull, lte, or, sql } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import { flights, gliders, sites } from '../schema.js';
+import { defaultPrivacyOf } from './users.js';
 import { defaultGliderId, GLIDER_COLUMNS, type GliderRef } from './gliders.js';
 import { SITE_COLUMNS, type SiteRecord } from './sites.js';
 
@@ -65,9 +66,12 @@ export async function listLogbook(
     siteId?: string;
     gliderId?: string;
     after?: LogbookCursor;
+    /** Публичный профиль (задача 3.11): только готовые полёты «Все». */
+    publicOnly?: boolean;
   },
 ): Promise<LogbookPage> {
   const conditions = [eq(flights.userId, query.userId)];
+  if (query.publicOnly) conditions.push(eq(flights.privacy, 'public'), eq(flights.status, 'ready'));
   // Дата — местная, по часам места старта (задача 2.14), как её видит пилот.
   if (query.from) conditions.push(gte(flights.localDate, query.from));
   if (query.to) conditions.push(lte(flights.localDate, query.to));
@@ -153,7 +157,14 @@ export async function claimFlights(
   const rows = await db
     .update(flights)
     // Забранный полёт получает крыло пилота по умолчанию, как и загруженный после входа.
-    .set({ userId, claimTokenHash: null, gliderId: defaultGliderId(userId), updatedAt: new Date() })
+    .set({
+      userId,
+      claimTokenHash: null,
+      gliderId: defaultGliderId(userId),
+      // Видимость — из настроек пилота (задача 3.11), как у загруженного после входа.
+      privacy: defaultPrivacyOf(userId),
+      updatedAt: new Date(),
+    })
     .where(
       and(
         isNull(flights.userId),

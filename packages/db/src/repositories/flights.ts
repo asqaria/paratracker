@@ -16,6 +16,7 @@ import { and, asc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import { flights, glides, thermals } from '../schema.js';
 import { defaultGliderId } from './gliders.js';
+import { defaultPrivacyOf } from './users.js';
 import { nearestSiteId } from './sites.js';
 
 /** Репозиторий полётов: наружу отдаются типизированные записи, не строки БД. */
@@ -105,6 +106,8 @@ export async function insertFlight(db: Database, flight: NewFlight): Promise<Fli
       claimTokenHash: flight.claimTokenHash ?? null,
       // Вошедший пилот — крыло по умолчанию сразу (задача 2.13б); сменит, если летал на другом.
       gliderId: flight.userId === null ? null : defaultGliderId(flight.userId),
+      // …и видимость из настроек (задача 3.11); анонимная загрузка — по умолчанию схемы.
+      ...(flight.userId === null ? {} : { privacy: defaultPrivacyOf(flight.userId) }),
     })
     .returning(RECORD_COLUMNS);
   if (!row) throw new Error('insertFlight returned no row');

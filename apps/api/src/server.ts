@@ -12,6 +12,7 @@ import {
   findFlight,
   findFlightDetails,
   findThermalReview,
+  findPublicProfile,
   findUserProfile,
   FLIGHT_STATUS_CHANNEL,
   insertFlight,
@@ -31,6 +32,7 @@ import {
   setFlightGlider,
   setFlightPrivacy,
   signInWithOAuth,
+  updateUserProfile,
   updateGlider,
 } from '@skyline/db';
 
@@ -62,6 +64,7 @@ const auth: AuthDeps | undefined = config.AUTH_JWT_SECRET
       users: {
         signIn: (identity) => signInWithOAuth(database.db, identity),
         profile: (id) => findUserProfile(database.db, id),
+      update: (id, patch) => updateUserProfile(database.db, id, patch),
       },
       sessions: {
         create: (session) => createSession(database.db, session),
@@ -130,6 +133,10 @@ const app = buildApp({
     thermals: (flightId) => listThermals(database.db, flightId),
     glides: (flightId) => listGlides(database.db, flightId),
     sameDay: (flightId, viewerId) => listSameDayFlights(database.db, flightId, viewerId),
+  },
+  profiles: {
+    find: (username) => findPublicProfile(database.db, username),
+    flights: (query) => listLogbook(database.db, { ...query, publicOnly: true }),
   },
   sharePage: {
     find: (token) => findSharePreview(database.db, token),

@@ -78,6 +78,7 @@ describe.runIf(Boolean(databaseUrl))('пользователи и сессии �
         avatarUrl: 'https://example.com/new.png',
         locale: 'ru',
         units: 'metric',
+        defaultPrivacy: 'unlisted',
       });
       const links = await connection.db.select().from(oauthAccounts).where(eq(oauthAccounts.userId, result.userId));
       expect(links.map((l) => [l.provider, l.subject])).toEqual([['google', `sub-${RUN}-new`]]);

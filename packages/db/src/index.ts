@@ -72,13 +72,17 @@ export {
 } from './repositories/logbook.js';
 export {
   createSession,
+  findPublicProfile,
   findUserProfile,
   revokeSession,
   rotateSession,
   signInWithOAuth,
+  updateUserProfile,
   type NewSession,
   type OAuthIdentity,
+  type PublicProfile,
   type RotateResult,
+  type UpdateProfileResult,
   type UserProfile,
 } from './repositories/users.js';
 export * from './schema.js';

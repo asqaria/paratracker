@@ -9,6 +9,7 @@ import { registerGliderRoutes, type GliderRoutesDeps } from './gliders.js';
 import { registerHealthRoutes, type HealthRouteOptions } from './health.js';
 import { registerLogbookRoutes, type LogbookRoutesDeps } from './logbook.js';
 import { registerProblemHandlers } from './problem.js';
+import { registerProfileRoutes, type ProfileRoutesDeps } from './profiles.js';
 import { registerReviewRoutes, type ReviewRoutesDeps } from './reviews.js';
 import { registerSharePageRoute, registerSharePreviewRoute, type SharePageDeps } from './share-page.js';
 import { registerSiteRoutes, type SiteRoutesDeps } from './sites.js';
@@ -38,6 +39,8 @@ export interface AppOptions {
   flightSettings?: FlightSettingsDeps;
   /** Ссылка для мессенджеров: страница /s/:token с превью (задача 3.8). */
   sharePage?: SharePageDeps;
+  /** Публичные профили пилотов (задача 3.11): без входа. */
+  profiles?: ProfileRoutesDeps;
 }
 
 export function buildApp(options: AppOptions): FastifyInstance {
@@ -59,6 +62,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       if (options.analysis) registerAnalysisRoutes(v1, options.analysis);
       if (options.tiles) registerTileRoutes(v1, options.tiles);
       if (options.sharePage) registerSharePreviewRoute(v1, options.sharePage);
+      if (options.profiles) registerProfileRoutes(v1, options.profiles);
       done();
     },
     { prefix: API_V1_PREFIX },

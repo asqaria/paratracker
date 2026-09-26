@@ -8,7 +8,7 @@ const ME = {
   displayName: 'Асқар',
   avatarUrl: null,
   locale: 'ru',
-  units: 'metric',
+  units: 'metric', defaultPrivacy: 'unlisted',
 };
 
 const problem = (status: number) =>

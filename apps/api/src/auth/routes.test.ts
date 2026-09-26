@@ -1,4 +1,4 @@
-import { MeResponse, PROBLEM_CONTENT_TYPE, UploadResponse } from '@skyline/core';
+import { MeResponse, PROBLEM_CONTENT_TYPE, UploadResponse, type ProfilePatch } from '@skyline/core';
 import type { NewSession, OAuthIdentity, RotateResult, UserProfile } from '@skyline/db';
 import { describe, expect, it } from 'vitest';
 
@@ -24,6 +24,7 @@ const PROFILE: UserProfile = {
   avatarUrl: 'https://lh3.googleusercontent.com/a/photo',
   locale: 'ru',
   units: 'metric',
+  defaultPrivacy: 'unlisted',
 };
 
 const IDENTITY: OAuthIdentity = {
@@ -37,6 +38,7 @@ const IDENTITY: OAuthIdentity = {
 interface Harness {
   app: ReturnType<typeof buildApp>;
   signIns: OAuthIdentity[];
+  updates: ProfilePatch[];
   sessions: NewSession[];
   rotations: string[];
   revoked: string[];
@@ -49,6 +51,7 @@ interface Harness {
 function harness(options: { google?: boolean } = {}): Harness {
   const h = {
     signIns: [] as OAuthIdentity[],
+    updates: [] as ProfilePatch[],
     sessions: [] as NewSession[],
     rotations: [] as string[],
     revoked: [] as string[],
@@ -77,6 +80,18 @@ function harness(options: { google?: boolean } = {}): Harness {
         return Promise.resolve({ userId: USER_ID, created: true });
       },
       profile: (id) => Promise.resolve(id === USER_ID ? PROFILE : null),
+      update: (id, patch) => {
+        h.updates.push(patch);
+        if (id !== USER_ID) return Promise.resolve({ kind: 'not_found' as const });
+        if (patch.username === 'taken') return Promise.resolve({ kind: 'taken' as const });
+        const profile: UserProfile = {
+          ...PROFILE,
+          ...(patch.displayName === undefined ? {} : { displayName: patch.displayName }),
+          ...(patch.username === undefined ? {} : { username: patch.username }),
+          ...(patch.defaultPrivacy === undefined ? {} : { defaultPrivacy: patch.defaultPrivacy }),
+        };
+        return Promise.resolve({ kind: 'ok' as const, profile });
+      },
     },
     sessions: {
       create: (session) => {
@@ -261,6 +276,33 @@ describe('GET /me', () => {
       expect(res.statusCode).toBe(401);
       expect(res.headers['content-type']).toContain(PROBLEM_CONTENT_TYPE);
     }
+  });
+});
+
+describe('PATCH /me (задача 3.11)', () => {
+  const patchMe = async (h: Harness, payload: unknown, signedIn = true) =>
+    h.app.inject({
+      method: 'PATCH',
+      url: '/api/v1/me',
+      payload: payload as Record<string, unknown>,
+      cookies: signedIn ? { skyline_at: await signAccessToken(USER_ID, SECRET, NOW) } : {},
+    });
+
+  it('имя, адрес и видимость по умолчанию; ответ — профиль по контракту', async () => {
+    const h = harness();
+    const res = await patchMe(h, { displayName: ' Асқар Т. ', username: 'Asqar.T', defaultPrivacy: 'public' });
+    expect(res.statusCode).toBe(200);
+    expect(MeResponse.parse(res.json())).toMatchObject({ displayName: 'Асқар Т.', username: 'asqar.t', defaultPrivacy: 'public' });
+    expect(h.updates).toEqual([{ displayName: 'Асқар Т.', username: 'asqar.t', defaultPrivacy: 'public' }]);
+  });
+
+  it('занятый адрес — 409; кривой — 400; без входа — 401', async () => {
+    const h = harness();
+    expect((await patchMe(h, { username: 'taken' })).statusCode).toBe(409);
+    expect((await patchMe(h, { username: 'не имя' })).statusCode).toBe(400);
+    expect((await patchMe(h, { email: 'a@b.kz' })).statusCode).toBe(400);
+    expect((await patchMe(h, { displayName: 'x' }, false)).statusCode).toBe(401);
+    expect(h.updates).toEqual([{ username: 'taken' }]);
   });
 });
 

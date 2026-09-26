@@ -7,10 +7,14 @@ import { UserMenu } from '../auth/UserMenu';
 import { LocaleSwitch } from '../i18n/LocaleSwitch';
 import { useLocaleStore, useT } from '../i18n/locale';
 import { LOGBOOK_QUERY_KEY } from '../logbook/logbook-keys';
+import { ProfileSettings } from '../profile/ProfileSettings';
 import { LOGBOOK_HASH } from '../routing';
 import { createGlider, deleteGlider, fetchGliders, GLIDERS_QUERY_KEY, updateGlider } from './gliders-api';
 
-/** «Мои крылья» (ТЗ §8.2 /settings, задача 2.13б): список, основное, добавить, удалить. */
+/**
+ * Настройки (ТЗ §8.2 /settings): профиль — имя, адрес, видимость новых полётов
+ * (задача 3.11) — и «Мои крылья» (задача 2.13б): список, основное, добавить, удалить.
+ */
 export function GlidersPage() {
   const t = useT();
   const locale = useLocaleStore((state) => state.locale);
@@ -21,7 +25,7 @@ export function GlidersPage() {
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-semibold">
           <a href="#/">{t('app.name')}</a>
-          <span className="ml-3 font-normal text-secondary">{t('gliders.title')}</span>
+          <span className="ml-3 font-normal text-secondary">{t('settings.title')}</span>
         </h1>
         <div className="flex items-center gap-3">
           <UserMenu />
@@ -29,7 +33,18 @@ export function GlidersPage() {
         </div>
       </header>
       {me === null && <p className="text-secondary">{t('logbook.signInPrompt')}</p>}
-      {me && <GlidersContent />}
+      {me && (
+        <div className="flex flex-col gap-6">
+          <section className="flex flex-col gap-2">
+            <h2 className="font-semibold">{t('profile.title')}</h2>
+            <ProfileSettings me={me} />
+          </section>
+          <section className="flex flex-col gap-2">
+            <h2 className="font-semibold">{t('gliders.title')}</h2>
+            <GlidersContent />
+          </section>
+        </div>
+      )}
     </main>
   );
 }

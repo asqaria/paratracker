@@ -1,6 +1,6 @@
 import cookie from '@fastify/cookie';
-import { AuthProvidersResponse, MeResponse, safeReturnTo } from '@skyline/core';
-import type { NewSession, OAuthIdentity, RotateResult, UserProfile } from '@skyline/db';
+import { AuthProvidersResponse, MeResponse, ProfilePatch, safeReturnTo } from '@skyline/core';
+import type { NewSession, OAuthIdentity, RotateResult, UpdateProfileResult, UserProfile } from '@skyline/db';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
@@ -42,6 +42,8 @@ export interface AuthDeps {
   users: {
     signIn(identity: OAuthIdentity): Promise<{ userId: string; created: boolean }>;
     profile(id: string): Promise<UserProfile | null>;
+    /** Настройки профиля (задача 3.11). */
+    update(id: string, patch: ProfilePatch): Promise<UpdateProfileResult>;
   };
   sessions: {
     create(session: NewSession): Promise<void>;
@@ -63,7 +65,7 @@ const COOKIE = {
 } as const;
 type CookieSpec = (typeof COOKIE)[keyof typeof COOKIE];
 
-const HTTP = { found: 302, noContent: 204, unauthorized: 401, conflict: 409, unavailable: 503 } as const;
+const HTTP = { found: 302, noContent: 204, badRequest: 400, unauthorized: 401, conflict: 409, unavailable: 503 } as const;
 const MS_PER_SECOND = 1000;
 /** Хэш-маршрут фронта, где объясняют, что вход не удался (apps/web routing.ts). */
 const AUTH_FAILED_ROUTE = '#/auth-failed';
@@ -204,5 +206,17 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
     const profile = request.userId ? await deps.users.profile(request.userId) : null;
     if (!profile) return sendProblem(reply, problem(HTTP.unauthorized, { detail: 'Not signed in' }));
     return reply.send(MeResponse.parse(profile));
+  });
+
+  /** Настройки профиля: имя, адрес /u/{имя}, видимость новых полётов (задача 3.11). */
+  app.patch('/me', async (request, reply) => {
+    if (!request.userId) return sendProblem(reply, problem(HTTP.unauthorized, { detail: 'Not signed in' }));
+    const patch = ProfilePatch.safeParse(request.body);
+    if (!patch.success) return sendProblem(reply, problem(HTTP.badRequest, { detail: z.prettifyError(patch.error) }));
+    const result = await deps.users.update(request.userId, patch.data);
+    if (result.kind === 'taken') return sendProblem(reply, problem(HTTP.conflict, { detail: 'Username is taken' }));
+    if (result.kind === 'not_found') return sendProblem(reply, problem(HTTP.unauthorized, { detail: 'Not signed in' }));
+    request.log.info({ userId: request.userId, fields: Object.keys(patch.data) }, 'profile updated');
+    return reply.send(MeResponse.parse(result.profile));
   });
 }

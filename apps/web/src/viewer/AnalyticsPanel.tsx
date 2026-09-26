@@ -5,6 +5,7 @@ import type { GliderDto, Privacy } from '@skyline/core';
 
 import { GliderLine } from '../gliders/GliderLine';
 import { formatLocalStart } from '../logbook/format-logbook';
+import { profileHash } from '../routing';
 import { PrivacyControl } from '../sharing/PrivacyControl';
 import { XcCard } from './XcCard';
 import { reviewHash } from '../routing';
@@ -137,6 +138,18 @@ export function AnalyticsPanel({
           )}
           {state.status === 'ready' && (
             <div className="mb-2">
+              {state.analytics.details.pilotName !== null && (
+                <p data-panel="flight-pilot" className="text-sm">
+                  <span className="text-secondary">{t('flight.pilot')}: </span>
+                  {state.analytics.details.pilotUsername === null ? (
+                    <span className="text-primary">{state.analytics.details.pilotName}</span>
+                  ) : (
+                    <a href={profileHash(state.analytics.details.pilotUsername)} className="text-accent">
+                      {state.analytics.details.pilotName}
+                    </a>
+                  )}
+                </p>
+              )}
               {state.analytics.details.startedAt !== null && (
                 <p data-panel="flight-start" className="text-sm">
                   <span className="text-secondary">{t('flight.start')}: </span>

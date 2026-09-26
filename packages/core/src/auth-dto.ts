@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { Locale, UnitSystem } from './user.js';
+import { Locale, Privacy, UnitSystem } from './user.js';
 
 /**
  * Контракт аутентификации (ТЗ §10, задача 2.10). Вход — только через
@@ -20,6 +20,8 @@ export const MeResponse = z.object({
   avatarUrl: z.url().nullable(),
   locale: Locale,
   units: UnitSystem,
+  /** Видимость новых полётов (задача 3.11): её пилот меняет в настройках. */
+  defaultPrivacy: Privacy,
 });
 export type MeResponse = z.infer<typeof MeResponse>;
 
@@ -29,8 +31,11 @@ export const AuthProvidersResponse = z.object({
 });
 export type AuthProvidersResponse = z.infer<typeof AuthProvidersResponse>;
 
-/** Хэш-маршрут приложения (ТЗ §8.2): `#/`, `#/flight/{id}` и т. п. */
-const APP_HASH_ROUTE = /^#\/[\w\-/]*$/;
+/**
+ * Хэш-маршрут приложения (ТЗ §8.2): `#/`, `#/flight/{id}`, `#/u/{имя}` и т. п.
+ * Точка — из имён пользователей (profile-dto USERNAME), `..` не пропускаем.
+ */
+const APP_HASH_ROUTE = /^#\/(?!.*\.\.)[\w\-/.]*$/;
 const HOME_ROUTE = '#/';
 
 /**
