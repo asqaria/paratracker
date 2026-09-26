@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { gliderPose, lyingAngleDeg, nodeTransforms, POSE, type GliderPose } from './glider-pose';
+import { gliderPose, lyingAngleDeg, lyingRollDeg, nodeTransforms, POSE, type GliderPose } from './glider-pose';
 
 /**
  * Позы пилота и крыла по времени (задача «анимация на земле»): до взлёта —
@@ -117,10 +117,37 @@ describe('lyingAngleDeg — крыло ложится на рельеф поза
   });
 
   it('nodeTransforms берёт угол раскладки снаружи', () => {
-    const lying = nodeTransforms(
-      { pilot: 'standing', wing: 'lying', wingProgress: 0, gaitPhase: 0 },
-      70,
-    );
+    const lying = nodeTransforms({ pilot: 'standing', wing: 'lying', wingProgress: 0, gaitPhase: 0 }, { angleDeg: 70, rollDeg: 0 });
     expect(angleOf(lying.canopy)).toBeCloseTo(-70, 6);
+  });
+});
+
+describe('lyingRollDeg — крыло на косогоре', () => {
+  it('ровно поперёк — наклона нет; левая законцовка выше — плюс, на размах законцовок', () => {
+    expect(lyingRollDeg(1200, 1200)).toBe(0);
+    const roll = lyingRollDeg(1203, 1197);
+    expect(Math.tan((roll * Math.PI) / 180) * 2 * POSE.lyingHalfSpanM).toBeCloseTo(6, 6);
+  });
+
+  it('обрыв поперёк — не круче предела; рельеф неизвестен — ноль', () => {
+    expect(lyingRollDeg(1300, 1200)).toBe(POSE.lyingMaxRollDeg);
+    expect(lyingRollDeg(Number.NaN, 1200)).toBe(0);
+  });
+
+  it('наклон по размаху поднимает левую законцовку лежащего крыла', () => {
+    const { rotation } = nodeTransforms({ pilot: 'standing', wing: 'lying', wingProgress: 0, gaitPhase: 0 }, { angleDeg: 90, rollDeg: 30 })
+      .canopy;
+    // Левая законцовка купола (+X) — точка (5.3, 4.3, 0) модели; после поворота её высота (Y) выше правой.
+    const rotate = ([x, y, z]: [number, number, number]): number[] => {
+      const [qx, qy, qz, qw] = rotation;
+      const ix = qw * x + qy * z - qz * y;
+      const iy = qw * y + qz * x - qx * z;
+      const iz = qw * z + qx * y - qy * x;
+      const iw = -qx * x - qy * y - qz * z;
+      return [ix * qw + iw * -qx + iy * -qz - iz * -qy, iy * qw + iw * -qy + iz * -qx - ix * -qz, iz * qw + iw * -qz + ix * -qy - iy * -qx];
+    };
+    const left = rotate([5.3, 4.3, 0]);
+    const right = rotate([-5.3, 4.3, 0]);
+    expect((left[1] ?? 0) - (right[1] ?? 0)).toBeCloseTo(2 * 5.3 * Math.sin(Math.PI / 6), 6);
   });
 });
