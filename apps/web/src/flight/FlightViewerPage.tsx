@@ -10,11 +10,13 @@ import { useTrack } from '../viewer/use-track';
 const Scene = lazy(() => import('../viewer/index'));
 
 export interface FlightViewerPageProps {
+  /** id полёта в API; null — демо-трек, аналитики нет. */
+  flightId: string | null;
   /** Откуда брать .track: /api/v1/flights/{id}/track или демо-файл. */
   trackUrl: string;
 }
 
-export function FlightViewerPage({ trackUrl }: FlightViewerPageProps) {
+export function FlightViewerPage({ flightId, trackUrl }: FlightViewerPageProps) {
   const t = useT();
   const track = useTrack(trackUrl);
 
@@ -45,7 +47,7 @@ export function FlightViewerPage({ trackUrl }: FlightViewerPageProps) {
         </p>
       }
     >
-      <Scene track={track.track} />
+      <Scene track={track.track} flightId={flightId} />
     </Suspense>
   );
 }

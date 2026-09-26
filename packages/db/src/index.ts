@@ -24,5 +24,13 @@ export {
   type NewFlight,
   type ProcessedFlight,
 } from './repositories/flights.js';
+export {
+  findFlightDetails,
+  listGlides,
+  listThermals,
+  type FlightDetailsRecord,
+  type GlideRecord,
+  type ThermalRecord,
+} from './repositories/analysis.js';
 export { readPostgisVersion } from './repositories/health.js';
 export * from './schema.js';
