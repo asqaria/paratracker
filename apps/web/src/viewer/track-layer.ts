@@ -7,15 +7,17 @@ import {
   GroundPolylinePrimitive,
   Material,
   PolylineColorAppearance,
+  PolylineCollection,
   PolylineGeometry,
   PolylineMaterialAppearance,
   Primitive,
+  type Polyline,
   ShowGeometryInstanceAttribute,
   type Scene,
 } from 'cesium';
 
 import type { TrackGeometry } from './track-geometry';
-import { chunkRanges, progressOf, type TrackShown } from './track-progress';
+import { chunkRanges, progressOf, TRACK_CHUNK_POINTS, type TrackShown } from './track-progress';
 
 /**
  * Линия трека и её тень на рельефе, нарезанные на куски (track-progress.ts):
@@ -23,6 +25,12 @@ import { chunkRanges, progressOf, type TrackShown } from './track-progress';
  * Линия — один Primitive с вершинными цветами (ТЗ §7.3, CLAUDE.md):
  * PolylineGeometry({ colors, colorsPerVertex }) + PolylineColorAppearance,
  * по инстансу на кусок, у каждого свой флаг show.
+ *
+ * Хвост — от начала текущего куска до пилота — PolylineCollection из коротких
+ * отрезков: их вершины меняются без пересборки геометрии, и последний отрезок
+ * в каждом кадре кончается в позиции пилота. Раньше хвост был примитивом,
+ * пересобираемым на каждой точке трека, — линия росла ступеньками раз в
+ * секунду записи и мигала при пересборке.
  */
 
 const CHANNELS_PER_COLOR = 4;
@@ -37,8 +45,11 @@ export class TrackLayer {
   private readonly ranges: Array<[number, number]>;
   private readonly line: Primitive;
   private readonly shadow: GroundPolylinePrimitive;
-  private tail: Primitive | null = null;
-  private tailRange: [number, number] | null = null;
+  private readonly tail: PolylineCollection;
+  /** Отрезки хвоста: кусок — до TRACK_CHUNK_POINTS отрезков, плюс отрезок до пилота. */
+  private readonly tailLines: Polyline[] = [];
+  /** Какие вершины [первая, последняя] уже разложены по отрезкам хвоста; null — хвост скрыт. */
+  private tailVertices: [number, number] | null = null;
   /** Сколько первых кусков показано сейчас; null — показ не применён (примитив не готов). */
   private visibleLine: number | null = null;
   private visibleShadow: number | null = null;
@@ -94,6 +105,19 @@ export class TrackLayer {
       }),
     });
     scene.groundPrimitives.add(this.shadow);
+
+    this.tail = new PolylineCollection();
+    for (let k = 0; k <= TRACK_CHUNK_POINTS + 1; k++) {
+      this.tailLines.push(
+        this.tail.add({
+          show: false,
+          width: style.linePx,
+          positions: [Cartesian3.ZERO, Cartesian3.ZERO],
+          material: Material.fromType('Color', { color: Color.WHITE }),
+        }),
+      );
+    }
+    scene.primitives.add(this.tail);
   }
 
   private lineGeometry(start: number, end: number): PolylineGeometry {
@@ -107,13 +131,18 @@ export class TrackLayer {
     });
   }
 
-  /** «Весь» или «Пройденный»; flownVertices — сколько вершин пройдено сейчас. */
-  update(shown: TrackShown, flownVertices: number): void {
+  /**
+   * «Весь» или «Пройденный»; flownVertices — сколько вершин пилот уже миновал,
+   * pilot — его позиция в этом кадре (между вершинами): хвост кончается в ней.
+   */
+  update(shown: TrackShown, flownVertices: number, pilot?: Cartesian3): void {
     const progress = shown === 'all' ? { fullChunks: this.ranges.length, tail: null } : progressOf(this.ranges, flownVertices);
     this.wantedChunks = progress.fullChunks;
     this.visibleLine = this.applyChunks(this.line, this.visibleLine);
     this.visibleShadow = this.applyChunks(this.shadow, this.visibleShadow);
-    this.setTail(progress.tail);
+    const start = this.ranges[progress.fullChunks]?.[0];
+    const last = flownVertices - 1;
+    this.setTail(shown === 'flown' && start !== undefined && last >= start ? [start, last] : null, pilot);
   }
 
   /** Примитив ещё не готов (тень строится асинхронно) — применить позже. */
@@ -135,18 +164,38 @@ export class TrackLayer {
     return wanted;
   }
 
-  private setTail(range: [number, number] | null): void {
-    if (range?.[0] === this.tailRange?.[0] && range?.[1] === this.tailRange?.[1]) return;
-    if (this.tail) this.scene.primitives.remove(this.tail);
-    this.tail = null;
-    this.tailRange = range;
-    if (!range) return;
-    const tail = new Primitive({
-      geometryInstances: new GeometryInstance({ geometry: this.lineGeometry(range[0], range[1]) }),
-      appearance: new PolylineColorAppearance({ translucent: false }),
-      asynchronous: false,
-    });
-    this.scene.primitives.add(tail);
-    this.tail = tail;
+  private setTail(vertices: [number, number] | null, pilot: Cartesian3 | undefined): void {
+    const lines = this.tailLines;
+    if (!vertices) {
+      if (this.tailVertices) for (const line of lines) line.show = false;
+      this.tailVertices = null;
+      return;
+    }
+    const [start, last] = vertices;
+    // Отрезки между вершинами меняются только при смене вершин — раз в секунду записи.
+    if (this.tailVertices?.[0] !== start || this.tailVertices[1] !== last) {
+      for (let k = 0; k < lines.length - 1; k++) {
+        const line = lines[k];
+        if (!line) continue;
+        const v = start + k;
+        line.show = v < last;
+        if (v >= last) continue;
+        line.positions = [this.positions[v] ?? Cartesian3.ZERO, this.positions[v + 1] ?? Cartesian3.ZERO];
+        (line.material.uniforms as { color: Color }).color = this.colors[v] ?? Color.WHITE;
+      }
+      this.tailVertices = [start, last];
+    }
+    // Последний отрезок — от миновавшей вершины до пилота, в каждом кадре.
+    const toPilot = lines[last - start];
+    for (let k = last - start + 1; k < lines.length; k++) {
+      const line = lines[k];
+      if (line) line.show = false;
+    }
+    if (!toPilot) return;
+    const from = this.positions[last];
+    toPilot.show = pilot !== undefined && from !== undefined;
+    if (!toPilot.show || !pilot || !from) return;
+    toPilot.positions = [from, pilot];
+    (toPilot.material.uniforms as { color: Color }).color = this.colors[last] ?? Color.WHITE;
   }
 }

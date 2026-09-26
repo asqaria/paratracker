@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { TRACK_FLAGS } from '@skyline/core';
 
-import { CURTAIN, curtainOnByDefault, curtainSamples, curtainSegmentsShown, flownSegments } from './curtain';
+import { CURTAIN, curtainOnByDefault, curtainPieces, curtainSamples, curtainSegmentsShown, pieceProgress } from './curtain';
 
 /**
  * «Занавес» под треком (ТЗ §7.2, задача 2.8): стена по прореженным точкам
@@ -40,15 +40,48 @@ describe('curtainSamples', () => {
   });
 });
 
-describe('flownSegments', () => {
-  const t = times(1000);
-  const samples = curtainSamples(t, { takeoff: 0, landing: 999 });
+describe('curtainPieces', () => {
+  const lat = Float64Array.from({ length: 100 }, (_, i) => 43.2 + i * 1e-4);
+  const lon = Float64Array.from({ length: 100 }, () => 76.9);
 
-  it('сегмент показан, когда пилот прошёл его конец', () => {
-    expect(flownSegments(t, samples, START_MS)).toBe(0);
-    expect(flownSegments(t, samples, START_MS + CURTAIN.sampleStepS * 1000)).toBe(1);
-    expect(flownSegments(t, samples, START_MS + (CURTAIN.sampleStepS * 1000 * 5) / 2)).toBe(2);
-    expect(flownSegments(t, samples, START_MS + 999_000)).toBe(samples.length - 1);
+  it('сегменты между термиками — отдельные стены, по порядку', () => {
+    const samples = [0, 10, 20, 30, 40, 50, 60];
+    const shown = [true, true, false, false, true, true];
+    expect(curtainPieces(samples, shown, lat, lon)).toEqual([
+      [0, 10, 20],
+      [40, 50, 60],
+    ]);
+  });
+
+  it('совпадающие соседние точки выброшены: WallGeometry выбросила бы их сама и сбила номера', () => {
+    const still = Float64Array.from(lat);
+    still[20] = still[10] ?? 0; // пилот стоит против ветра: точка та же
+    expect(curtainPieces([0, 10, 20, 30], [true, true, true], still, lon)).toEqual([[0, 10, 30]]);
+  });
+
+  it('стена из одной точки — не стена', () => {
+    expect(curtainPieces([0, 10, 20], [false, false], lat, lon)).toEqual([]);
+  });
+});
+
+describe('pieceProgress', () => {
+  const t = times(100);
+  const piece = [10, 20, 30];
+
+  it('доля s стены — по номеру точки и доле времени внутри отрезка: край у пилота', () => {
+    expect(pieceProgress(t, piece, START_MS + 5_000)).toBe(0);
+    expect(pieceProgress(t, piece, START_MS + 10_000)).toBe(0);
+    expect(pieceProgress(t, piece, START_MS + 15_000)).toBeCloseTo(0.25, 9);
+    expect(pieceProgress(t, piece, START_MS + 20_000)).toBeCloseTo(0.5, 9);
+    expect(pieceProgress(t, piece, START_MS + 27_500)).toBeCloseTo(0.875, 9);
+    expect(pieceProgress(t, piece, START_MS + 40_000)).toBe(1);
+  });
+
+  it('плавно: между кадрами доля растёт непрерывно, без ступенек', () => {
+    const at = (ms: number): number => pieceProgress(t, piece, START_MS + ms);
+    for (let ms = 10_000; ms < 30_000; ms += 250) {
+      expect(at(ms + 250) - at(ms)).toBeCloseTo(250 / 20_000, 9);
+    }
   });
 });
 

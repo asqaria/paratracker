@@ -4,15 +4,16 @@ import { MS_PER_SECOND } from './playback';
 
 /**
  * «Занавес» под треком (ТЗ §7.2, задача 2.8) — расчёт без Cesium. Стена от
- * трека до земли по прореженным точкам участка полёта, сегментами между
- * соседними точками: в режиме «Пройденный» сегменты показываются за пилотом.
+ * трека до земли по прореженным точкам участка полёта; между термиками —
+ * отдельные стены. В режиме «Пройденный» край каждой стены обрезается по
+ * пилоту в каждом кадре — занавес идёт вместе с линией.
  */
 
 export const CURTAIN = {
   /**
    * Точка стены — раз в столько секунд: стена широкая и прозрачная, мелкий
    * изгиб трека на ней не виден, а рельеф под каждой точкой спрашивается
-   * отдельно. «Пройденный» отстаёт от пилота не больше чем на этот шаг.
+   * отдельно. В «Пройденном» край стены идёт за пилотом плавно (pieceProgress).
    */
   sampleStepS: 5,
   /**
@@ -52,13 +53,6 @@ export function curtainSamples(t: Float64Array, range: FlightRange): number[] {
   return samples;
 }
 
-/** Сколько сегментов стены (между соседними точками) пилот уже пролетел к моменту timeMs. */
-export function flownSegments(t: Float64Array, samples: readonly number[], timeMs: number): number {
-  let count = 0;
-  while (count + 1 < samples.length && (t[samples[count + 1] ?? 0] ?? Infinity) <= timeMs) count += 1;
-  return count;
-}
-
 /**
  * Какие сегменты стены рисовать: в термике — нет. Спираль, свёрнутая в стену,
  * накладывается на себя десятки раз, прозрачность складывается в белые «башни»,
@@ -69,6 +63,61 @@ export function flownSegments(t: Float64Array, samples: readonly number[], timeM
 export function curtainSegmentsShown(samples: readonly number[], flags: Uint8Array): boolean[] {
   const inThermal = (index: number): boolean => ((flags[index] ?? 0) & TRACK_FLAGS.thermal) !== 0;
   return samples.slice(1).map((end, k) => !(inThermal(samples[k] ?? 0) || inThermal(end)));
+}
+
+/**
+ * Стены занавеса: непрерывные участки показанных сегментов (между термиками),
+ * по индексам точек трека. Соседняя точка с теми же координатами выброшена:
+ * WallGeometry выбросила бы её сама, и номер точки перестал бы совпадать
+ * с координатой s стены (s = номер точки / (число точек − 1)).
+ */
+export function curtainPieces(
+  samples: readonly number[],
+  shownSegments: readonly boolean[],
+  lat: Float64Array,
+  lon: Float64Array,
+): number[][] {
+  const pieces: number[][] = [];
+  let piece: number[] = [];
+  const close = (): void => {
+    if (piece.length >= 2) pieces.push(piece);
+    piece = [];
+  };
+  const push = (index: number): void => {
+    const last = piece.at(-1);
+    if (last !== undefined && lat[last] === lat[index] && lon[last] === lon[index]) return;
+    piece.push(index);
+  };
+  shownSegments.forEach((shown, k) => {
+    if (!shown) {
+      close();
+      return;
+    }
+    if (piece.length === 0) push(samples[k] ?? 0);
+    push(samples[k + 1] ?? 0);
+  });
+  close();
+  return pieces;
+}
+
+/**
+ * Докуда рисовать стену в момент timeMs — координата s (0…1): номер отрезка,
+ * где пилот, плюс доля времени внутри него. На 5 с отрезка скорость почти
+ * постоянна, и доля времени — это доля пути вдоль стены: край идёт за пилотом
+ * непрерывно, без ступенек. 0 — пилот до стены, 1 — стена пройдена.
+ */
+export function pieceProgress(t: Float64Array, piece: readonly number[], timeMs: number): number {
+  const last = piece.length - 1;
+  if (last < 1) return 0;
+  const first = t[piece[0] ?? 0] ?? Infinity;
+  if (timeMs <= first) return 0;
+  if (timeMs >= (t[piece[last] ?? 0] ?? -Infinity)) return 1;
+  let k = 0;
+  while (k < last - 1 && (t[piece[k + 1] ?? 0] ?? Infinity) <= timeMs) k += 1;
+  const from = t[piece[k] ?? 0] ?? 0;
+  const to = t[piece[k + 1] ?? 0] ?? 0;
+  const fraction = to > from ? (timeMs - from) / (to - from) : 1;
+  return (k + fraction) / last;
 }
 
 /** ТЗ §5.3: на мобильном GPU занавес по умолчанию выключен. */
