@@ -103,11 +103,16 @@ function Content({ analytics, timeline, timeMs, tab, onTab, onSelect }: ContentP
   if (details.analysisLevel === 'basic') {
     return <p className="text-secondary">{t('viewer.analytics.basic')}</p>;
   }
+  // Число термиков записывается при каждом анализе, даже нулевое; null — анализ
+  // не делался: полёт обработан раньше, чем анализ появился в конвейере.
+  if (details.thermalCount === null) {
+    return <p className="text-secondary">{t('viewer.analytics.notAnalysed')}</p>;
+  }
 
   // Термиков нет — лучшего нет: NaN превращается в прочерк при форматировании.
   const bestClimb = analytics.thermals.length > 0 ? Math.max(...analytics.thermals.map((th) => th.avgClimbMs)) : Number.NaN;
   const stats: ReadonlyArray<{ label: MessageKey; value: string }> = [
-    { label: 'viewer.analytics.thermalCount', value: String(details.thermalCount ?? analytics.thermals.length) },
+    { label: 'viewer.analytics.thermalCount', value: String(details.thermalCount) },
     { label: 'viewer.analytics.bestClimb', value: verticalSpeed(bestClimb, locale, t) },
     { label: 'viewer.analytics.avgClimb', value: verticalSpeed(details.avgClimbMs ?? Number.NaN, locale, t) },
     { label: 'viewer.analytics.avgGlideRatio', value: glideRatioText(details.avgGlideRatio, locale) },

@@ -128,6 +128,20 @@ describe('AnalyticsPanel', () => {
     expect(html).toContain(text['viewer.analytics.basic']);
   });
 
+  it('полёт обработан до появления анализа — объяснение, а не «0» и прочерки', () => {
+    const notAnalysed: AnalyticsState = {
+      status: 'ready',
+      analytics: {
+        ...analytics({ thermalCount: null, avgClimbMs: null, avgGlideRatio: null, wind: null }),
+        thermals: [],
+        glides: [],
+      },
+    };
+    const html = render(notAnalysed);
+    expect(html).toContain(text['viewer.analytics.notAnalysed']);
+    expect(html).not.toContain(text['viewer.analytics.thermalCount']);
+  });
+
   it('загрузка и ошибка — своими строками', () => {
     expect(render({ status: 'loading' })).toContain(text['viewer.analytics.loading']);
     expect(render({ status: 'error' })).toContain(text['viewer.analytics.error']);
