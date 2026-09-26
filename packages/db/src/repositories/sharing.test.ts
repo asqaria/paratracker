@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDatabase, type DatabaseConnection } from '../client.js';
 import { flights, users } from '../schema.js';
 import { insertFlight } from './flights.js';
-import { ensureShareToken, findSharedFlight, resetShareToken, setFlightPrivacy } from './sharing.js';
+import { ensureShareToken, findSharedFlight, findSharePreview, resetShareToken, setFlightPrivacy } from './sharing.js';
 
 const databaseUrl = process.env.DATABASE_URL;
 const RUN = Date.now().toString(36);
@@ -57,9 +57,21 @@ describe.runIf(Boolean(databaseUrl))('приватность и ссылки п�
     expect(await findSharedFlight(connection.db, `c-${RUN}`)).toBe(flightId);
   });
 
+  it('карточка для мессенджера (задача 3.8): по действующему токену', async () => {
+    await connection.db.update(flights).set({ previewObjectKey: `previews/${flightId}.jpg` }).where(eq(flights.id, flightId));
+    expect(await findSharePreview(connection.db, `c-${RUN}`)).toMatchObject({
+      flightId,
+      previewObjectKey: `previews/${flightId}.jpg`,
+      siteName: null,
+      airtimeS: null,
+    });
+    expect(await findSharePreview(connection.db, `a-${RUN}`)).toBeNull();
+  });
+
   it('«только я» — ссылка не открывает; чужой пилот ничего не меняет', async () => {
     expect(await setFlightPrivacy(connection.db, { flightId, userId: pilot, privacy: 'private' })).toBe(true);
     expect(await findSharedFlight(connection.db, `c-${RUN}`)).toBeNull();
+    expect(await findSharePreview(connection.db, `c-${RUN}`)).toBeNull();
 
     expect(await setFlightPrivacy(connection.db, { flightId, userId: other, privacy: 'public' })).toBe(false);
     expect(await ensureShareToken(connection.db, { flightId, userId: other, newToken: 'x' })).toBeNull();

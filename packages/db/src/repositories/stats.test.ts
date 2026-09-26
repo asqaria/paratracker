@@ -35,6 +35,7 @@ describe.runIf(Boolean(databaseUrl))('статистика сезона на ж�
     await markFlightReady(connection.db, row.id, {
       trackObjectKey: `tracks/${row.id}.track`,
       publicTrackObjectKey: null,
+      previewObjectKey: null,
       altitudeSource: 'baro',
       analysisLevel: 'basic',
       startedAt,

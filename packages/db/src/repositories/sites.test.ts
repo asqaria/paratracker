@@ -44,6 +44,7 @@ describe.runIf(Boolean(databaseUrl))('места старта на живой Б
     await markFlightReady(connection.db, flight.id, {
       trackObjectKey: `tracks/${flight.id}.track`,
       publicTrackObjectKey: null,
+      previewObjectKey: null,
       altitudeSource: 'baro',
       analysisLevel: 'basic',
       startedAt: new Date(Date.UTC(2003, 0, 1)),

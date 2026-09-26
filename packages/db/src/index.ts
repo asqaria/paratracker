@@ -44,7 +44,14 @@ export {
   type SetFlightGliderResult,
 } from './repositories/gliders.js';
 export { readPostgisVersion } from './repositories/health.js';
-export { ensureShareToken, findSharedFlight, resetShareToken, setFlightPrivacy } from './repositories/sharing.js';
+export {
+  ensureShareToken,
+  findSharedFlight,
+  findSharePreview,
+  resetShareToken,
+  setFlightPrivacy,
+  type SharePreviewRecord,
+} from './repositories/sharing.js';
 export { findThermalReview, saveThermalReview, type ThermalReviewRecord } from './repositories/reviews.js';
 export { seasonStats, type SeasonStats, type SeasonTotals } from './repositories/stats.js';
 export {

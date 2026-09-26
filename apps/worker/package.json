@@ -27,6 +27,7 @@
     "@skyline/track-format": "workspace:*",
     "igc-xc-score": "^1.8.0",
     "pino": "^10.3.1",
+    "sharp": "^0.35.4",
     "zod": "^4.6.5"
   },
   "devDependencies": {

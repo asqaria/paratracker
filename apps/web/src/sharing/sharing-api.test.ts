@@ -6,7 +6,7 @@ const FLIGHT = '22222222-2222-4333-8444-555555555555';
 
 describe('sharing-api', () => {
   it('ссылка для чата — хэш-маршрут /s/ с токеном', () => {
-    expect(shareUrl('https://skyline.gateapp.kz', 'abc_-1')).toBe('https://skyline.gateapp.kz/#/s/abc_-1');
+    expect(shareUrl('https://skyline.gateapp.kz', 'abc_-1')).toBe('https://skyline.gateapp.kz/s/abc_-1');
   });
 
   it('токен добавляется к запросам полёта; без токена адрес не меняется', () => {

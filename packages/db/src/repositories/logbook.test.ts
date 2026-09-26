@@ -41,6 +41,7 @@ describe.runIf(Boolean(databaseUrl))('логбук на живой БД', () => 
     await markFlightReady(connection.db, flight.id, {
       trackObjectKey: `tracks/${flight.id}.track`,
       publicTrackObjectKey: `tracks/${flight.id}.public.track`,
+      previewObjectKey: `previews/${flight.id}.jpg`,
       altitudeSource: 'baro',
       analysisLevel: 'full',
       startedAt,

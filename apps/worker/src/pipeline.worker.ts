@@ -50,6 +50,8 @@ export interface PipelineSuccess {
    * по краям, без записи на земле; null — полёта нет, посторонним нечего показать.
    */
   publicTrack: ArrayBuffer | null;
+  /** Упрощённая линия того же участка — для картинки-превью (задача 3.8). */
+  publicLine: { lat: number[]; lon: number[] } | null;
   pointCount: number;
   analysisLevel: 'full' | 'basic';
   altitudeSource: 'baro' | 'gnss';
@@ -104,6 +106,14 @@ function parse(message: PipelineTaskMessage): ParseResult | null {
       // fit и csv — Фаза 2+ (ТЗ §3.2).
       return null;
   }
+}
+
+/** Дуглас–Пекер по участку [takeoff, landing] — сотни точек вместо десятков тысяч. */
+function simplifiedLine(lat: Float64Array, lon: Float64Array, range: { takeoff: number; landing: number }) {
+  const la = lat.subarray(range.takeoff, range.landing + 1);
+  const lo = lon.subarray(range.takeoff, range.landing + 1);
+  const { indices } = simplifyTrack(la, lo);
+  return { lat: Array.from(indices, (i) => la[i] ?? 0), lon: Array.from(indices, (i) => lo[i] ?? 0) };
 }
 
 export function runPipeline(message: PipelineTaskMessage, onProgress: (value: number) => void): PipelineMessage {
@@ -171,6 +181,7 @@ export function runPipeline(message: PipelineTaskMessage, onProgress: (value: nu
         flags: columns.flags.subarray(visible.takeoff, visible.landing + 1),
       })
     : null;
+  const publicLine = visible ? simplifiedLine(points.lat, points.lon, visible) : null;
 
   const startedAt = points.t[0] ?? Number.NaN;
   const endedAt = points.t[points.t.length - 1] ?? Number.NaN;
@@ -182,6 +193,7 @@ export function runPipeline(message: PipelineTaskMessage, onProgress: (value: nu
       ok: true,
       track: buffer,
       publicTrack,
+      publicLine,
       pointCount: points.t.length,
       analysisLevel: derived.analysisLevel,
       altitudeSource: derived.altitudeSource,

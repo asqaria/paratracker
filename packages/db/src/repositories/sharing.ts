@@ -2,7 +2,7 @@ import type { Privacy } from '@skyline/core';
 import { and, eq, ne, sql } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
-import { flights } from '../schema.js';
+import { flights, sites } from '../schema.js';
 
 /**
  * Приватность и ссылки полёта (задача 3.7). Токен ссылки хранится как есть:
@@ -56,4 +56,42 @@ export async function findSharedFlight(db: Database, token: string): Promise<str
     .from(flights)
     .where(and(eq(flights.shareToken, token), ne(flights.privacy, 'private')));
   return row?.id ?? null;
+}
+
+/** Что показать мессенджеру по ссылке (задача 3.8): подпись карточки и картинка. */
+export interface SharePreviewRecord {
+  flightId: string;
+  /** JPEG в хранилище; null — превью ещё не нарисовано. */
+  previewObjectKey: string | null;
+  siteName: string | null;
+  startedAt: Date | null;
+  /** IANA; дата в подписи — местная, как в логбуке. */
+  timezone: string | null;
+  airtimeS: number | null;
+  distanceTrackM: number | null;
+  maxAltM: number | null;
+  xcDistanceM: number | null;
+  xcScore: number | null;
+}
+
+/** Полёт по ссылке для карточки мессенджера; личный («только я») — null. */
+export async function findSharePreview(db: Database, token: string): Promise<SharePreviewRecord | null> {
+  const [row] = await db
+    .select({
+      flightId: flights.id,
+      previewObjectKey: flights.previewObjectKey,
+      siteName: sites.name,
+      startedAt: flights.startedAt,
+      timezone: flights.timezone,
+      airtimeS: flights.airtimeS,
+      distanceTrackM: flights.distanceTrackM,
+      maxAltM: flights.maxAltM,
+      xcDistanceM: flights.xcDistanceM,
+      xcScore: flights.xcScore,
+    })
+    .from(flights)
+    .leftJoin(sites, eq(sites.id, flights.takeoffSiteId))
+    .where(and(eq(flights.shareToken, token), ne(flights.privacy, 'private')))
+    .limit(1);
+  return row ?? null;
 }

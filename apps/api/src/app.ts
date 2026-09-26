@@ -10,6 +10,7 @@ import { registerHealthRoutes, type HealthRouteOptions } from './health.js';
 import { registerLogbookRoutes, type LogbookRoutesDeps } from './logbook.js';
 import { registerProblemHandlers } from './problem.js';
 import { registerReviewRoutes, type ReviewRoutesDeps } from './reviews.js';
+import { registerSharePageRoute, registerSharePreviewRoute, type SharePageDeps } from './share-page.js';
 import { registerSiteRoutes, type SiteRoutesDeps } from './sites.js';
 import { registerTileRoutes, type TileRoutesDeps } from './tiles.js';
 
@@ -35,6 +36,8 @@ export interface AppOptions {
   reviews?: ReviewRoutesDeps;
   /** Настройки своего полёта (крыло, приватность, ссылка) и открытие ссылки (задача 3.7). */
   flightSettings?: FlightSettingsDeps;
+  /** Ссылка для мессенджеров: страница /s/:token с превью (задача 3.8). */
+  sharePage?: SharePageDeps;
 }
 
 export function buildApp(options: AppOptions): FastifyInstance {
@@ -42,6 +45,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
 
   registerProblemHandlers(app);
   registerAuthHook(app, options.auth);
+  if (options.sharePage) registerSharePageRoute(app, options.sharePage);
   void app.register(
     (v1, _opts, done) => {
       if (options.health) registerHealthRoutes(v1, options.health);
@@ -54,6 +58,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       if (options.flights) registerFlightRoutes(v1, options.flights);
       if (options.analysis) registerAnalysisRoutes(v1, options.analysis);
       if (options.tiles) registerTileRoutes(v1, options.tiles);
+      if (options.sharePage) registerSharePreviewRoute(v1, options.sharePage);
       done();
     },
     { prefix: API_V1_PREFIX },
