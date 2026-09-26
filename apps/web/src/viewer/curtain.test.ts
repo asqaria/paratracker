@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { TRACK_FLAGS } from '@skyline/core';
 
-import { CURTAIN, curtainOnByDefault, curtainPieces, curtainSamples, curtainSegmentsShown, pieceProgress } from './curtain';
+import { CURTAIN, curtainInMode, curtainOnByDefault, curtainPieces, curtainSamples, curtainSegmentsShown, pieceProgress } from './curtain';
 
 /**
  * «Занавес» под треком (ТЗ §7.2, задача 2.8): стена по прореженным точкам
@@ -97,6 +97,21 @@ describe('curtainSegmentsShown', () => {
   it('другие флаги точки (разрыв) термиком не считаются', () => {
     const flags = new Uint8Array(30).fill(TRACK_FLAGS.gap);
     expect(curtainSegmentsShown([0, 10, 20], flags)).toEqual([true, true]);
+  });
+});
+
+describe('curtainInMode', () => {
+  it('только Side и Free: сбоку и со стороны стена показывает высоту, из Chase видна с торца', () => {
+    expect(curtainInMode('side')).toBe(true);
+    expect(curtainInMode('free')).toBe(true);
+    for (const mode of ['chase', 'cockpit', 'top'] as const) expect(curtainInMode(mode)).toBe(false);
+  });
+});
+
+describe('CURTAIN', () => {
+  it('у земли стена не растворяется, а кромка у рельефа плотнее — видно, где стена встала на землю', () => {
+    expect(CURTAIN.bottomAlpha).toBeGreaterThan(0);
+    expect(CURTAIN.groundEdge.alpha).toBeGreaterThan(CURTAIN.topAlpha);
   });
 });
 

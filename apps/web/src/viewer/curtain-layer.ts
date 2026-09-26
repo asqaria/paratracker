@@ -4,8 +4,9 @@ import { CURTAIN, pieceProgress } from './curtain';
 
 /**
  * «Занавес» под треком (ТЗ §7.2, задача 2.8): по примитиву WallGeometry на
- * каждую стену между термиками (curtainPieces). Градиент прозрачности —
- * материал на координате t стены (0 у земли, 1 у трека); цвет нейтральный —
+ * каждую стену между термиками (curtainPieces). Прозрачность — материал на
+ * координате t стены (0 у земли, 1 у трека): почти ровная, с плотной кромкой
+ * у рельефа (CURTAIN.groundEdge); цвет нейтральный —
  * палитра варио остаётся единственным «кричащим» элементом сцены (ТЗ §8.1).
  *
  * «Пройденный»: у каждой стены своя униформа progress — докуда рисовать по
@@ -26,8 +27,9 @@ const WALL_SOURCE = `
 czm_material czm_getMaterial(czm_materialInput materialInput) {
   if (materialInput.st.s > progress) discard;
   czm_material material = czm_getDefaultMaterial(materialInput);
+  float t = clamp(materialInput.st.t, 0.0, 1.0);
   material.diffuse = color.rgb;
-  material.alpha = color.a * pow(clamp(materialInput.st.t, 0.0, 1.0), fadePower);
+  material.alpha = t < edgeFraction ? edgeAlpha : mix(bottomAlpha, topAlpha, t);
   return material;
 }`;
 
@@ -44,8 +46,8 @@ export class CurtainLayer {
 
   /**
    * pieces — стены по индексам точек трека (curtainPieces); groundM — высота
-   * рельефа под точкой, м (нет — не пришла); color — цвет у трека (альфа —
-   * CURTAIN.topAlpha).
+   * рельефа под точкой, м (нет — не пришла); color — цвет стены (прозрачность —
+   * из CURTAIN).
    */
   constructor(
     private readonly scene: Scene,
@@ -64,7 +66,14 @@ export class CurtainLayer {
       const material = new Material({
         fabric: {
           type: 'CurtainGradient',
-          uniforms: { color: color.withAlpha(CURTAIN.topAlpha), fadePower: CURTAIN.fadePower, progress: 1 },
+          uniforms: {
+            color,
+            topAlpha: CURTAIN.topAlpha,
+            bottomAlpha: CURTAIN.bottomAlpha,
+            edgeFraction: CURTAIN.groundEdge.fraction,
+            edgeAlpha: CURTAIN.groundEdge.alpha,
+            progress: 1,
+          },
           source: WALL_SOURCE,
         },
         translucent: true,

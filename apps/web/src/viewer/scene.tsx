@@ -92,7 +92,7 @@ import { SummaryPanel } from './SummaryPanel';
 import { TimelinePanel } from './TimelinePanel';
 import { VarioLegend } from './VarioLegend';
 import { buildTrackGeometry } from './track-geometry';
-import { CURTAIN, curtainOnByDefault, curtainPieces, curtainSamples, curtainSegmentsShown } from './curtain';
+import { CURTAIN, curtainInMode, curtainOnByDefault, curtainPieces, curtainSamples, curtainSegmentsShown } from './curtain';
 import { CurtainLayer } from './curtain-layer';
 import { currentColumn, thermalColumns, type ThermalColumn } from './thermal-columns';
 import { ThermalLayer } from './thermal-layer';
@@ -432,7 +432,7 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
             const pieces = curtainPieces(samples, curtainSegmentsShown(samples, shown.flags), shown.lat, shown.lon);
             const groundAt = new Map(samples.map((i, k) => [i, ground[k] ?? Number.NaN]));
             const curtain = new CurtainLayer(scene, shown, pieces, groundAt, curtainColor);
-            curtain.setVisible(curtainOnRef.current);
+            curtain.setVisible(curtainOnRef.current && curtainInMode(cameraModeRef.current));
             curtainRef.current = curtain;
             scene.requestRender();
           });
@@ -539,9 +539,9 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
 
   useEffect(() => {
     curtainOnRef.current = curtainOn;
-    curtainRef.current?.setVisible(curtainOn);
+    curtainRef.current?.setVisible(curtainOn && curtainInMode(cameraMode));
     viewerRef.current?.scene.requestRender();
-  }, [curtainOn]);
+  }, [curtainOn, cameraMode]);
 
   /** «Весь / Пройденный»: применяется в кадре (onPreRender), здесь — только перерисовка. */
   useEffect(() => {
@@ -893,7 +893,7 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
           trackShown={trackShown}
           onTrackShown={setTrackShown}
           curtainOn={curtainOn}
-          onCurtainOn={setCurtainOn}
+          {...(curtainInMode(cameraMode) ? { onCurtainOn: setCurtainOn } : {})}
           onTogglePlay={togglePlay}
           onSeekTo={seekTo}
           onSpeed={setSpeed}
