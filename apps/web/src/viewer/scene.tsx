@@ -411,7 +411,8 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
         // Линия и тень — кусками, чтобы показывать только пройденный путь (track-layer.ts).
         // Толщина — по экрану: на телефоне 4 px — полоса поперёк долины.
         const widths = trackWidths(window.matchMedia(COMPACT_MEDIA_QUERY).matches);
-        const layer = new TrackLayer(scene, geometry, positions, {
+        const vertexTimes = Float64Array.from(geometry.sourceIndex, (i) => track.t[i] ?? Number.NaN);
+        const layer = new TrackLayer(scene, geometry, positions, vertexTimes, {
           linePx: widths.linePx,
           shadowPx: widths.shadowPx,
           shadowColor: new Color(0, 0, 0, SHADOW_ALPHA),
@@ -464,7 +465,7 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
           // точка может быть ещё впереди — линия забегала бы на полсекунды.
           const passed = (track.t[index] ?? Infinity) > current ? index - 1 : index;
           const pilot = viewer ? flightClock.position.getValue(viewer.clock.currentTime) : undefined;
-          layer.update(trackShownRef.current, flownVertexCount(geometry.sourceIndex, passed), pilot);
+          layer.update(trackShownRef.current, flownVertexCount(geometry.sourceIndex, passed), pilot, current);
           // Край занавеса — по времени пилота в этом кадре, а не по точке трека:
           // между точками он идёт вместе с пилотом, без ступенек.
           curtainRef.current?.update(trackShownRef.current === 'all' ? null : current);

@@ -74,3 +74,29 @@ export function progressOf(ranges: ReadonlyArray<readonly [number, number]>, flo
   const start = ranges[fullChunks]?.[0];
   return { fullChunks, tail: start !== undefined && last > start ? [start, last] : null };
 }
+
+/**
+ * Доля длины куска, пройденная к моменту timeMs: отрезки до вершины last
+ * целиком плюс доля отрезка last → last + 1 по времени. lengths — длины
+ * отрезков куска, lengths[j] — от вершины start + j к следующей; times —
+ * время каждой вершины линии. Тень обрезается по этой доле в каждом кадре:
+ * координата s прижатой линии идёт по длине, а не по номеру вершины.
+ */
+export function chunkShare(
+  lengths: readonly number[],
+  times: ArrayLike<number>,
+  start: number,
+  last: number,
+  timeMs: number,
+): number {
+  const total = lengths.reduce((sum, length) => sum + length, 0);
+  if (!(total > 0) || last < start) return 0;
+  const k = last - start;
+  let done = 0;
+  for (let j = 0; j < k && j < lengths.length; j++) done += lengths[j] ?? 0;
+  if (k >= lengths.length) return 1;
+  const from = times[last] ?? 0;
+  const to = times[last + 1] ?? from;
+  const fraction = to > from ? Math.min(1, Math.max(0, (timeMs - from) / (to - from))) : 1;
+  return Math.min(1, (done + (lengths[k] ?? 0) * fraction) / total);
+}

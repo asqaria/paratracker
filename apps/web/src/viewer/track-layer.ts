@@ -1,6 +1,8 @@
 import {
   ArcType,
   Cartesian3,
+  Cartographic,
+  EllipsoidGeodesic,
   Color,
   GeometryInstance,
   GroundPolylineGeometry,
@@ -17,7 +19,7 @@ import {
 } from 'cesium';
 
 import type { TrackGeometry } from './track-geometry';
-import { chunkRanges, progressOf, TRACK_CHUNK_POINTS, type TrackShown } from './track-progress';
+import { chunkRanges, chunkShare, progressOf, TRACK_CHUNK_POINTS, type TrackShown } from './track-progress';
 
 /**
  * Линия трека и её тень на рельефе, нарезанные на куски (track-progress.ts):
@@ -25,6 +27,11 @@ import { chunkRanges, progressOf, TRACK_CHUNK_POINTS, type TrackShown } from './
  * Линия — один Primitive с вершинными цветами (ТЗ §7.3, CLAUDE.md):
  * PolylineGeometry({ colors, colorsPerVertex }) + PolylineColorAppearance,
  * по инстансу на кусок, у каждого свой флаг show.
+ *
+ * Тень текущего куска — отдельная прижатая линия с униформой progress: шейдер
+ * отбрасывает всё дальше пилота по координате s (она у прижатой линии идёт по
+ * длине — отсюда chunkShare). Следующий кусок строится заранее: прижатая
+ * линия собирается асинхронно, и без запаса на стыке кусков тень мигала бы.
  *
  * Хвост — от начала текущего куска до пилота — PolylineCollection из коротких
  * отрезков: их вершины меняются без пересборки геометрии, и последний отрезок
@@ -34,6 +41,23 @@ import { chunkRanges, progressOf, TRACK_CHUNK_POINTS, type TrackShown } from './
  */
 
 const CHANNELS_PER_COLOR = 4;
+
+const SHADOW_PROGRESS_SOURCE = `
+czm_material czm_getMaterial(czm_materialInput materialInput) {
+  if (materialInput.st.s > progress) discard;
+  czm_material material = czm_getDefaultMaterial(materialInput);
+  material.diffuse = color.rgb;
+  material.alpha = color.a;
+  return material;
+}`;
+
+/** Тень одного куска, обрезаемая по пилоту. */
+interface PartialShadow {
+  primitive: GroundPolylinePrimitive;
+  material: Material;
+  /** Длины отрезков куска по земле, м. */
+  lengths: number[];
+}
 
 export interface TrackLayerStyle {
   linePx: number;
@@ -56,12 +80,20 @@ export class TrackLayer {
   private wantedChunks: number;
   private readonly positions: Cartesian3[];
   private readonly colors: Color[];
+  private readonly ground: Cartesian3[];
+  /** Тени кусков, обрезаемые по пилоту: текущий и следующий. */
+  private readonly partials = new Map<number, PartialShadow>();
+  private partialPending = false;
 
-  /** positions — вершины линии (Cartesian3 из geometry.positions), их же берёт сцена. */
+  /**
+   * positions — вершины линии (Cartesian3 из geometry.positions), их же берёт сцена;
+   * vertexTimes — время каждой вершины, UTC мс: по нему тень режется у пилота.
+   */
   constructor(
     private readonly scene: Scene,
     geometry: TrackGeometry,
     positions: Cartesian3[],
+    private readonly vertexTimes: ArrayLike<number>,
     private readonly style: TrackLayerStyle,
   ) {
     this.positions = positions;
@@ -73,6 +105,7 @@ export class TrackLayer {
       );
     }
     const ground = Cartesian3.fromDegreesArray(Array.from(geometry.groundPositions));
+    this.ground = ground;
 
     this.ranges = chunkRanges(geometry.pointCount);
     this.wantedChunks = this.ranges.length;
@@ -88,9 +121,8 @@ export class TrackLayer {
     });
     scene.primitives.add(this.line);
 
-    // Тень трека на рельефе — те же куски, прижатые к земле (ТЗ §7.2). Хвоста
-    // у тени нет: прижатая линия строится асинхронно, перестраивать её на каждой
-    // точке дорого. Тень отстаёт от пилота не больше чем на кусок.
+    // Тень трека на рельефе — те же куски, прижатые к земле (ТЗ §7.2). Текущий
+    // кусок в «Пройденном» — отдельная тень, обрезаемая по пилоту (partialShadow).
     this.shadow = new GroundPolylinePrimitive({
       geometryInstances: this.ranges.map(
         ([start, end], id) =>
@@ -133,9 +165,10 @@ export class TrackLayer {
 
   /**
    * «Весь» или «Пройденный»; flownVertices — сколько вершин пилот уже миновал,
-   * pilot — его позиция в этом кадре (между вершинами): хвост кончается в ней.
+   * pilot и timeMs — его позиция и время в этом кадре (между вершинами):
+   * хвост линии и тень текущего куска кончаются у него.
    */
-  update(shown: TrackShown, flownVertices: number, pilot?: Cartesian3): void {
+  update(shown: TrackShown, flownVertices: number, pilot?: Cartesian3, timeMs?: number): void {
     const progress = shown === 'all' ? { fullChunks: this.ranges.length, tail: null } : progressOf(this.ranges, flownVertices);
     this.wantedChunks = progress.fullChunks;
     this.visibleLine = this.applyChunks(this.line, this.visibleLine);
@@ -143,11 +176,70 @@ export class TrackLayer {
     const start = this.ranges[progress.fullChunks]?.[0];
     const last = flownVertices - 1;
     this.setTail(shown === 'flown' && start !== undefined && last >= start ? [start, last] : null, pilot);
+    this.setPartialShadow(shown === 'flown' ? progress.fullChunks : null, last, timeMs);
+  }
+
+  /** Тень куска id, обрезаемая по пилоту; строится асинхронно, как вся прижатая тень. */
+  private partialShadow(id: number): PartialShadow | null {
+    const cached = this.partials.get(id);
+    if (cached) return cached;
+    const range = this.ranges[id];
+    if (!range) return null;
+    const [start, end] = range;
+    const positions = this.ground.slice(start, end + 1);
+    const geodesic = new EllipsoidGeodesic();
+    const lengths: number[] = [];
+    for (let k = 0; k + 1 < positions.length; k++) {
+      geodesic.setEndPoints(
+        Cartographic.fromCartesian(positions[k] ?? Cartesian3.ZERO),
+        Cartographic.fromCartesian(positions[k + 1] ?? Cartesian3.ZERO),
+      );
+      lengths.push(geodesic.surfaceDistance);
+    }
+    const material = new Material({
+      fabric: { type: 'ShadowProgress', uniforms: { color: this.style.shadowColor, progress: 0 }, source: SHADOW_PROGRESS_SOURCE },
+    });
+    const primitive = new GroundPolylinePrimitive({
+      geometryInstances: new GeometryInstance({
+        geometry: new GroundPolylineGeometry({ positions, width: this.style.shadowPx }),
+      }),
+      appearance: new PolylineMaterialAppearance({ material }),
+      show: false,
+    });
+    this.scene.groundPrimitives.add(primitive);
+    const partial = { primitive, material, lengths };
+    this.partials.set(id, partial);
+    return partial;
+  }
+
+  /** chunk — номер текущего куска; null — «Весь», обрезанных теней нет. */
+  private setPartialShadow(chunk: number | null, last: number, timeMs: number | undefined): void {
+    const keep = chunk === null ? [] : [chunk, chunk + 1];
+    for (const [id, partial] of this.partials) {
+      if (keep.includes(id)) continue;
+      this.scene.groundPrimitives.remove(partial.primitive);
+      this.partials.delete(id);
+    }
+    this.partialPending = false;
+    if (chunk === null) return;
+    // Следующий кусок — заранее, чтобы на стыке он был уже собран.
+    const next = this.partialShadow(chunk + 1);
+    if (next && !next.primitive.ready) this.partialPending = true;
+    const current = this.partialShadow(chunk);
+    const range = this.ranges[chunk];
+    if (!current || !range) return;
+    if (!current.primitive.ready) {
+      this.partialPending = true;
+      return;
+    }
+    const share = timeMs === undefined ? 0 : chunkShare(current.lengths, this.vertexTimes, range[0], last, timeMs);
+    (current.material.uniforms as { progress: number }).progress = share;
+    current.primitive.show = share > 0;
   }
 
   /** Примитив ещё не готов (тень строится асинхронно) — применить позже. */
   get pending(): boolean {
-    return this.visibleLine !== this.wantedChunks || this.visibleShadow !== this.wantedChunks;
+    return this.visibleLine !== this.wantedChunks || this.visibleShadow !== this.wantedChunks || this.partialPending;
   }
 
   private applyChunks(primitive: Primitive | GroundPolylinePrimitive, visible: number | null): number | null {
