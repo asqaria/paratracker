@@ -1191,12 +1191,14 @@ GET    /api/v1/flights/{id}/events        SSE-поток статуса обра
 POST   /api/v1/flights/{id}/reprocess     пересчитать при обновлении алгоритмов
 
 # Полёты
-GET    /api/v1/flights/{id}               полные метаданные + агрегаты
+GET    /api/v1/flights/{id}               полные метаданные + агрегаты (пока: статус, время,
+                                          уровень анализа, термики, ср. набор, ср. качество, ветер)
 GET    /api/v1/flights/{id}/track         → бинарный .track (или 302 на CDN)
-GET    /api/v1/flights/{id}/thermals
-GET    /api/v1/flights/{id}/glides
+GET    /api/v1/flights/{id}/thermals      по порядку; класс силы, точки входа/выхода, снос «откуда»
+GET    /api/v1/flights/{id}/glides        по порядку; у dynamic glideRatio = null
 GET    /api/v1/flights/{id}/airspace
-GET    /api/v1/flights/{id}/wind
+GET    /api/v1/flights/{id}/wind          { flight, profile } — ветер полёта и слои §6.5
+                                          thermals|glides|wind: 409, пока полёт не ready (как track)
 PATCH  /api/v1/flights/{id}               title, description, privacy, gliderId
 DELETE /api/v1/flights/{id}
 GET    /api/v1/flights/{id}/export?format=igc|gpx|kml

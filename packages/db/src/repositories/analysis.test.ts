@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createDatabase, type DatabaseConnection } from '../client.js';
 import { flights, glides, thermals } from '../schema.js';
+import { findFlightDetails, listGlides, listThermals } from './analysis.js';
 import { deleteFlights, markFlightReady, type ProcessedFlight } from './flights.js';
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -160,5 +161,60 @@ describe.runIf(Boolean(databaseUrl))('markFlightReady пишет анализ п
     await deleteFlights(connection.db, [other.id]);
     expect(await connection.db.select().from(thermals).where(eq(thermals.flightId, other.id))).toEqual([]);
     expect(await connection.db.select().from(glides).where(eq(glides.flightId, other.id))).toEqual([]);
+  });
+});
+
+describe.runIf(Boolean(databaseUrl))('чтение анализа полёта (задача 2.6)', () => {
+  let connection: DatabaseConnection;
+  let flightId: string;
+
+  beforeAll(async () => {
+    connection = createDatabase(databaseUrl ?? '');
+    const [row] = await connection.db
+      .insert(flights)
+      .values({ sourceFormat: 'igc', rawObjectKey: `raw/test/read-${Date.now()}.igc.gz` })
+      .returning({ id: flights.id });
+    if (!row) throw new Error('insert returned no row');
+    flightId = row.id;
+    await markFlightReady(connection.db, flightId, processed(analysis(2)));
+  });
+
+  afterAll(async () => {
+    await deleteFlights(connection.db, [flightId]);
+    await connection.close();
+  });
+
+  it('детали полёта: статус, время, агрегаты и профиль ветра', async () => {
+    const details = await findFlightDetails(connection.db, flightId);
+    expect(details).toMatchObject({
+      id: flightId,
+      status: 'ready',
+      analysisLevel: 'full',
+      durationS: 3600,
+      thermalCount: 2,
+      avgClimbMs: 2,
+      avgGlideRatio: 8.2,
+      windDirDeg: 44,
+      windSpeedMs: 3.61,
+    });
+    expect(details?.startedAt?.getTime()).toBe(T0);
+    expect(details?.windProfile).toEqual(analysis(2).windProfile);
+    expect(await findFlightDetails(connection.db, '00000000-0000-4000-8000-000000000000')).toBeNull();
+  });
+
+  it('термики по порядку, точки входа и выхода — широта и долгота из geography', async () => {
+    const list = await listThermals(connection.db, flightId);
+    expect(list.map((t) => t.seq)).toEqual([0, 1]);
+    expect(list[0]).toMatchObject({ entryLat: 43.2, entryLon: 76.9, exitLat: 43.201, exitLon: 76.898, gainM: 180, direction: 'ccw' });
+    expect(list[0]?.startedAt.getTime()).toBe(T0);
+    expect(list[1]).toMatchObject({ driftDirDeg: 70, driftSpeedMs: 1.49 });
+  });
+
+  it('глайды по порядку; у dynamic нет качества', async () => {
+    const list = await listGlides(connection.db, flightId);
+    expect(list.map((g) => [g.seq, g.kind, g.glideRatio])).toEqual([
+      [0, 'glide', 8.2],
+      [1, 'dynamic', null],
+    ]);
   });
 });

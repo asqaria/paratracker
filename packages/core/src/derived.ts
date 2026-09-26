@@ -1,3 +1,4 @@
+import { THERMAL } from './constants.js';
 import type { AltitudeSource, AnalysisLevel } from './flight.js';
 
 /** Биты флагов точки — те же, что в колонке flags формата .track (ТЗ §5.4). */
@@ -99,7 +100,17 @@ export const TURN_DIRECTIONS = ['cw', 'ccw'] as const;
 export type TurnDirection = (typeof TURN_DIRECTIONS)[number];
 
 /** Сила термика по среднему набору, ТЗ §6.3. */
-export type ThermalStrength = 'weak' | 'medium' | 'strong' | 'powerful';
+export const THERMAL_STRENGTHS = ['weak', 'medium', 'strong', 'powerful'] as const;
+export type ThermalStrength = (typeof THERMAL_STRENGTHS)[number];
+
+/** Класс термика по среднему набору: слабый < 1, средний 1–3, сильный 3–5, мощный > 5 м/с (§6.3). */
+export function thermalStrength(avgClimbMs: number): ThermalStrength {
+  const bounds = THERMAL.strengthUpperBoundsMs;
+  if (avgClimbMs < bounds.weak) return 'weak';
+  if (avgClimbMs < bounds.medium) return 'medium';
+  if (avgClimbMs < bounds.strong) return 'strong';
+  return 'powerful';
+}
 
 /**
  * Термик, ТЗ §6.3: полтора оборота и больше подряд с набором. Индексы —

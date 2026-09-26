@@ -1,4 +1,4 @@
-import { CLEAN, GEO, THERMAL, TIME, type Circle, type CircleLimits, type Thermal, type ThermalStrength } from '@skyline/core';
+import { CLEAN, GEO, THERMAL, TIME, thermalStrength, type Circle, type CircleLimits, type Thermal } from '@skyline/core';
 
 import { headingTurns, minTurningRate, type CircleColumns, type HeadingTurns } from './circles.js';
 
@@ -68,14 +68,6 @@ function groupCircles(points: ThermalColumns, circles: readonly Circle[]): Circl
     else groups.push([circle]);
   }
   return groups;
-}
-
-function strengthOf(avgClimbMs: number): ThermalStrength {
-  const bounds = THERMAL.strengthUpperBoundsMs;
-  if (avgClimbMs < bounds.weak) return 'weak';
-  if (avgClimbMs < bounds.medium) return 'medium';
-  if (avgClimbMs < bounds.strong) return 'strong';
-  return 'powerful';
 }
 
 /** Снос по центрам первого и последнего круга, м/с; null — круг один. */
@@ -230,7 +222,7 @@ export function detectThermals(points: ThermalColumns, circles: readonly Circle[
       driftEastMs: drift?.east ?? null,
       driftNorthMs: drift?.north ?? null,
       efficiency: avgClimbMs / maxClimbMs,
-      strength: strengthOf(avgClimbMs),
+      strength: thermalStrength(avgClimbMs),
     });
   }
   return thermals;

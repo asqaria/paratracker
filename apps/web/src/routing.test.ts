@@ -29,12 +29,13 @@ describe('routeFromHash', () => {
     expect(routeFromHash(HEALTH_HASH)).toEqual({ kind: 'health' });
   });
 
-  it('полёт и демо ведут в просмотрщик', () => {
+  it('полёт и демо ведут в просмотрщик; у демо нет id — аналитики из API нет', () => {
     expect(routeFromHash(flightHash('11111111-2222-4333-8444-555555555555'))).toEqual({
       kind: 'flight',
+      flightId: '11111111-2222-4333-8444-555555555555',
       trackUrl: '/api/v1/flights/11111111-2222-4333-8444-555555555555/track',
     });
-    expect(routeFromHash('#/demo')).toEqual({ kind: 'flight', trackUrl: '/demo/baseline.track' });
+    expect(routeFromHash('#/demo')).toEqual({ kind: 'flight', flightId: null, trackUrl: '/demo/baseline.track' });
   });
 });
 

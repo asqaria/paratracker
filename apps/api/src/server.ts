@@ -2,8 +2,11 @@ import {
   createChannelListener,
   createDatabase,
   findFlight,
+  findFlightDetails,
   FLIGHT_STATUS_CHANNEL,
   insertFlight,
+  listGlides,
+  listThermals,
   notifyFlightQueued,
 } from '@skyline/db';
 
@@ -39,6 +42,11 @@ const app = buildApp({
     storage,
     events,
     onQueued: (flightId) => notifyFlightQueued(database.db, flightId),
+  },
+  analysis: {
+    details: (id) => findFlightDetails(database.db, id),
+    thermals: (flightId) => listThermals(database.db, flightId),
+    glides: (flightId) => listGlides(database.db, flightId),
   },
   // Ключ ArcGIS остаётся на сервере; без него подложка Esri просто недоступна.
   tiles: {

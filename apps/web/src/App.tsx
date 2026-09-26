@@ -34,6 +34,6 @@ export function App() {
   const route = useRoute();
 
   if (route.kind === 'health') return <HealthPage />;
-  if (route.kind === 'flight') return <FlightViewerPage trackUrl={route.trackUrl} />;
+  if (route.kind === 'flight') return <FlightViewerPage flightId={route.flightId} trackUrl={route.trackUrl} />;
   return <UploadPage />;
 }

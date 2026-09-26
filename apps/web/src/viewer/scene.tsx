@@ -85,6 +85,8 @@ import {
   type ImagerySource,
   type ViewerConfig,
 } from './providers';
+import { AnalyticsPanel, type SelectedSegment } from './AnalyticsPanel';
+import { useFlightAnalytics } from './flight-analytics';
 import { SummaryPanel } from './SummaryPanel';
 import { TimelinePanel } from './TimelinePanel';
 import { VarioLegend } from './VarioLegend';
@@ -109,6 +111,8 @@ import { useHotkeys } from './use-hotkeys';
 
 export interface SceneProps {
   track: DecodedTrack;
+  /** id полёта в API — для аналитики; null — демо-трек, панели нет. */
+  flightId?: string | null;
   /**
    * Свечение под треком (ТЗ §7.3). По умолчанию выключено: прозрачный примитив
    * рисуется в проходе после непрозрачного, то есть ложится ПОВЕРХ цветной линии
@@ -116,6 +120,11 @@ export interface SceneProps {
    */
   showGlow?: boolean;
 }
+
+/** Перелёт свободной камеры к сегменту из аналитики: длительность, наклон, дальность в радиусах сегмента. */
+const SEGMENT_FLIGHT_S = 1.2;
+const SEGMENT_PITCH_DEG = -35;
+const SEGMENT_RANGE_FACTOR = 3;
 
 /** ТЗ §7.2: основная линия 3–5 px, свечение — шире и приглушённее. */
 const GLOW_WIDTH_PX = 12;
@@ -239,7 +248,7 @@ function createImageryProvider(source: ImagerySource): ImageryLayer {
   );
 }
 
-export function Scene({ track, showGlow = false }: SceneProps) {
+export function Scene({ track, flightId = null, showGlow = false }: SceneProps) {
   const t = useT();
   const container = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Viewer | null>(null);
@@ -625,6 +634,34 @@ export function Scene({ track, showGlow = false }: SceneProps) {
     viewerRef.current?.scene.requestRender();
   }, [timeline]);
 
+  const analytics = useFlightAnalytics(flightId);
+
+  /**
+   * Клик по сегменту в аналитике: время — на его начало. Следящие камеры
+   * (Chase, Side, Cockpit, Top) придут за пилотом сами; свободная — перелетает
+   * к сегменту так, чтобы он целиком был в кадре.
+   */
+  const selectSegment = useCallback(
+    (segment: SelectedSegment) => {
+      seekTo(segment.startMs);
+      const viewer = viewerRef.current;
+      if (!viewer || cameraModeRef.current !== 'free') return;
+      const from = indexAt(track.t, segment.startMs);
+      const to = indexAt(track.t, segment.endMs);
+      const points: Cartesian3[] = [];
+      for (let i = from; i <= to; i++) {
+        points.push(Cartesian3.fromDegrees(track.lon[i] ?? 0, track.lat[i] ?? 0, track.alt[i] ?? 0));
+      }
+      if (points.length === 0) return;
+      const sphere = BoundingSphere.fromPoints(points);
+      viewer.camera.flyToBoundingSphere(sphere, {
+        duration: SEGMENT_FLIGHT_S,
+        offset: new HeadingPitchRange(viewer.camera.heading, CesiumMath.toRadians(SEGMENT_PITCH_DEG), sphere.radius * SEGMENT_RANGE_FACTOR),
+      });
+    },
+    [seekTo, track],
+  );
+
   const togglePlay = useCallback(() => {
     // Доиграли до посадки — следующий запуск с начала.
     if (timeMs >= timeline.endMs) seekTo(timeline.startMs);
@@ -689,7 +726,8 @@ export function Scene({ track, showGlow = false }: SceneProps) {
           )}
         </div>
 
-        <div data-panel="imagery" className="pointer-events-auto ml-auto flex flex-col gap-2 rounded-xl glass p-3 text-sm compact:gap-1 compact:p-1">
+        <div className="pointer-events-auto ml-auto flex flex-col items-end gap-2">
+        <div data-panel="imagery" className="flex flex-col gap-2 rounded-xl glass p-3 text-sm compact:gap-1 compact:p-1">
           <span className="text-secondary compact:hidden">{t('viewer.imagery')}</span>
           <div role="group" aria-label={t('viewer.imagery')} className="flex gap-1">
             {shownSources.map((source) => (
@@ -712,6 +750,10 @@ export function Scene({ track, showGlow = false }: SceneProps) {
           <span className="numeric text-secondary compact:hidden">
             {t('viewer.points')}: {track.pointCount}
           </span>
+        </div>
+        {analytics !== null && (
+          <AnalyticsPanel state={analytics} timeline={timeline} timeMs={timeMs} onSelect={selectSegment} />
+        )}
         </div>
       </div>
 
