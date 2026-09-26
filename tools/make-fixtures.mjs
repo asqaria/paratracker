@@ -809,6 +809,68 @@ function summaryOf(points) {
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
+   Эталон упрощения трека для карты логбука (задача 2.11) — независимая
+   реализация Дугласа–Пекера по записанным в файл точкам. Тест прогоняет
+   simplifyTrack из packages/analysis и сверяет список оставленных точек.
+   Проекция — равнопромежуточная у широты первой точки, расстояние — до
+   отрезка (с зажимом), не до бесконечной прямой: у спирали термика отрезок
+   и прямая дают разные ответы.
+   ─────────────────────────────────────────────────────────────────────────── */
+/** = SIMPLIFY из packages/core. */
+const SIMPLIFY_TOLERANCE_M = 15;
+const SIMPLIFY_MAX_POINTS = 1000;
+
+function douglasPeucker(xs, ys, toleranceM) {
+  const n = xs.length;
+  const keep = new Array(n).fill(false);
+  if (n === 0) return [];
+  keep[0] = true;
+  keep[n - 1] = true;
+  const stack = [[0, n - 1]];
+  while (stack.length > 0) {
+    const [a, b] = stack.pop();
+    let worst = -1;
+    let worstDistance = 0;
+    const dx = xs[b] - xs[a];
+    const dy = ys[b] - ys[a];
+    const lengthSq = dx * dx + dy * dy;
+    for (let i = a + 1; i < b; i++) {
+      let px = xs[i] - xs[a];
+      let py = ys[i] - ys[a];
+      if (lengthSq > 0) {
+        const u = Math.max(0, Math.min(1, (px * dx + py * dy) / lengthSq));
+        px -= u * dx;
+        py -= u * dy;
+      }
+      const distance = Math.hypot(px, py);
+      if (distance > worstDistance) {
+        worstDistance = distance;
+        worst = i;
+      }
+    }
+    if (worst >= 0 && worstDistance > toleranceM) {
+      keep[worst] = true;
+      stack.push([a, worst], [worst, b]);
+    }
+  }
+  return keep.flatMap((k, i) => (k ? [i] : []));
+}
+
+function simplifiedOf(points) {
+  const k = (MEAN_EARTH_RADIUS_M * Math.PI) / 180;
+  const cosLat0 = Math.cos((points[0].lat * Math.PI) / 180);
+  const xs = points.map((p) => p.lon * cosLat0 * k);
+  const ys = points.map((p) => p.lat * k);
+  let toleranceM = SIMPLIFY_TOLERANCE_M;
+  let indices = douglasPeucker(xs, ys, toleranceM);
+  while (indices.length > SIMPLIFY_MAX_POINTS) {
+    toleranceM *= 2;
+    indices = douglasPeucker(xs, ys, toleranceM);
+  }
+  return { toleranceM, indices };
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
    Датум GNSS-высоты — как в парсере (packages/parsing/src/altitude-datum.ts):
    IGC без HFALG, GEO, MSL, NKN — геоид (CIVL 7H §3.2.1); ELL — эллипсоид;
    NIL — высоты нет. Эталон altGnss — над эллипсоидом WGS84: h = H + N(lat, lon)
@@ -889,7 +951,8 @@ for (const [name, spec] of Object.entries(CASES)) {
       maxAlt: hasAltitude ? Math.max(...altitudes) : null
     },
     trajectory: TRAJECTORY,
-    summary: r.exact ? summaryOf(r.exact) : null
+    summary: r.exact ? summaryOf(r.exact) : null,
+    simplified: r.exact ? simplifiedOf(r.exact) : null
   };
 
   readme.push(`| \`${name}\` | ${spec.what} | ${spec.checks} |`);

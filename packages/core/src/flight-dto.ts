@@ -25,6 +25,11 @@ export type FlightErrorCode = z.infer<typeof FlightErrorCode>;
 export const UploadResponse = z.object({
   flightId: z.uuid(),
   status: FlightStatus,
+  /**
+   * Только у анонимной загрузки: секрет, которым браузер после входа забирает
+   * полёт в логбук (POST /api/v1/flights/claim, задача 2.11).
+   */
+  claimToken: z.string().min(1).optional(),
 });
 export type UploadResponse = z.infer<typeof UploadResponse>;
 

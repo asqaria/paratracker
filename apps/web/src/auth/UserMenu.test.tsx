@@ -43,6 +43,8 @@ describe('UserMenuView', () => {
     expect(html).toContain('src="https://lh3.googleusercontent.com/a/photo"');
     expect(html).toContain(t['auth.signOut']);
     expect(html).not.toContain(t['auth.signIn']);
+    // Имя ведёт в логбук.
+    expect(html).toContain('href="#/logbook"');
   });
 
   it('без имени — username, без аватара — без картинки', () => {

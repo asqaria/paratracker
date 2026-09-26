@@ -20,7 +20,7 @@ export interface FormattedSummary {
 const SECONDS_PER_MINUTE = 60;
 const MINUTES_PER_HOUR = 60;
 
-function formatDuration(durationS: number, t: Translate): string {
+export function formatDuration(durationS: number, t: Translate): string {
   const totalMinutes = Math.round(durationS / SECONDS_PER_MINUTE);
   const hours = Math.floor(totalMinutes / MINUTES_PER_HOUR);
   const minutes = totalMinutes % MINUTES_PER_HOUR;

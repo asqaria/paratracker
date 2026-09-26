@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 
 import { FlightViewerPage } from './flight/FlightViewerPage';
 import { HealthPage } from './health/HealthPage';
+import { ClaimOnSignIn } from './logbook/ClaimOnSignIn';
+import { LogbookPage } from './logbook/LogbookPage';
 import { routeFromHash, type Route } from './routing';
 import { UploadPage } from './upload/UploadPage';
 
@@ -30,10 +32,20 @@ export function useRoute(): Route {
   return route;
 }
 
-export function App() {
+function Screen() {
   const route = useRoute();
 
   if (route.kind === 'health') return <HealthPage />;
+  if (route.kind === 'logbook') return <LogbookPage />;
   if (route.kind === 'flight') return <FlightViewerPage flightId={route.flightId} trackUrl={route.trackUrl} />;
   return <UploadPage authFailed={route.kind === 'landing' && route.authFailed === true} />;
+}
+
+export function App() {
+  return (
+    <>
+      <ClaimOnSignIn />
+      <Screen />
+    </>
+  );
 }

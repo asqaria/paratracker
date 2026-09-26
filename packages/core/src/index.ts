@@ -6,6 +6,7 @@ export * from './flight.js';
 export * from './flight-dto.js';
 export * from './health.js';
 export * from './imagery.js';
+export * from './logbook-dto.js';
 export * from './parse.js';
 export * from './problem.js';
 export * from './track.js';

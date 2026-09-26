@@ -5,6 +5,7 @@ import type { FlightRecord } from '@skyline/db';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { buildApp } from './app.js';
+import { hashToken } from './auth/tokens.js';
 import type { FlightEventListener, FlightRoutesDeps } from './flights.js';
 import { multipartBody } from './testing/multipart.js';
 
@@ -25,7 +26,7 @@ const record = (overrides: Partial<FlightRecord> = {}): FlightRecord => ({
 interface Harness {
   app: ReturnType<typeof buildApp>;
   objects: Map<string, Uint8Array>;
-  inserted: { id: string; sourceFormat: SourceFormat; rawObjectKey: string; userId: string | null }[];
+  inserted: { id: string; sourceFormat: SourceFormat; rawObjectKey: string; userId: string | null; claimTokenHash?: string }[];
   queued: string[];
   emit: (flightId: string, event: FlightStatusResponse) => void;
 }
@@ -102,12 +103,17 @@ describe('POST /api/v1/flights/upload', () => {
     const response = await upload(test.app, 'flight.igc');
 
     expect(response.statusCode).toBe(202);
-    expect(UploadResponse.parse(response.json())).toEqual({ flightId: FLIGHT_ID, status: 'pending' });
+    // Анонимная загрузка — с токеном для переноса в логбук (задача 2.11).
+    const { claimToken, ...accepted } = UploadResponse.parse(response.json());
+    expect(accepted).toEqual({ flightId: FLIGHT_ID, status: 'pending' });
+    expect(claimToken).toMatch(/^[\w-]{43}$/);
 
     const key = `raw/anonymous/${FLIGHT_ID}.igc.gz`;
     expect([...test.objects.keys()]).toEqual([key]);
     expect(gunzipSync(test.objects.get(key) ?? new Uint8Array()).toString()).toBe(IGC);
-    expect(test.inserted).toEqual([{ id: FLIGHT_ID, userId: null, sourceFormat: 'igc', rawObjectKey: key }]);
+    expect(test.inserted).toEqual([
+      { id: FLIGHT_ID, userId: null, sourceFormat: 'igc', rawObjectKey: key, claimTokenHash: hashToken(claimToken ?? '') },
+    ]);
     expect(test.queued).toEqual([FLIGHT_ID]);
   });
 

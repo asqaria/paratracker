@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 
 import { useT } from '../i18n/locale';
+import { SaveFlightBanner } from '../logbook/SaveFlightBanner';
 import { useTrack } from '../viewer/use-track';
 
 /**
@@ -48,6 +49,7 @@ export function FlightViewerPage({ flightId, trackUrl }: FlightViewerPageProps) 
       }
     >
       <Scene track={track.track} flightId={flightId} />
+      {flightId !== null && <SaveFlightBanner flightId={flightId} />}
     </Suspense>
   );
 }

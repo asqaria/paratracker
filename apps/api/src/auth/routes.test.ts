@@ -1,4 +1,4 @@
-import { MeResponse, PROBLEM_CONTENT_TYPE } from '@skyline/core';
+import { MeResponse, PROBLEM_CONTENT_TYPE, UploadResponse } from '@skyline/core';
 import type { NewSession, OAuthIdentity, RotateResult, UserProfile } from '@skyline/db';
 import { describe, expect, it } from 'vitest';
 
@@ -330,5 +330,17 @@ describe('загрузка полёта', () => {
     await upload(h, { skyline_at: 'expired-or-garbage' });
     expect(h.inserted.map((f) => f.userId)).toEqual([null, null]);
     expect(h.inserted[0]?.rawObjectKey).toBe(`raw/anonymous/${FLIGHT_ID}.igc.gz`);
+  });
+
+  it('аноним получает токен, в БД — только его хэш; у вошедшего токена нет', async () => {
+    const h = harness();
+    const anonymous = await upload(h, {});
+    const token = UploadResponse.parse(anonymous.json()).claimToken ?? '';
+    expect(token).toMatch(/^[\w-]{43}$/);
+    expect(h.inserted[0]?.claimTokenHash).toBe(hashToken(token));
+
+    const owned = await upload(h, { skyline_at: await signAccessToken(USER_ID, SECRET, NOW) });
+    expect(owned.json()).not.toHaveProperty('claimToken');
+    expect(h.inserted[1]).not.toHaveProperty('claimTokenHash');
   });
 });

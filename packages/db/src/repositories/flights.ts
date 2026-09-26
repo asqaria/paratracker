@@ -4,6 +4,7 @@ import {
   type AnalysisLevel,
   type FlightAnalysis,
   type FlightStatus,
+  type SimplifiedLine,
   type SourceFormat,
 } from '@skyline/core';
 import { and, asc, eq, inArray, isNull, lt } from 'drizzle-orm';
@@ -20,6 +21,8 @@ export interface NewFlight {
   userId: string | null;
   sourceFormat: SourceFormat;
   rawObjectKey: string;
+  /** Анонимная загрузка: хэш токена, по которому полёт потом забирают в логбук. */
+  claimTokenHash?: string;
 }
 
 export interface FlightRecord {
@@ -41,6 +44,11 @@ export interface ProcessedFlight {
   durationS: number;
   /** Термики, глайды, ветер (ТЗ §6.2–6.5); null — трек 'basic', анализ не делался. */
   analysis: FlightAnalysis | null;
+  /** NaN — высоты нет. */
+  maxAltM: number;
+  distanceTrackM: number;
+  /** Линия для карты логбука (задача 2.11); null — точек меньше двух. */
+  simplified: SimplifiedLine | null;
 }
 
 const RECORD_COLUMNS = {
@@ -60,6 +68,7 @@ export async function insertFlight(db: Database, flight: NewFlight): Promise<Fli
       userId: flight.userId,
       sourceFormat: flight.sourceFormat,
       rawObjectKey: flight.rawObjectKey,
+      claimTokenHash: flight.claimTokenHash ?? null,
     })
     .returning(RECORD_COLUMNS);
   if (!row) throw new Error('insertFlight returned no row');
@@ -95,6 +104,35 @@ const bearing = (value: number | null | undefined): number | null => {
 };
 /** Точка geography в EWKT: долгота, потом широта. */
 const point = (lat: number, lon: number): string => `SRID=4326;POINT(${lon} ${lat})`;
+
+const MS_PER_SECOND = 1000;
+
+/**
+ * Упрощённая линия в EWKT: X — долгота, Y — широта, Z — высота (нет — 0:
+ * карта логбука высоту не рисует), M — секунды от первой точки.
+ */
+function lineZM(line: SimplifiedLine): string {
+  const t0 = line.timeMs[0] ?? 0;
+  const coords = line.lat.map((lat, i) => {
+    const seconds = ((line.timeMs[i] ?? t0) - t0) / MS_PER_SECOND;
+    return `${line.lon[i] ?? 0} ${lat} ${finite(line.altM[i]) ?? 0} ${seconds}`;
+  });
+  return `SRID=4326;LINESTRINGZM(${coords.join(', ')})`;
+}
+
+/**
+ * Прямоугольник по крайним координатам. Грубый: стороны geography — дуги
+ * большого круга, а не параллели; для отбора полётов в окне карты хватает.
+ * Вырожденный (трек вдоль меридиана или параллели) — null: такой полигон невалиден.
+ */
+function bboxPolygon(line: SimplifiedLine): string | null {
+  const minLat = Math.min(...line.lat);
+  const maxLat = Math.max(...line.lat);
+  const minLon = Math.min(...line.lon);
+  const maxLon = Math.max(...line.lon);
+  if (minLat === maxLat || minLon === maxLon) return null;
+  return `SRID=4326;POLYGON((${minLon} ${minLat}, ${maxLon} ${minLat}, ${maxLon} ${maxLat}, ${minLon} ${maxLat}, ${minLon} ${minLat}))`;
+}
 /** Для колонок NOT NULL: не число — ошибка анализа, запись не должна пройти молча. */
 const required = (value: number | null, column: string): number => {
   if (value === null) throw new Error(`${column}: not a finite number`);
@@ -126,6 +164,10 @@ export async function markFlightReady(db: Database, id: string, result: Processe
         windDirDeg: bearing(analysis?.wind?.dirDeg),
         windSpeedMs: finite(analysis?.wind?.speedMs),
         windProfile: analysis ? analysis.windProfile : null,
+        maxAltM: whole(result.maxAltM),
+        distanceTrackM: whole(result.distanceTrackM),
+        trackSimplified: result.simplified ? lineZM(result.simplified) : null,
+        bbox: result.simplified ? bboxPolygon(result.simplified) : null,
         updatedAt: new Date(),
       })
       .where(eq(flights.id, id));
@@ -224,4 +266,19 @@ export async function listUnfinishedFlights(db: Database): Promise<FlightRecord[
     .from(flights)
     .where(inArray(flights.status, [...UNFINISHED_FLIGHT_STATUSES]))
     .orderBy(flights.createdAt);
+}
+
+/**
+ * Разовая догрузка данных логбука (задача 2.11): у полётов, обработанных до
+ * неё, нет сводки и линии для карты. Такие полёты возвращаются в очередь —
+ * их подберёт обычное восстановление при старте воркера. После обработки
+ * distance_track_m заполнена (хотя бы 0), поэтому повторно они не попадут.
+ */
+export async function requeueFlightsWithoutSummary(db: Database): Promise<number> {
+  const rows = await db
+    .update(flights)
+    .set({ status: 'pending', updatedAt: new Date() })
+    .where(and(eq(flights.status, 'ready'), isNull(flights.distanceTrackM)))
+    .returning({ id: flights.id });
+  return rows.length;
 }

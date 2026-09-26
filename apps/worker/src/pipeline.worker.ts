@@ -1,6 +1,6 @@
 import { parentPort } from 'node:worker_threads';
 
-import { analyseFlight, cleanAndDerive } from '@skyline/analysis';
+import { analyseFlight, cleanAndDerive, simplifyTrack, summarizeFlight } from '@skyline/analysis';
 import {
   DEFAULT_AIRCRAFT_TYPE,
   TRACK_FLAGS,
@@ -9,6 +9,7 @@ import {
   type GnssAltitudeDatum,
   type ParsedTrack,
   type ParseResult,
+  type SimplifiedLine,
   type SourceFormat,
 } from '@skyline/core';
 import { parseGpx, parseIgc, parseKml } from '@skyline/parsing';
@@ -43,6 +44,12 @@ export interface PipelineSuccess {
   warningCount: number;
   /** Термики, глайды, ветер; null — трек 'basic', анализ не делался. */
   analysis: FlightAnalysis | null;
+  /** Максимальная высота очищенного трека, м; NaN — высоты нет. */
+  maxAltM: number;
+  /** Длина очищенного трека, м. */
+  distanceTrackM: number;
+  /** Линия для карты логбука; null — меньше двух точек, линии нет. */
+  simplified: SimplifiedLine | null;
 }
 
 export type PipelineMessage =
@@ -104,6 +111,15 @@ export function runPipeline(message: PipelineTaskMessage, onProgress: (value: nu
   });
   onProgress(PROGRESS.packed);
 
+  // Сводка и линия для логбука — по тем же очищенным точкам, что и .track.
+  const summary = summarizeFlight({ t: points.t, lat: points.lat, lon: points.lon, alt: points.altitude });
+  const { indices } = simplifyTrack(points.lat, points.lon);
+  const pick = (column: Float64Array): number[] => Array.from(indices, (i) => column[i] ?? Number.NaN);
+  const simplified: SimplifiedLine | null =
+    indices.length >= 2
+      ? { lat: pick(points.lat), lon: pick(points.lon), altM: pick(points.altitude), timeMs: pick(points.t) }
+      : null;
+
   const startedAt = points.t[0] ?? Number.NaN;
   const endedAt = points.t[points.t.length - 1] ?? Number.NaN;
   onProgress(PROGRESS.done);
@@ -123,6 +139,9 @@ export function runPipeline(message: PipelineTaskMessage, onProgress: (value: nu
       durationS: Math.round((endedAt - startedAt) / MS_PER_SECOND),
       warningCount: track.warnings.length,
       analysis,
+      maxAltM: summary.maxAltM,
+      distanceTrackM: summary.distanceTrackM,
+      simplified,
     },
   };
 }

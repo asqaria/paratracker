@@ -1,0 +1,1 @@
+ALTER TABLE "flights" ADD COLUMN "claim_token_hash" text;

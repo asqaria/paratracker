@@ -70,6 +70,9 @@ const processed = (result: FlightAnalysis | null): ProcessedFlight => ({
   endedAt: new Date(T0 + 3_600_000),
   durationS: 3600,
   analysis: result,
+  maxAltM: 2000,
+  distanceTrackM: 30_000,
+  simplified: null,
 });
 
 // Интеграционный: нужен поднятый docker compose и применённые миграции.
