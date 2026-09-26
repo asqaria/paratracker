@@ -72,6 +72,7 @@ const analytics = (overrides: Partial<FlightAnalytics['details']> = {}): FlightA
     landingSite: null,
     glider: null,
     gliderRaw: null,
+    timezone: 'Asia/Almaty',
     canEdit: false,
     ...overrides,
   },
@@ -86,6 +87,14 @@ const render = (state: AnalyticsState, timeMs = START_MS, tab: 'thermals' | 'gli
   );
 
 const ready = (details: Partial<FlightAnalytics['details']> = {}): AnalyticsState => ({ status: 'ready', analytics: analytics(details) });
+
+describe('AnalyticsPanel: начало полёта (задача 2.14)', () => {
+  it('по часам места взлёта, с поясом', () => {
+    const html = render(ready());
+    expect(html).toContain(text['flight.start']);
+    expect(html).toContain('GMT+5');
+  });
+});
 
 describe('AnalyticsPanel: место старта (задача 2.13)', () => {
   const site = { id: '33333333-2222-4333-8444-555555555555', name: 'Ush Konyr', countryCode: 'kz', source: 'seed' } as const;

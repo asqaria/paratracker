@@ -29,6 +29,11 @@ export const FlightDetailsResponse = z.object({
   analysisLevel: AnalysisLevel.nullable(),
   startedAt: Iso.nullable(),
   endedAt: Iso.nullable(),
+  /**
+   * IANA-таймзона места взлёта (задача 2.14): время хранится в UTC, местное —
+   * только для показа. null — полёт не обработан.
+   */
+  timezone: z.string().nullable(),
   durationS: z.number().int().nullable(),
   /** null — анализа нет (трек basic или не обработан). */
   thermalCount: z.number().int().min(0).nullable(),

@@ -165,6 +165,7 @@ const ru = {
   'gliders.add': 'Добавить',
   'gliders.noClass': 'класс не указан',
   'gliders.error': 'Не удалось сохранить крыло',
+  'flight.start': 'Начало',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -335,6 +336,7 @@ const en: Messages = {
   'gliders.add': 'Add',
   'gliders.noClass': 'class not set',
   'gliders.error': 'Could not save the glider',
+  'flight.start': 'Start',
 };
 
 export const messages: Record<Locale, Messages> = { ru, en };

@@ -55,6 +55,7 @@ describe.runIf(Boolean(databaseUrl))('места старта на живой Б
       takeoff: { ...at, altM: 1948.4 },
       landing: { lat: at.lat + 0.1, lon: at.lon, altM: 800 },
       gliderRaw: null,
+      timezone: 'Antarctica/Palmer',
     });
     return flight.id;
   };

@@ -14,6 +14,7 @@ const ENTRY = {
   status: 'ready',
   startedAt: '2023-07-23T06:00:00.000Z',
   uploadedAt: '2026-09-26T10:00:00.000Z',
+  timezone: 'Asia/Almaty',
   durationS: 17_640,
   distanceTrackM: 162_100,
   maxAltM: 3293,

@@ -16,7 +16,7 @@ export const LOGBOOK_PAGE = {
   maxLimit: 100,
 } as const;
 
-/** GET /api/v1/logbook — фильтр по дате старта (UTC до задачи 2.14), курсор, размер. */
+/** GET /api/v1/logbook — фильтр по местной дате старта (задача 2.14), курсор, размер. */
 export const LogbookQuery = z.object({
   from: z.iso.date().optional(),
   to: z.iso.date().optional(),
@@ -37,6 +37,8 @@ export const LogbookEntry = z.object({
   startedAt: z.iso.datetime().nullable(),
   /** Когда загружен, ISO 8601 UTC. */
   uploadedAt: z.iso.datetime(),
+  /** IANA-таймзона места взлёта: дата в строке — местная (задача 2.14); null — не обработан. */
+  timezone: z.string().nullable(),
   durationS: z.number().int().nonnegative().nullable(),
   distanceTrackM: z.number().int().nonnegative().nullable(),
   maxAltM: z.number().int().nullable(),

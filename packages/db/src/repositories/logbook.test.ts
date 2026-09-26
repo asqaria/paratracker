@@ -58,6 +58,7 @@ describe.runIf(Boolean(databaseUrl))('логбук на живой БД', () => 
       takeoff: { lat: -61, lon: -101, altM: 1500 },
       landing: { lat: -61.1, lon: -101, altM: 800 },
       gliderRaw: null,
+      timezone: 'Asia/Almaty',
     });
     return flight.id;
   };
@@ -102,6 +103,17 @@ describe.runIf(Boolean(databaseUrl))('логбук на живой БД', () => 
     expect(result.items.map((f) => f.startedAt)).toEqual([day(3), day(2)]);
   });
 
+  it('дата — местная: вечерний полёт в Алматы по UTC ещё «вчера», для пилота — сегодня', async () => {
+    // 20:00 UTC 10 мая = 02:00 11 мая в Алматы.
+    const evening = await readyFlight(pilot, day(10, 20));
+    const [row] = await connection.db.select({ localDate: flights.localDate }).from(flights).where(eq(flights.id, evening));
+    expect(row?.localDate).toBe('2002-05-11');
+
+    const byLocal = await listLogbook(connection.db, { userId: pilot, limit: 10, from: '2002-05-11', to: '2002-05-11' });
+    expect(byLocal.items.map((f) => f.id)).toEqual([evening]);
+    expect(byLocal.items[0]?.timezone).toBe('Asia/Almaty');
+  });
+
   it('полёт в обработке — в списке по времени загрузки, без сводки', async () => {
     const pending = await insertFlight(connection.db, { userId: pilot, sourceFormat: 'igc', rawObjectKey: `raw/test/${RUN}-p.igc.gz` });
     createdFlights.push(pending.id);
@@ -112,7 +124,8 @@ describe.runIf(Boolean(databaseUrl))('логбук на живой БД', () => 
 
   it('карта: упрощённые треки своих полётов в [долгота, широта]', async () => {
     const map = await listLogbookMap(connection.db, pilot);
-    const ours = map.filter((f) => f.startedAt !== null && f.startedAt.getUTCFullYear() === 2002);
+    // Полёты 1–3 мая 2002 из первого теста; остальные тесты добавляют свои.
+    const ours = map.filter((f) => f.startedAt !== null && f.startedAt.getTime() <= day(3).getTime() && f.startedAt >= day(1));
     expect(ours).toHaveLength(3);
     expect(ours[0]?.coordinates).toEqual([
       [76.9, 43.2],

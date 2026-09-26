@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1133.0",
+    "@photostructure/tz-lookup": "^11.7.0",
     "@skyline/analysis": "workspace:*",
     "@skyline/core": "workspace:*",
     "@skyline/db": "workspace:*",

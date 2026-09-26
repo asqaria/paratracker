@@ -40,6 +40,7 @@ function toDetails(flight: FlightDetailsRecord, viewerId: string | null): Flight
     startedAt: iso(flight.startedAt),
     endedAt: iso(flight.endedAt),
     durationS: flight.durationS,
+    timezone: flight.timezone,
     thermalCount: flight.thermalCount,
     avgClimbMs: flight.avgClimbMs,
     avgGlideRatio: flight.avgGlideRatio,

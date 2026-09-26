@@ -116,6 +116,8 @@ describe('обработка одного полёта', () => {
     expect(line?.lat.length).toBeGreaterThan(2);
     expect(line?.lat.length).toBeLessThan(960);
     expect(line?.timeMs[0]).toBe(ready[0]?.startedAt.getTime());
+    // Таймзона — по точке взлёта (задача 2.14): baseline генератора — под Алматы.
+    expect(ready[0]?.timezone).toBe('Asia/Almaty');
     // Анализ из потока доходит до репозитория: две спирали генератора — два термика.
     expect(ready[0]?.analysis?.thermals).toHaveLength(2);
     expect(ready[0]?.analysis?.glides.length).toBeGreaterThan(0);
