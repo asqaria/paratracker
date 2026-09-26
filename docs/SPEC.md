@@ -1233,16 +1233,23 @@ GET    /api/v1/flights/{id}/glides        по порядку; у dynamic glideR
 GET    /api/v1/flights/{id}/airspace
 GET    /api/v1/flights/{id}/wind          { flight, profile } — ветер полёта и слои §6.5
                                           thermals|glides|wind: 409, пока полёт не ready (как track)
-PATCH  /api/v1/flights/{id}               title, description, privacy, gliderId
+PATCH  /api/v1/flights/{id}               { gliderId } — крыло своего полёта (2.13б);
+                                           title, description, privacy — позже
 DELETE /api/v1/flights/{id}
 GET    /api/v1/flights/{id}/export?format=igc|gpx|kml
 
 # Логбук (только вошедший; без входа — 401)
-GET    /api/v1/logbook?from&to&siteId&cursor&limit   свои полёты, новые сверху; курсор
+GET    /api/v1/logbook?from&to&siteId&gliderId&cursor&limit  свои полёты, новые сверху; курсор
                                            непрозрачный. from/to — дата старта UTC (локальная —
-                                           с 2.14); gliderId — с 2.13б
+                                           с 2.14); gliderId — крыло (2.13б)
 GET    /api/v1/logbook/map                GeoJSON упрощённых треков своих полётов (до 500)
 GET    /api/v1/logbook/sites              места, откуда летал пилот, с числом полётов
+GET    /api/v1/gliders                    крылья вошедшего (задача 2.13б)
+POST   /api/v1/gliders                    { manufacturer, model, size?, certification?, isDefault? };
+                                           первое крыло — сразу по умолчанию; новые полёты и
+                                           забранные анонимные получают крыло по умолчанию
+PATCH  /api/v1/gliders/{id}               то же тело; «по умолчанию» переходит, но не снимается
+DELETE /api/v1/gliders/{id}               полёты крыла остаются без крыла
 POST   /api/v1/sites                      { flightId, name } — пилот добавляет место старта
                                            своего полёта; 201 | 404 | 409 (место уже есть)
 POST   /api/v1/flights/claim              { claims: [{ flightId, token }] } → { claimed } —
@@ -1537,7 +1544,7 @@ Chrome/Edge 120+, Safari 17+, Firefox 120+. WebGL2 обязателен для 3
 2.11 Логбук: список полётов, фильтр по дате, карта всех полётов (MapLibre), перенос анонимных загрузок
 2.12 Статистика сезона: часы, км, набор, число полётов, топ-мест, график по месяцам
 2.13 а) Места старта: таблица sites, сид paragliding.earth, автоопределение, добавление пилотом
-     б) Привязка крыльев
+     б) Крылья: «Мои крылья», крыло по умолчанию, выбор в полёте, подсказка из IGC HFGTY, фильтр
 2.14 Определение таймзоны по месту старта → локальное время полёта
 2.15 Расширенные каналы графика: варио, скорость, AGL
 ```

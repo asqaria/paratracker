@@ -93,7 +93,7 @@ import {
 } from './providers';
 import { AnalyticsPanel, type SelectedSegment } from './AnalyticsPanel';
 import { BottomSheet } from './BottomSheet';
-import { useCreateSite, useFlightAnalytics } from './flight-analytics';
+import { useCreateSite, useFlightAnalytics, useOwnGliders, useSetFlightGlider } from './flight-analytics';
 import { SummaryLine, SummaryPanel } from './SummaryPanel';
 import { TimelinePanel } from './TimelinePanel';
 import { VarioLegend } from './VarioLegend';
@@ -747,6 +747,13 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
 
   const analytics = useFlightAnalytics(flightId);
   const createSite = useCreateSite(flightId);
+  const setGlider = useSetFlightGlider(flightId);
+  const ownGliders = useOwnGliders();
+  const editing = {
+    ...(createSite ? { onCreateSite: createSite } : {}),
+    ...(setGlider ? { onSetGlider: setGlider } : {}),
+    gliders: ownGliders,
+  };
   // Данные запроса стабильны между рендерами, в отличие от объекта состояния вокруг них.
   const analyticsData = analytics?.status === 'ready' ? analytics.analytics : null;
 
@@ -937,7 +944,7 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
             onSelect={selectSegment}
             columnsShown={columnsShown}
             onColumnsShown={setColumnsShown}
-            {...(createSite ? { onCreateSite: createSite } : {})}
+            {...editing}
           />
         )}
         </div>
@@ -973,7 +980,7 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
                   columnsShown={columnsShown}
                   onColumnsShown={setColumnsShown}
                   embedded
-                  {...(createSite ? { onCreateSite: createSite } : {})}
+                  {...editing}
                 />
               )}
             </div>

@@ -33,6 +33,16 @@ export {
   type GlideRecord,
   type ThermalRecord,
 } from './repositories/analysis.js';
+export {
+  createGlider,
+  deleteGlider,
+  listGliders,
+  setFlightGlider,
+  updateGlider,
+  type GliderRecord,
+  type GliderRef,
+  type SetFlightGliderResult,
+} from './repositories/gliders.js';
 export { readPostgisVersion } from './repositories/health.js';
 export {
   attachNearbyFlights,

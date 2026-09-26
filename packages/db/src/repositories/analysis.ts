@@ -3,7 +3,8 @@ import { asc, eq, sql, type AnyColumn } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 import type { Database } from '../client.js';
-import { flights, glides, sites, thermals } from '../schema.js';
+import { flights, glides, gliders, sites, thermals } from '../schema.js';
+import { GLIDER_COLUMNS, type GliderRef } from './gliders.js';
 import type { SiteRecord } from './sites.js';
 
 /**
@@ -29,6 +30,8 @@ export interface FlightDetailsRecord {
   userId: string | null;
   takeoffSite: SiteRecord | null;
   landingSite: SiteRecord | null;
+  glider: GliderRef | null;
+  gliderRaw: string | null;
 }
 
 export interface ThermalRecord {
@@ -99,10 +102,13 @@ export async function findFlightDetails(db: Database, id: string): Promise<Fligh
         countryCode: landingSites.countryCode,
         source: landingSites.source,
       },
+      glider: GLIDER_COLUMNS,
+      gliderRaw: flights.gliderRaw,
     })
     .from(flights)
     .leftJoin(takeoffSites, eq(takeoffSites.id, flights.takeoffSiteId))
     .leftJoin(landingSites, eq(landingSites.id, flights.landingSiteId))
+    .leftJoin(gliders, eq(gliders.id, flights.gliderId))
     .where(eq(flights.id, id))
     .limit(1);
   return row ?? null;

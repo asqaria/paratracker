@@ -14,6 +14,8 @@ export const HEALTH_HASH = '#/health';
 export const AUTH_FAILED_HASH = '#/auth-failed';
 /** Логбук вошедшего (задача 2.11, ТЗ §8.2 /logbook). */
 export const LOGBOOK_HASH = '#/logbook';
+/** Настройки: пока — «Мои крылья» (задача 2.13б, ТЗ §8.2 /settings). */
+export const SETTINGS_HASH = '#/settings';
 
 /** Адрес просмотрщика загруженного полёта — им же делается редирект. */
 export const flightHash = (flightId: string): string => `#/flight/${flightId}`;
@@ -33,12 +35,14 @@ export type Route =
   | { kind: 'landing'; authFailed?: true }
   | { kind: 'health' }
   | { kind: 'logbook' }
+  | { kind: 'settings' }
   /** flightId null — демо-трек: его нет в API, аналитики к нему нет. */
   | { kind: 'flight'; flightId: string | null; trackUrl: string };
 
 export function routeFromHash(hash: string): Route {
   if (hash === HEALTH_HASH) return { kind: 'health' };
   if (hash === LOGBOOK_HASH) return { kind: 'logbook' };
+  if (hash === SETTINGS_HASH) return { kind: 'settings' };
   if (hash === AUTH_FAILED_HASH) return { kind: 'landing', authFailed: true };
   const trackUrl = trackUrlFromHash(hash);
   return trackUrl === null ? { kind: 'landing' } : { kind: 'flight', flightId: flightIdFromHash(hash), trackUrl };

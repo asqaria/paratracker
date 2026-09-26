@@ -2,7 +2,8 @@ import type { FlightStatus } from '@skyline/core';
 import { and, desc, eq, gte, isNull, lt, or, sql } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
-import { flights, sites } from '../schema.js';
+import { flights, gliders, sites } from '../schema.js';
+import { defaultGliderId, GLIDER_COLUMNS, type GliderRef } from './gliders.js';
 import { SITE_COLUMNS, type SiteRecord } from './sites.js';
 
 /**
@@ -21,6 +22,7 @@ export interface LogbookEntryRecord {
   maxAltM: number | null;
   thermalCount: number | null;
   takeoffSite: SiteRecord | null;
+  glider: GliderRef | null;
 }
 
 /** Позиция в списке: ключ сортировки и id для равных ключей. */
@@ -54,13 +56,22 @@ const MAP_MAX_FLIGHTS = 500;
 
 export async function listLogbook(
   db: Database,
-  query: { userId: string; limit: number; from?: string; to?: string; siteId?: string; after?: LogbookCursor },
+  query: {
+    userId: string;
+    limit: number;
+    from?: string;
+    to?: string;
+    siteId?: string;
+    gliderId?: string;
+    after?: LogbookCursor;
+  },
 ): Promise<LogbookPage> {
   const conditions = [eq(flights.userId, query.userId)];
   // Дата старта в UTC; локальная дата места — с задачей 2.14.
   if (query.from) conditions.push(gte(flights.startedAt, sql`${query.from}::date`));
   if (query.to) conditions.push(lt(flights.startedAt, sql`${query.to}::date + 1`));
   if (query.siteId) conditions.push(eq(flights.takeoffSiteId, query.siteId));
+  if (query.gliderId) conditions.push(eq(flights.gliderId, query.gliderId));
   if (query.after) {
     conditions.push(sql`(${sortKey}, ${flights.id}) < (${query.after.sortKey.toISOString()}::timestamptz, ${query.after.id}::uuid)`);
   }
@@ -76,10 +87,12 @@ export async function listLogbook(
       maxAltM: flights.maxAltM,
       thermalCount: flights.thermalCount,
       takeoffSite: SITE_COLUMNS,
+      glider: GLIDER_COLUMNS,
       sortKey,
     })
     .from(flights)
     .leftJoin(sites, eq(sites.id, flights.takeoffSiteId))
+    .leftJoin(gliders, eq(gliders.id, flights.gliderId))
     .where(and(...conditions))
     .orderBy(desc(sortKey), desc(flights.id))
     // На одну строку больше: так видно, есть ли следующая страница.
@@ -98,6 +111,7 @@ export async function listLogbook(
       maxAltM: row.maxAltM,
       thermalCount: row.thermalCount,
       takeoffSite: row.takeoffSite,
+      glider: row.glider,
     })),
     next: rows.length > query.limit && last ? { sortKey: new Date(last.sortKey), id: last.id } : null,
   };
@@ -135,7 +149,8 @@ export async function claimFlights(
   if (claims.length === 0) return [];
   const rows = await db
     .update(flights)
-    .set({ userId, claimTokenHash: null, updatedAt: new Date() })
+    // Забранный полёт получает крыло пилота по умолчанию, как и загруженный после входа.
+    .set({ userId, claimTokenHash: null, gliderId: defaultGliderId(userId), updatedAt: new Date() })
     .where(
       and(
         isNull(flights.userId),

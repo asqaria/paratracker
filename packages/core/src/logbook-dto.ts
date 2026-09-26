@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { FlightStatus } from './flight.js';
+import { GliderSummary } from './glider.js';
 import { SiteSummary } from './site-dto.js';
 
 /**
@@ -22,6 +23,8 @@ export const LogbookQuery = z.object({
   cursor: z.string().min(1).optional(),
   /** Только полёты с этого места старта (задача 2.13). */
   siteId: z.uuid().optional(),
+  /** Только полёты на этом крыле (задача 2.13б). */
+  gliderId: z.uuid().optional(),
   limit: z.coerce.number().int().min(1).max(LOGBOOK_PAGE.maxLimit).default(LOGBOOK_PAGE.defaultLimit),
 });
 export type LogbookQuery = z.infer<typeof LogbookQuery>;
@@ -40,6 +43,7 @@ export const LogbookEntry = z.object({
   thermalCount: z.number().int().nonnegative().nullable(),
   /** null — место не определено (нет рядом известного или полёт не обработан). */
   takeoffSite: SiteSummary.nullable(),
+  glider: GliderSummary.nullable(),
 });
 export type LogbookEntry = z.infer<typeof LogbookEntry>;
 

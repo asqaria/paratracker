@@ -13,6 +13,7 @@ const FLIGHT_A = 'aaaaaaaa-2222-4333-8444-555555555555';
 const FLIGHT_B = 'bbbbbbbb-2222-4333-8444-555555555555';
 const NOW = new Date(Date.UTC(2026, 8, 26, 12));
 const SITE_ID = '33333333-2222-4333-8444-555555555555';
+const GLIDER_ID = '44444444-2222-4333-8444-555555555555';
 
 const entry = (id: string, startedAt: Date | null): LogbookEntryRecord => ({
   id,
@@ -24,6 +25,7 @@ const entry = (id: string, startedAt: Date | null): LogbookEntryRecord => ({
   maxAltM: startedAt ? 3505 : null,
   thermalCount: startedAt ? 12 : null,
   takeoffSite: startedAt ? { id: SITE_ID, name: 'Ush Konyr', countryCode: 'kz', source: 'seed' } : null,
+  glider: startedAt ? { id: GLIDER_ID, manufacturer: 'Ozone', model: 'Rush 6', size: null } : null,
 });
 
 function harness(page: LogbookPage = { items: [], next: null }) {
@@ -86,6 +88,7 @@ describe('GET /logbook', () => {
       maxAltM: 3505,
       thermalCount: 12,
       takeoffSite: { id: SITE_ID, name: 'Ush Konyr', countryCode: 'kz', source: 'seed' },
+      glider: { id: GLIDER_ID, label: 'Ozone Rush 6' },
     });
     expect(body.items[1]?.startedAt).toBeNull();
     expect(h.listed[0]).toEqual({ userId: USER_ID, limit: 2, from: '2026-06-01' });
@@ -94,9 +97,13 @@ describe('GET /logbook', () => {
     await h.app.inject({ url: `/api/v1/logbook?siteId=${SITE_ID}`, cookies: await signedIn() });
     expect(h.listed[1]).toEqual({ userId: USER_ID, limit: 30, siteId: SITE_ID });
 
+    // Фильтр по крылу (задача 2.13б).
+    await h.app.inject({ url: `/api/v1/logbook?gliderId=${GLIDER_ID}`, cookies: await signedIn() });
+    expect(h.listed[2]).toEqual({ userId: USER_ID, limit: 30, gliderId: GLIDER_ID });
+
     // Курсор — как есть в следующий запрос.
     await h.app.inject({ url: `/api/v1/logbook?cursor=${body.nextCursor ?? ''}`, cookies: await signedIn() });
-    expect(h.listed[2]).toEqual({ userId: USER_ID, limit: 30, after: next });
+    expect(h.listed[3]).toEqual({ userId: USER_ID, limit: 30, after: next });
   });
 
   it('кривой курсор или лимит — 400', async () => {

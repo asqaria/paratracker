@@ -4,12 +4,14 @@ import {
   ThermalsResponse,
   WindResponse,
   type GlideDto,
+  type GliderDto,
   type ThermalDto,
 } from '@skyline/core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
 import { useMe } from '../auth/session';
+import { fetchGliders, GLIDERS_QUERY_KEY, setFlightGlider } from '../gliders/gliders-api';
 import { createSite } from '../sites/create-site';
 
 /**
@@ -71,6 +73,26 @@ export function useCreateSite(flightId: string | null): ((name: string) => Promi
     [client, flightId],
   );
   return flightId === null ? undefined : create;
+}
+
+/** Крыло своего полёта (задача 2.13б): смена и обновление панели. */
+export function useSetFlightGlider(flightId: string | null): ((gliderId: string | null) => Promise<void>) | undefined {
+  const client = useQueryClient();
+  const set = useCallback(
+    async (gliderId: string | null) => {
+      if (flightId === null) return;
+      await setFlightGlider(flightId, gliderId);
+      await client.invalidateQueries({ queryKey: ['flight-analytics', flightId] });
+    },
+    [client, flightId],
+  );
+  return flightId === null ? undefined : set;
+}
+
+/** Крылья вошедшего — для выбора в панели; не вошёл — не запрашиваем. */
+export function useOwnGliders(): GliderDto[] | undefined {
+  const me = useMe();
+  return useQuery({ queryKey: GLIDERS_QUERY_KEY, queryFn: () => fetchGliders(), enabled: Boolean(me) }).data;
 }
 
 /** null — демо-трек: его нет в API, панели нет. */

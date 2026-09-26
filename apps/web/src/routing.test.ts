@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { AUTH_FAILED_HASH, flightHash, HEALTH_HASH, LOGBOOK_HASH, routeFromHash, trackUrlFromHash } from './routing';
+import {
+  AUTH_FAILED_HASH,
+  flightHash,
+  HEALTH_HASH,
+  LOGBOOK_HASH,
+  routeFromHash,
+  SETTINGS_HASH,
+  trackUrlFromHash,
+} from './routing';
 
 describe('trackUrlFromHash', () => {
   it('полёт по id — .track из API', () => {
@@ -29,8 +37,9 @@ describe('routeFromHash', () => {
     expect(routeFromHash(AUTH_FAILED_HASH)).toEqual({ kind: 'landing', authFailed: true });
   });
 
-  it('логбук — отдельный маршрут', () => {
+  it('логбук и настройки — отдельные маршруты', () => {
     expect(routeFromHash(LOGBOOK_HASH)).toEqual({ kind: 'logbook' });
+    expect(routeFromHash(SETTINGS_HASH)).toEqual({ kind: 'settings' });
   });
 
   it('состояние сервисов — отдельный маршрут', () => {

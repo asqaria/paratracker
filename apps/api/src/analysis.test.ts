@@ -15,6 +15,7 @@ import { buildApp } from './app.js';
 const FLIGHT_ID = '11111111-2222-4333-8444-555555555555';
 const T0 = Date.UTC(2026, 6, 15, 10);
 const SITE_ID = '33333333-2222-4333-8444-555555555555';
+const GLIDER_ID = '44444444-2222-4333-8444-555555555555';
 
 const details = (overrides: Partial<FlightDetailsRecord> = {}): FlightDetailsRecord => ({
   id: FLIGHT_ID,
@@ -32,6 +33,8 @@ const details = (overrides: Partial<FlightDetailsRecord> = {}): FlightDetailsRec
   userId: null,
   takeoffSite: { id: SITE_ID, name: 'Ush Konyr', countryCode: 'kz', source: 'seed' },
   landingSite: null,
+  glider: { id: GLIDER_ID, manufacturer: 'Ozone', model: 'Rush 6', size: 'ML' },
+  gliderRaw: 'OZONE Rush6',
   ...overrides,
 });
 
@@ -107,6 +110,8 @@ describe('GET /api/v1/flights/:id', () => {
       wind: { speedMs: 3.63, dirDeg: 44 },
       takeoffSite: { id: SITE_ID, name: 'Ush Konyr', countryCode: 'kz', source: 'seed' },
       landingSite: null,
+      glider: { id: GLIDER_ID, label: 'Ozone Rush 6 ML' },
+      gliderRaw: 'OZONE Rush6',
       // Аноним смотрит анонимный полёт — править нечего.
       canEdit: false,
     });

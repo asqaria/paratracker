@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { GLIDE_KINDS, THERMAL_STRENGTHS, TURN_DIRECTIONS } from './derived.js';
 import { AnalysisLevel, FlightStatus } from './flight.js';
+import { GliderSummary } from './glider.js';
 import { SiteSummary } from './site-dto.js';
 
 /**
@@ -38,6 +39,10 @@ export const FlightDetailsResponse = z.object({
   /** Место старта и посадки (задача 2.13); null — рядом нет известного места. */
   takeoffSite: SiteSummary.nullable(),
   landingSite: SiteSummary.nullable(),
+  /** Крыло полёта (задача 2.13б); null — не указано. */
+  glider: GliderSummary.nullable(),
+  /** Модель крыла, записанная прибором (IGC HFGTY) — подсказка, когда крыло не выбрано. */
+  gliderRaw: z.string().nullable(),
   /** Спрашивающий — владелец полёта: может добавить место, править полёт. */
   canEdit: z.boolean(),
 });

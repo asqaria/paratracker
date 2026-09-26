@@ -54,6 +54,8 @@ export interface PipelineSuccess {
   /** Взлёт и посадка по скорости (flightRange): по ним ищется место старта (§6.8). */
   takeoff: FlightPoint;
   landing: FlightPoint;
+  /** Модель крыла из заголовка файла (IGC HFGTY); null — прибор не записал. */
+  gliderRaw: string | null;
 }
 
 export type PipelineMessage =
@@ -156,6 +158,7 @@ export function runPipeline(message: PipelineTaskMessage, onProgress: (value: nu
       simplified,
       takeoff: pointAt(range.takeoff),
       landing: pointAt(range.landing),
+      gliderRaw: track.meta.glider?.trim() || null,
     },
   };
 }

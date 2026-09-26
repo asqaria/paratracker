@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { REFRESH_URL } from '../auth/session';
-import { CLAIM_URL, fetchLogbookPage, LOGBOOK_URL, postClaims } from './fetch-logbook';
+import { CLAIM_URL, fetchLogbookPage, LOGBOOK_URL, NO_FILTERS, postClaims } from './fetch-logbook';
 
 const FLIGHT = '11111111-2222-4333-8444-555555555555';
 
@@ -20,21 +20,25 @@ describe('fetchLogbookPage', () => {
   it('первая страница без курсора, следующая — с курсором как есть', async () => {
     const page = { items: [], nextCursor: null };
     const { calls, fetchImpl } = scripted([json(page), json(page), json(page)]);
-    await fetchLogbookPage(null, null, fetchImpl);
-    await fetchLogbookPage('abc_-1', null, fetchImpl);
-    await fetchLogbookPage(null, FLIGHT, fetchImpl);
-    expect(calls.map((c) => c.url)).toEqual([LOGBOOK_URL, `${LOGBOOK_URL}?cursor=abc_-1`, `${LOGBOOK_URL}?siteId=${FLIGHT}`]);
+    await fetchLogbookPage(null, NO_FILTERS, fetchImpl);
+    await fetchLogbookPage('abc_-1', NO_FILTERS, fetchImpl);
+    await fetchLogbookPage(null, { siteId: FLIGHT, gliderId: FLIGHT }, fetchImpl);
+    expect(calls.map((c) => c.url)).toEqual([
+      LOGBOOK_URL,
+      `${LOGBOOK_URL}?cursor=abc_-1`,
+      `${LOGBOOK_URL}?siteId=${FLIGHT}&gliderId=${FLIGHT}`,
+    ]);
   });
 
   it('access истёк — обновляет сессию и повторяет', async () => {
     const { calls, fetchImpl } = scripted([json({}, 401), new Response(null, { status: 204 }), json({ items: [], nextCursor: null })]);
-    await expect(fetchLogbookPage(null, null, fetchImpl)).resolves.toEqual({ items: [], nextCursor: null });
+    await expect(fetchLogbookPage(null, NO_FILTERS, fetchImpl)).resolves.toEqual({ items: [], nextCursor: null });
     expect(calls.map((c) => c.url)).toEqual([LOGBOOK_URL, REFRESH_URL, LOGBOOK_URL]);
   });
 
   it('сессии нет — ошибка', async () => {
     const { fetchImpl } = scripted([json({}, 401), json({}, 401)]);
-    await expect(fetchLogbookPage(null, null, fetchImpl)).rejects.toThrow(/401/);
+    await expect(fetchLogbookPage(null, NO_FILTERS, fetchImpl)).rejects.toThrow(/401/);
   });
 });
 

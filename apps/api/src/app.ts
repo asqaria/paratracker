@@ -4,6 +4,7 @@ import { registerAnalysisRoutes, type AnalysisRoutesDeps } from './analysis.js';
 import { registerAuthHook, registerAuthRoutes, type AuthDeps } from './auth/routes.js';
 import { API_V1_PREFIX } from './constants.js';
 import { registerFlightRoutes, type FlightRoutesDeps } from './flights.js';
+import { registerGliderRoutes, type GliderRoutesDeps } from './gliders.js';
 import { registerHealthRoutes, type HealthRouteOptions } from './health.js';
 import { registerLogbookRoutes, type LogbookRoutesDeps } from './logbook.js';
 import { registerProblemHandlers } from './problem.js';
@@ -26,6 +27,8 @@ export interface AppOptions {
   logbook?: LogbookRoutesDeps;
   /** Места старта; как и логбук — только со входом. */
   sites?: SiteRoutesDeps;
+  /** Крылья пилота и крыло полёта (задача 2.13б); только со входом. */
+  gliders?: GliderRoutesDeps;
 }
 
 export function buildApp(options: AppOptions): FastifyInstance {
@@ -39,6 +42,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       if (options.auth) registerAuthRoutes(v1, options.auth);
       if (options.auth && options.logbook) registerLogbookRoutes(v1, options.logbook);
       if (options.auth && options.sites) registerSiteRoutes(v1, options.sites);
+      if (options.auth && options.gliders) registerGliderRoutes(v1, options.gliders);
       if (options.flights) registerFlightRoutes(v1, options.flights);
       if (options.analysis) registerAnalysisRoutes(v1, options.analysis);
       if (options.tiles) registerTileRoutes(v1, options.tiles);
