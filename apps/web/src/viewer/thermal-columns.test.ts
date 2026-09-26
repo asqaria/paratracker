@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { COLUMN_ALPHA, currentColumn, THERMAL_COLUMN, thermalColumns, type ColumnTrack } from './thermal-columns';
+import { COLUMN_ALPHA, columnStates, currentColumn, THERMAL_COLUMN, thermalColumns, type ColumnTrack } from './thermal-columns';
 import { varioRgb } from './vario-palette';
 
 /**
@@ -88,5 +88,31 @@ describe('currentColumn и прозрачность', () => {
 
   it('текущая плотнее остальных', () => {
     expect(COLUMN_ALPHA.current).toBeGreaterThan(COLUMN_ALPHA.other);
+  });
+});
+
+describe('columnStates — какие колонны видны и какая выделена', () => {
+  const columns = thermalColumns(spiralTrack(), [thermal]);
+  const inside = thermal.startMs + 1000;
+
+  it('«Весь» — все видны; пилот в термике со стороны (Free, Top) — выделена', () => {
+    expect(columnStates(columns, { timeMs: inside, style: 'highlight', flown: false })).toEqual([{ show: true, highlighted: true }]);
+    expect(columnStates(columns, { timeMs: thermal.startMs - 1000, style: 'highlight', flown: false })).toEqual([
+      { show: true, highlighted: false },
+    ]);
+  });
+
+  it('«Пройденный» — колонна появляется, когда пилот входит в термик', () => {
+    expect(columnStates(columns, { timeMs: thermal.startMs - 1000, style: 'highlight', flown: true })).toEqual([
+      { show: false, highlighted: false },
+    ]);
+    expect(columnStates(columns, { timeMs: inside, style: 'highlight', flown: true })).toEqual([{ show: true, highlighted: true }]);
+    expect(columnStates(columns, { timeMs: thermal.endMs + 60_000, style: 'highlight', flown: true })).toEqual([
+      { show: true, highlighted: false },
+    ]);
+  });
+
+  it('следящая камера у стенки — колонна, где пилот, скрыта в любом режиме', () => {
+    expect(columnStates(columns, { timeMs: inside, style: 'hide', flown: false })).toEqual([{ show: false, highlighted: false }]);
   });
 });
