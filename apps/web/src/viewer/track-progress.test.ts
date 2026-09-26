@@ -2,14 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  chunkRanges,
-  COMPACT_MEDIA_QUERY,
-  flownVertexCount,
-  progressOf,
-  trackWidths,
-  TRACK_CHUNK_POINTS,
-} from './track-progress';
+import { chunkRanges, chunkShare, COMPACT_MEDIA_QUERY, flownVertexCount, progressOf, TRACK_CHUNK_POINTS, trackWidths } from './track-progress';
 
 /**
  * «Пройденный путь»: трек нарезан на куски, каждый со своим флагом показа,
@@ -103,5 +96,30 @@ describe('COMPACT_MEDIA_QUERY — те же пороги, что у вариан
     }
     expect(COMPACT_MEDIA_QUERY).toContain('max-width');
     expect(COMPACT_MEDIA_QUERY).toContain('max-height');
+  });
+});
+
+describe('chunkShare — доля куска тени до пилота', () => {
+  // Отрезки 10, 30, 60 м; вершины — раз в секунду.
+  const lengths = [10, 30, 60];
+  const times = [0, 1000, 2000, 3000];
+
+  it('по длине, а не по номеру вершины: пройдены отрезки плюс доля текущего по времени', () => {
+    expect(chunkShare(lengths, times, 0, 0, 0)).toBe(0);
+    expect(chunkShare(lengths, times, 0, 0, 500)).toBeCloseTo(0.05, 9);
+    expect(chunkShare(lengths, times, 0, 1, 1000)).toBeCloseTo(0.1, 9);
+    expect(chunkShare(lengths, times, 0, 2, 2500)).toBeCloseTo(0.7, 9);
+    expect(chunkShare(lengths, times, 0, 3, 3000)).toBe(1);
+  });
+
+  it('плавно: доля растёт непрерывно между вершинами', () => {
+    for (let ms = 1000; ms < 2000; ms += 100) {
+      expect(chunkShare(lengths, times, 0, 1, ms + 100) - chunkShare(lengths, times, 0, 1, ms)).toBeCloseTo(0.03, 9);
+    }
+  });
+
+  it('пилот ещё не в куске — ноль; нулевая длина — ноль', () => {
+    expect(chunkShare(lengths, times, 1, 0, 500)).toBe(0);
+    expect(chunkShare([0, 0], [0, 1000, 2000], 0, 1, 1500)).toBe(0);
   });
 });
