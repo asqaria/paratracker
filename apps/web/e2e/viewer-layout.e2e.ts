@@ -138,10 +138,13 @@ for (const viewport of VIEWPORTS) {
         const attribution = page.locator('[data-panel="attribution"]');
         const toggle = attribution.getByRole('button');
         await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-        const collapsed = (await attribution.boundingBox())?.height ?? 0;
+        // Раскрытая — полный текст лицензий: он длиннее свёрнутой строки. Высота
+        // может не измениться (у Esri полный текст помещается в строку).
+        const shown = async (): Promise<string> => (await attribution.locator('p:visible').innerText()).trim();
+        const collapsed = await shown();
         await toggle.click();
         await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-        expect((await attribution.boundingBox())?.height ?? 0).toBeGreaterThan(collapsed);
+        expect((await shown()).length).toBeGreaterThan(collapsed.length);
       });
     }
   });

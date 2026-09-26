@@ -10,7 +10,12 @@
 /** Что рисовать: весь трек или только путь до пилота. */
 export const TRACK_SHOWN = ['all', 'flown'] as const;
 export type TrackShown = (typeof TRACK_SHOWN)[number];
-export const DEFAULT_TRACK_SHOWN: TrackShown = 'all';
+/**
+ * По умолчанию — пройденный путь (решение владельца): при проигрывании трек
+ * рисуется за пилотом, полёт разворачивается как история, а не висит сразу
+ * целиком. «Весь» — одной кнопкой.
+ */
+export const DEFAULT_TRACK_SHOWN: TrackShown = 'flown';
 
 /**
  * Вершин в куске. Мельче — больше инстансов (на 30 тыс. точек при 32 — около

@@ -126,6 +126,15 @@ export function availableImagery(
 }
 
 /**
+ * Подложка по умолчанию — Esri, если сервер её подтвердил (решение владельца:
+ * суб-метровые снимки над населёнными местами), иначе Sentinel-2. При отказе
+ * тайлов Esri сцена сама откатывается на Sentinel-2 (tileFailureTracker).
+ */
+export function preferredImagery(available: readonly ImagerySource[]): ImageryId {
+  return available.some((source) => source.id === 'esri') ? 'esri' : 'sentinel2';
+}
+
+/**
  * Ошибок тайлов подряд, после которых подложка считается сломанной и сцена
  * откатывается на Sentinel-2. Одиночная ошибка тайла — обычное дело и
  * подложку срывать не должна; восемь — это уже экран без снимков.
