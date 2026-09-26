@@ -169,7 +169,13 @@ export function addGlider(
     orientation,
     model: {
       uri: `${import.meta.env.BASE_URL}${PARAGLIDER_MODEL_PATH}`,
-      minimumPixelSize: GLIDER_MIN_PIXEL_SIZE,
+      // Не мельче 48 px — только в воздухе. Cesium увеличивает модель вокруг
+      // точки подвеса, а на земле крыло и ноги ниже неё: издалека они уходили
+      // в склон пропорционально увеличению. На земле — настоящий размер.
+      minimumPixelSize: new CallbackProperty(
+        (time) => (time && poseAt(JulianDate.toDate(time).getTime()).pilot !== 'flying' ? 0 : GLIDER_MIN_PIXEL_SIZE),
+        false,
+      ),
       maximumScale: GLIDER_MAX_SCALE,
       nodeTransformations: nodeTransformations(poseAt, lyingAt, () => frame),
     },
