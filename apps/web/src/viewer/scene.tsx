@@ -101,7 +101,7 @@ import { buildTrackGeometry } from './track-geometry';
 import { flownByTime, smoothTrack } from './track-smooth';
 import { CURTAIN, curtainInMode, curtainOnByDefault, curtainPieces, curtainSamples, curtainSegmentsShown } from './curtain';
 import { CurtainLayer } from './curtain-layer';
-import { currentColumn, thermalColumns, type ThermalColumn } from './thermal-columns';
+import { columnStates, thermalColumns, type ThermalColumn } from './thermal-columns';
 import { ThermalLayer } from './thermal-layer';
 import { TrackLayer } from './track-layer';
 import {
@@ -779,11 +779,12 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
   }, [columnsShown, sceneTrack, analyticsData]);
 
   // Термик, в котором пилот: со стороны (Free, Top) — плотнее; из следящей камеры,
-  // которая у самого пилота, то есть у стенки колонны, — скрыт.
+  // которая у самого пилота, то есть у стенки колонны, — скрыт. «Пройденный» —
+  // колонна появляется, когда пилот входит в термик.
   useEffect(() => {
     const style = cameraMode === 'free' || cameraMode === 'top' ? 'highlight' : 'hide';
-    thermalLayerRef.current?.setCurrent(currentColumn(columnsRef.current, timeMs), style);
-  }, [timeMs, cameraMode, sceneTrack, analyticsData]);
+    thermalLayerRef.current?.setStates(columnStates(columnsRef.current, { timeMs, style, flown: trackShown === 'flown' }));
+  }, [timeMs, cameraMode, trackShown, sceneTrack, analyticsData]);
 
   /**
    * Клик по сегменту в аналитике: время — на его начало. Следящие камеры

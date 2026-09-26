@@ -14,7 +14,7 @@ import {
   type Scene,
 } from 'cesium';
 
-import { COLUMN_ALPHA, type CurrentColumnStyle, type ThermalColumn } from './thermal-columns';
+import { COLUMN_ALPHA, type ColumnState, type ThermalColumn } from './thermal-columns';
 
 /**
  * Колонны термиков (ТЗ §7.2, задача 2.7): ОДИН Primitive, по экземпляру на
@@ -65,9 +65,9 @@ const colorOf = (column: ThermalColumn, alpha: number): Color =>
 
 export class ThermalLayer {
   private readonly primitive: Primitive | null;
-  /** Выделенная сейчас и та, что нужно выделить: атрибуты доступны лишь у готового примитива. */
-  private current: { index: number | null; style: CurrentColumnStyle } = { index: null, style: 'highlight' };
-  private wanted: { index: number | null; style: CurrentColumnStyle } = { index: null, style: 'highlight' };
+  /** Состояние колонн — применённое и заказанное: атрибуты доступны лишь у готового примитива. */
+  private applied: ColumnState[] = [];
+  private wanted: ColumnState[] = [];
   private readonly stopListening: () => void;
 
   constructor(
@@ -109,7 +109,7 @@ export class ThermalLayer {
     scene.primitives.add(this.primitive);
     // Подсветка, заказанная до готовности примитива, применяется после кадра, в котором он собрался.
     this.stopListening = scene.postRender.addEventListener(() => {
-      if (this.wanted.index !== this.current.index || this.wanted.style !== this.current.style) this.apply();
+      if (this.wanted !== this.applied) this.apply();
     });
   }
 
@@ -117,29 +117,28 @@ export class ThermalLayer {
     if (this.primitive) this.primitive.show = visible;
   }
 
-  /** Выделить колонну с номером index (в выходе thermalColumns); null — ни одну. */
-  setCurrent(index: number | null, style: CurrentColumnStyle): void {
-    this.wanted = { index, style };
+  /** Видимость и выделение колонн (columnStates); меняются только изменившиеся. */
+  setStates(states: ColumnState[]): void {
+    this.wanted = states;
     this.apply();
   }
 
   private apply(): void {
-    const { index, style } = this.wanted;
     if (!this.primitive?.ready) return;
-    if (index === this.current.index && style === this.current.style) return;
-    for (const k of new Set([this.current.index, index])) {
-      if (k === null) continue;
+    const wanted = this.wanted;
+    let changed = false;
+    wanted.forEach((state, k) => {
+      const before = this.applied[k];
+      if (before && before.show === state.show && before.highlighted === state.highlighted) return;
       const column = this.columns[k];
-      const attributes = this.primitive.getGeometryInstanceAttributes(k) as { color?: Uint8Array; show?: Uint8Array } | undefined;
-      if (!column || !attributes) continue;
-      const isCurrent = k === index;
-      attributes.color = ColorGeometryInstanceAttribute.toValue(
-        colorOf(column, isCurrent && style === 'highlight' ? COLUMN_ALPHA.current : COLUMN_ALPHA.other),
-      );
-      attributes.show = ShowGeometryInstanceAttribute.toValue(!(isCurrent && style === 'hide'));
-    }
-    this.current = { index, style };
-    this.scene.requestRender();
+      const attributes = this.primitive?.getGeometryInstanceAttributes(k) as { color?: Uint8Array; show?: Uint8Array } | undefined;
+      if (!column || !attributes) return;
+      attributes.color = ColorGeometryInstanceAttribute.toValue(colorOf(column, state.highlighted ? COLUMN_ALPHA.current : COLUMN_ALPHA.other));
+      attributes.show = ShowGeometryInstanceAttribute.toValue(state.show);
+      changed = true;
+    });
+    this.applied = wanted;
+    if (changed) this.scene.requestRender();
   }
 
   destroy(): void {

@@ -109,3 +109,27 @@ export function currentColumn(columns: readonly ThermalColumn[], timeMs: number)
   const found = columns.findIndex((c) => timeMs >= c.startMs && timeMs <= c.endMs);
   return found === -1 ? null : found;
 }
+
+export interface ColumnState {
+  show: boolean;
+  /** Плотнее остальных: пилот в этом термике, камера смотрит со стороны. */
+  highlighted: boolean;
+}
+
+/**
+ * Видимость и выделение каждой колонны в момент timeMs. «Пройденный» (flown) —
+ * колонна появляется, когда пилот входит в термик: полёт разворачивается как
+ * история, впереди колонн нет. Колонна, где пилот: со стороны — выделена,
+ * из следящей камеры (она у стенки колонны) — скрыта.
+ */
+export function columnStates(
+  columns: readonly ThermalColumn[],
+  { timeMs, style, flown }: { timeMs: number; style: CurrentColumnStyle; flown: boolean },
+): ColumnState[] {
+  const current = currentColumn(columns, timeMs);
+  return columns.map((column, k) => {
+    const isCurrent = k === current;
+    const reached = !flown || column.startMs <= timeMs;
+    return { show: reached && !(isCurrent && style === 'hide'), highlighted: isCurrent && style === 'highlight' };
+  });
+}
