@@ -84,3 +84,21 @@ export function gliderAttitude(track: AttitudeTrack, timeMs: number, inFlight: b
   const bank = Math.atan((speed * turnRadS) / STANDARD_GRAVITY_MS2) / DEG;
   return { headingDeg, bankDeg: Math.max(-MAX_BANK_DEG, Math.min(MAX_BANK_DEG, bank)) };
 }
+
+/** Сколько секунд полёта после взлёта искать направление разбега. */
+export const LAUNCH_SEARCH_S = 30;
+
+/**
+ * Направление разбега — курс в первые секунды после взлёта. До взлёта пилот,
+ * стоящий на месте, курса не имеет, и модель смотрела на север: крыло,
+ * разложенное «позади», ложилось куда придётся — на склоне часто вниз и в
+ * воздух или вверх и в гору. На старте пилот стоит лицом к разбегу, крыло —
+ * за спиной вверх по склону. NaN — курса не нашлось.
+ */
+export function launchHeadingDeg(track: TargetTrack, takeoffMs: number): number {
+  for (let s = 0; s <= LAUNCH_SEARCH_S; s++) {
+    const heading = headingAt(track, takeoffMs + s * MS_PER_S);
+    if (!Number.isNaN(heading)) return heading;
+  }
+  return Number.NaN;
+}

@@ -26,12 +26,24 @@ export const POSE = {
   /** После касания купол опадает за столько секунд. */
   collapseS: 3,
   /**
-   * Лежащее крыло: купол повёрнут вокруг точки подвеса назад на этот угол —
-   * как маятник, стропы остаются у пилота. 98° = 90° плюс наклон строп к
-   * земле: подвеска в метре над землёй, купол — в 7.4 м, asin(1 / 7.4) ≈ 8°.
-   * Купол ложится дугой позади пилота — так крыло раскладывают перед стартом.
+   * Лежащее крыло: купол повёрнут вокруг точки подвеса назад, как маятник,
+   * стропы остаются у пилота; угол — чтобы верх купола лёг на рельеф позади
+   * (lyingAngleDeg). На ровной площадке — 98° = 90° плюс наклон строп к земле:
+   * подвеска в метре над землёй, купол — в canopyTopM, asin(1 / 7.2) ≈ 8°.
+   * Фиксированный угол на старте, где склон за спиной поднимается, клал
+   * купол внутрь горы.
    */
   lyingAngleDeg: 98,
+  /** Верх купола над точкой подвеса, м (make-paraglider.mjs, CANOPY_TOP_M). */
+  canopyTopM: 7.2,
+  /**
+   * Пределы угла: не круче, чем на 20° ниже горизонта (за обрывом купол
+   * висел бы вниз), и не выше 30° от вертикали (склон круче — лежит на нём
+   * насколько можно, но не стоит свечой).
+   */
+  lyingLimitsDeg: { min: 30, max: 110 },
+  /** Позади пилота по горизонтали — где лежит верх купола, м: canopyTopM · sin 98°. */
+  lyingBehindM: 7.1,
   /** Лежащее крыло сплющено по хорде до этой доли — лежит на земле, а не стоит ребром. */
   lyingFlatten: 0.12,
   /** Размах шага ноги, градусы, и частота шагового цикла, Гц. */
@@ -120,30 +132,42 @@ const aroundX = (radians: number): Quat => (radians === 0 ? IDENTITY_ROTATION : 
 const smoothstep = (x: number): number => x * x * (3 - 2 * x);
 
 /**
- * Купол — маятник вокруг точки подвеса: лежит позади (повёрнут на
- * POSE.lyingAngleDeg и сплющен по хорде), поднимается над головой, опадает.
+ * Угол раскладки, градусы: при нём верх купола на радиусе canopyTopM от
+ * подвески — на высоте groundAboveHarnessM (рельеф позади минус подвеска).
+ * Не известен — угол ровной площадки.
+ */
+export function lyingAngleDeg(groundAboveHarnessM: number): number {
+  if (!Number.isFinite(groundAboveHarnessM)) return POSE.lyingAngleDeg;
+  const cosine = Math.min(1, Math.max(-1, groundAboveHarnessM / POSE.canopyTopM));
+  const angle = Math.acos(cosine) / DEG;
+  return Math.min(POSE.lyingLimitsDeg.max, Math.max(POSE.lyingLimitsDeg.min, angle));
+}
+
+/**
+ * Купол — маятник вокруг точки подвеса: лежит позади (повёрнут на угол
+ * раскладки и сплющен по хорде), поднимается над головой, опадает.
  * Стропы — в том же узле и поворачиваются с ним: всегда идут от пилота.
  */
-function canopyTransform(pose: GliderPose): NodeTransform {
+function canopyTransform(pose: GliderPose, lyingDeg: number): NodeTransform {
   if (pose.wing === 'packed') return HIDDEN;
   if (pose.wing === 'flying') return SHOWN;
   const q = smoothstep(Math.min(1, Math.max(0, pose.wingProgress)));
   if (q === 1) return SHOWN;
   return {
     translation: [0, 0, 0],
-    rotation: aroundX(-POSE.lyingAngleDeg * DEG * (1 - q)),
+    rotation: aroundX(-lyingDeg * DEG * (1 - q)),
     scale: [1, 1, POSE.lyingFlatten + (1 - POSE.lyingFlatten) * q],
   };
 }
 
-/** Преобразования всех узлов модели для позы. */
-export function nodeTransforms(pose: GliderPose): Record<GliderNode, NodeTransform> {
+/** Преобразования всех узлов модели для позы; lyingDeg — угол раскладки по рельефу (lyingAngleDeg). */
+export function nodeTransforms(pose: GliderPose, lyingDeg: number = POSE.lyingAngleDeg): Record<GliderNode, NodeTransform> {
   const flying = pose.pilot === 'flying';
   const gait = pose.pilot === 'walking' || pose.pilot === 'running' ? POSE.gait[pose.pilot] : null;
   const swing = gait ? gait.amplitudeDeg * DEG * Math.sin(pose.gaitPhase) : 0;
   const leg = (sign: 1 | -1): NodeTransform => (flying ? HIDDEN : { ...SHOWN, rotation: aroundX(sign * swing) });
   return {
-    canopy: canopyTransform(pose),
+    canopy: canopyTransform(pose, lyingDeg),
     'pilot-seated': flying ? SHOWN : HIDDEN,
     'pilot-standing': flying ? HIDDEN : { ...SHOWN, rotation: aroundX(pose.pilot === 'running' ? POSE.runLeanDeg * DEG : 0) },
     'leg-left': leg(1),

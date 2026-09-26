@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { shortestTurn } from './camera-modes';
-import { gliderAttitude, MAX_BANK_DEG } from './glider-attitude';
+import { gliderAttitude, launchHeadingDeg, MAX_BANK_DEG } from './glider-attitude';
 
 import type { AttitudeTrack } from './glider-attitude';
 
@@ -102,5 +102,25 @@ describe('gliderAttitude — как стоит крыло', () => {
     const pose = gliderAttitude(standing, at(60), true);
     expect(pose.headingDeg).toBeNaN();
     expect(pose.bankDeg).toBe(0);
+  });
+});
+
+describe('launchHeadingDeg — пилот на старте лицом к разбегу', () => {
+  it('курс первых секунд после взлёта: стоял — разбежался на восток', () => {
+    const n = 200;
+    const t = Float64Array.from({ length: n }, (_, i) => i * 1000);
+    // 60 с стоит, потом летит на восток 10 м/с.
+    const lon = Float64Array.from({ length: n }, (_, i) => 76.9 + (Math.max(0, i - 60) * 10) / 81_000);
+    const lat = new Float64Array(n).fill(43.2);
+    const alt = new Float64Array(n).fill(1500);
+    const heading = launchHeadingDeg({ t, lat, lon, alt }, 60_000);
+    expect(Math.abs(heading - 90)).toBeLessThan(2);
+  });
+
+  it('после взлёта курса нет (стоит всю запись) — NaN', () => {
+    const n = 100;
+    const t = Float64Array.from({ length: n }, (_, i) => i * 1000);
+    const still = { t, lat: new Float64Array(n).fill(43.2), lon: new Float64Array(n).fill(76.9), alt: new Float64Array(n).fill(1500) };
+    expect(launchHeadingDeg(still, 10_000)).toBeNaN();
   });
 });

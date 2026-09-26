@@ -44,11 +44,13 @@ import {
   wheelZoomInPx,
   zoomBy,
   type CameraAdjust,
+  type HeadingPitchRangeDeg,
 } from './camera-input';
 import { travelCourse } from './camera-course';
 import { cameraTarget, easeHalfWidth, targetHalfWidthS } from './camera-target';
+import { pitchClearingGround } from './ground-clearance';
 import { addGlider } from './glider';
-import { gliderAttitude } from './glider-attitude';
+import { gliderAttitude, launchHeadingDeg } from './glider-attitude';
 import { gliderPose } from './glider-pose';
 import {
   CAMERA_POSES,
@@ -136,6 +138,9 @@ export interface SceneProps {
  */
 const MAX_PIXEL_RATIO = 2;
 
+/** Проходов подъёма камеры над склоном: после первого она над другой точкой склона. */
+const CAMERA_CLEARANCE_PASSES = 2;
+
 /** Перелёт свободной камеры к сегменту из аналитики: длительность, наклон, дальность в радиусах сегмента. */
 const SEGMENT_FLIGHT_S = 1.2;
 const SEGMENT_PITCH_DEG = -35;
@@ -214,6 +219,30 @@ async function calibratedForScene(
   });
   const filled = fillTerrain(track.t, terrainHeights, range);
   return { ...track, alt: settleOnGround(track.t, calibrated, filled, range) };
+}
+
+/**
+ * Камера смотрит на цель с позы; если под камерой склон выше неё — наклон
+ * круче, камера поднимается над склоном по дуге на той же дальности. Рельеф —
+ * тот, что сцена рисует сейчас; два прохода: после подъёма камера над другой
+ * точкой склона.
+ */
+function lookAtAboveGround(viewer: Viewer, target: Cartesian3, targetM: number, pose: HeadingPitchRangeDeg): void {
+  let pitchDeg = pose.pitchDeg;
+  for (let pass = 0; pass < CAMERA_CLEARANCE_PASSES; pass++) {
+    viewer.camera.lookAt(
+      target,
+      new HeadingPitchRange(CesiumMath.toRadians(pose.headingDeg), CesiumMath.toRadians(pitchDeg), pose.rangeM),
+    );
+    const place = Cartographic.fromCartesian(viewer.camera.positionWC);
+    const next = place ? pitchClearingGround({ pitchDeg, rangeM: pose.rangeM }, targetM, viewer.scene.globe.getHeight(place)) : pitchDeg;
+    if (next === pitchDeg) return;
+    pitchDeg = next;
+  }
+  viewer.camera.lookAt(
+    target,
+    new HeadingPitchRange(CesiumMath.toRadians(pose.headingDeg), CesiumMath.toRadians(pitchDeg), pose.rangeM),
+  );
 }
 
 /** Поправки мыши для следящего режима; у Free их нет — там управляет Cesium. */
@@ -454,12 +483,15 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
         clockRef.current = flightClock;
         // Пилот — модель параплана: курс по сглаженной траектории, крен в вираже.
         // На земле (до взлёта, после посадки) — без крена.
+        const launchHeading = launchHeadingDeg(shown, track.t[range.takeoff] ?? Number.NaN);
         addGlider(
           viewer,
           flightClock.position,
           (timeMs) => {
             const at = indexAt(track.t, timeMs);
-            return gliderAttitude(shown, timeMs, at >= range.takeoff && at <= range.landing);
+            const attitude = gliderAttitude(shown, timeMs, at >= range.takeoff && at <= range.landing);
+            // До взлёта стоит на месте — лицом к разбегу: крыло за спиной ляжет вверх по склону.
+            return Number.isNaN(attitude.headingDeg) && at <= range.takeoff ? { ...attitude, headingDeg: launchHeading } : attitude;
           },
           // На земле — стоит, идёт, разбег с подъёмом крыла, посадка (glider-pose.ts).
           (timeMs) => gliderPose(track, range, timeMs),
@@ -514,14 +546,7 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
           const pose = poseFor(mode, adjust, smoothHeadingRef.current.headingDeg);
           // NaN в lookAt останавливает рендер Cesium целиком — лучше пропустить кадр.
           if (![pose.headingDeg, pose.pitchDeg, pose.rangeM].every(Number.isFinite)) return;
-          viewer.camera.lookAt(
-            position,
-            new HeadingPitchRange(
-              CesiumMath.toRadians(pose.headingDeg),
-              CesiumMath.toRadians(pose.pitchDeg),
-              pose.rangeM,
-            ),
-          );
+          lookAtAboveGround(viewer, position, aim.alt, pose);
         };
         scene.preRender.addEventListener(onPreRender);
 
@@ -621,10 +646,8 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
       const toLocal = Matrix4.inverseTransformation(Transforms.eastNorthUpToFixedFrame(pilot), new Matrix4());
       const local = Matrix4.multiplyByPoint(toLocal, viewer.camera.positionWC, new Cartesian3());
       const next = orbitAroundPilot(hprFromOffset({ east: local.x, north: local.y, up: local.z }), dx, dy);
-      viewer.camera.lookAt(
-        pilot,
-        new HeadingPitchRange(CesiumMath.toRadians(next.headingDeg), CesiumMath.toRadians(next.pitchDeg), next.rangeM),
-      );
+      const pilotM = Cartographic.fromCartesian(pilot)?.height ?? Number.NaN;
+      lookAtAboveGround(viewer, pilot, pilotM, next);
       viewer.camera.lookAtTransform(Matrix4.IDENTITY);
     };
 
