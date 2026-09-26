@@ -7,8 +7,9 @@ import { resolveShare, withShare } from './sharing-api';
 /**
  * Полёт по ссылке «по ссылке» (#/s/{токен}, задача 3.7): без входа. Токен
  * идёт во все запросы полёта — без него посторонний полёт не увидит.
+ * embed — тот же полёт в iframe чужого сайта (/embed/{токен}, задача 3.9).
  */
-export function SharedFlightPage({ token }: { token: string }) {
+export function SharedFlightPage({ token, embed = false }: { token: string; embed?: boolean }) {
   const t = useT();
   const locale = useLocaleStore((state) => state.locale);
   const flight = useQuery({ queryKey: ['share', token], queryFn: () => resolveShare(token), retry: false, staleTime: Infinity });
@@ -27,7 +28,7 @@ export function SharedFlightPage({ token }: { token: string }) {
           <p role="alert" className="text-lg">
             {t('share.notFound')}
           </p>
-          <a href="#/" className="mt-4 inline-block text-accent">
+          <a href="/#/" {...(embed ? { target: '_blank', rel: 'noopener' } : {})} className="mt-4 inline-block text-accent">
             {t('app.name')}
           </a>
         </div>
@@ -35,6 +36,11 @@ export function SharedFlightPage({ token }: { token: string }) {
     );
   }
   return (
-    <FlightViewerPage flightId={flight.data} trackUrl={withShare(`/api/v1/flights/${flight.data}/track`, token)} share={token} />
+    <FlightViewerPage
+      flightId={flight.data}
+      trackUrl={withShare(`/api/v1/flights/${flight.data}/track`, token)}
+      share={token}
+      embed={embed}
+    />
   );
 }

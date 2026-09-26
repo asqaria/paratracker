@@ -7,6 +7,21 @@ import { fetchWithSession } from '../auth/session';
 /** Адрес для чата, открывается без входа. /s/, не /#/s/: страницу с превью мессенджеру отдаёт сервер (задача 3.8). */
 export const shareUrl = (origin: string, token: string): string => `${origin}/s/${token}`;
 
+/**
+ * Размер iframe по умолчанию, CSS px: ширина колонки статьи или поста, 4:3.
+ * Таймлайн с графиком занимает ~200 px по высоте — при 16:10 (500 px) сцене
+ * оставалась половина рамки. Сайт может поменять размер сам.
+ */
+export const EMBED_FRAME = { width: 800, height: 600 } as const;
+
+const escapeAttribute = (text: string): string =>
+  text.replace(/[&"<>]/g, (ch) => ({ '&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;' })[ch] ?? ch);
+
+/** HTML для вставки на сайт (задача 3.9): тот же токен, что у ссылки. */
+export const embedCode = (origin: string, token: string, title: string): string =>
+  `<iframe src="${origin}/embed/${token}" width="${EMBED_FRAME.width}" height="${EMBED_FRAME.height}" ` +
+  `style="border:0" allow="fullscreen" loading="lazy" title="${escapeAttribute(title)}"></iframe>`;
+
 /** Токен ссылки в запросе к полёту: посторонний видит «по ссылке» только с ним. */
 export const withShare = (url: string, share: string | null): string =>
   share === null ? url : `${url}${url.includes('?') ? '&' : '?'}${new URLSearchParams({ share }).toString()}`;
