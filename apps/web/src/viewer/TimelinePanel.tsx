@@ -68,7 +68,7 @@ export function TimelinePanel(props: TimelinePanelProps) {
     if (!element || !box) return undefined;
 
     const draw = (): void => {
-      // Высота — из вёрстки: на телефоне график ниже (compact:h-14).
+      // Высота — из вёрстки: на телефоне график ниже (compact:h-11).
       const width = box.clientWidth;
       const height = box.clientHeight;
       if (height === 0) return;
@@ -134,7 +134,7 @@ export function TimelinePanel(props: TimelinePanelProps) {
         ориентации в том же ряду, в портрете (max-sm) — вторым рядом.
         Кнопки — не меньше 44 px (compact:min-h-11), под палец.
       */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 text-sm compact:gap-x-2 compact:px-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 text-sm compact:gap-x-2 compact:px-3 compact:py-1.5">
         <button
           type="button"
           onClick={props.onTogglePlay}
@@ -273,7 +273,7 @@ export function TimelinePanel(props: TimelinePanelProps) {
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(fraction * 100)}
-        className="relative h-24 cursor-col-resize touch-none compact:h-14"
+        className="relative h-24 cursor-col-resize touch-none compact:h-11"
         onPointerDown={(event) => {
           dragging.current = true;
           event.currentTarget.setPointerCapture(event.pointerId);

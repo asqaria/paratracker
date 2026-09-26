@@ -14,11 +14,11 @@ const VIEWPORTS = [
 ] as const;
 
 /**
- * Десктоп — панели поверх сцены; телефон — сводка, подложка и аналитика
- * в шторке снизу (ТЗ §8.3), верхних панелей нет.
+ * Десктоп — панели поверх сцены; телефон — сводка, легенда, подложка и
+ * аналитика в шторке снизу (ТЗ §8.3), поверх сцены панелей нет.
  */
 const PANELS = {
-  compact: ['sheet', 'legend', 'attribution', 'timeline'],
+  compact: ['sheet', 'attribution', 'timeline'],
   wide: ['summary', 'imagery', 'legend', 'attribution', 'timeline'],
 } as const;
 
@@ -95,6 +95,12 @@ for (const viewport of VIEWPORTS) {
     });
 
     if (viewport.compact) {
+      test('сцене — не меньше 60 % высоты экрана: низ не съедает её', async ({ page }) => {
+        await openDemo(page);
+        const top = await page.locator('[data-panel="sheet"]').evaluate((element) => element.getBoundingClientRect().top);
+        expect(top / viewport.height).toBeGreaterThanOrEqual(viewport.width > viewport.height ? 0.35 : 0.6);
+      });
+
       test('кнопки таймлайна, ручка шторки и подложка — под палец', async ({ page }) => {
         await openDemo(page);
         // Подложка — в шторке: раскрыть её тапом по ручке.
@@ -118,7 +124,7 @@ for (const viewport of VIEWPORTS) {
         const sheet = page.locator('[data-panel="sheet"]');
         const handle = sheet.locator('> button');
         await expect(sheet).toHaveAttribute('data-snap', 'peek');
-        await expect(page.locator('[data-panel="sheet-summary"]')).toBeVisible();
+        await expect(page.locator('[data-panel="sheet-line"]')).toBeVisible();
         const peek = (await sheet.boundingBox())?.height ?? 0;
         await handle.click();
         await expect(sheet).toHaveAttribute('data-snap', 'half');

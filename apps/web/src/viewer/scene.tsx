@@ -92,7 +92,7 @@ import {
 import { AnalyticsPanel, type SelectedSegment } from './AnalyticsPanel';
 import { BottomSheet } from './BottomSheet';
 import { useFlightAnalytics } from './flight-analytics';
-import { SummaryPanel } from './SummaryPanel';
+import { SummaryLine, SummaryPanel } from './SummaryPanel';
 import { TimelinePanel } from './TimelinePanel';
 import { VarioLegend } from './VarioLegend';
 import { buildTrackGeometry } from './track-geometry';
@@ -912,14 +912,17 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
         а она обязательна по лицензиям и не скрывается (ТЗ §4.4, §11.3).
       */}
       <div className="absolute bottom-0 left-0 right-0">
-        <div className="px-4 pb-2 compact:px-2 compact:pb-1">
+        {/* На телефоне легенда — в шторке: поверх сцены она съедала высоту. */}
+        <div className="px-4 pb-2 compact:hidden">
           <VarioLegend />
         </div>
 
         {/* Телефон: шторка — сводка всегда видна, остальное по жесту (ТЗ §8.3). */}
-        <div className="hidden px-[max(0.5rem,env(safe-area-inset-left))] compact:block">
-          <BottomSheet summary={<SummaryPanel summary={track.summary} bare />}>
+        <div className="hidden px-[max(0.5rem,env(safe-area-inset-left))] pb-1 compact:block">
+          <BottomSheet summary={<SummaryLine summary={track.summary} />}>
             <div className="flex flex-col gap-3">
+              <SummaryPanel summary={track.summary} bare />
+              <VarioLegend />
               <div data-panel="sheet-imagery" className="flex items-center justify-between gap-2 text-sm">
                 <span className="text-secondary">{t('viewer.imagery')}</span>
                 {imageryButtons}
@@ -943,7 +946,7 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
           На телефоне атрибуция свёрнута до названий источников и «Powered by
           Esri» (collapsedAttribution), полный текст — по кнопке. Не скрывается.
         */}
-        <div data-panel="attribution" className="flex items-start bg-void/70 text-xs text-secondary compact:text-2xs">
+        <div data-panel="attribution" className="flex items-center bg-void/70 text-xs text-secondary compact:text-2xs">
           <AttributionLine entries={attribution} className={attributionOpen ? '' : 'compact:hidden'} />
           <AttributionLine
             entries={collapsedAttribution(attribution)}
@@ -954,7 +957,7 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
             aria-expanded={attributionOpen}
             aria-label={attributionOpen ? t('viewer.attribution.less') : t('viewer.attribution.more')}
             onClick={() => setAttributionOpen((open) => !open)}
-            className="hidden min-h-8 px-3 text-primary compact:block"
+            className="hidden min-h-6 px-3 text-primary compact:block"
           >
             {attributionOpen ? '▴' : '▾'}
           </button>
@@ -985,7 +988,7 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
 function AttributionLine({ entries, className }: { entries: readonly AttributionEntry[]; className: string }) {
   const t = useT();
   return (
-    <p className={`flex-1 px-3 py-1 ${className}`}>
+    <p className={`flex-1 px-3 py-1 compact:py-0.5 ${className}`}>
       {entries.map((entry, index) => (
         <span key={entry.text}>
           {index > 0 && ' · '}
