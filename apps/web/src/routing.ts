@@ -5,7 +5,7 @@
  * лендинг с сообщением о неудачном входе, #/logbook — логбук.
  */
 
-const FLIGHT_HASH = /^#\/flight\/([0-9a-f-]{36})$/i;
+const FLIGHT_HASH = /^#\/flight\/([0-9a-f-]{36})(\/review)?$/i;
 const DEMO_HASH = '#/demo';
 const DEMO_TRACK_URL = '/demo/baseline.track';
 
@@ -19,6 +19,8 @@ export const SETTINGS_HASH = '#/settings';
 
 /** Адрес просмотрщика загруженного полёта — им же делается редирект. */
 export const flightHash = (flightId: string): string => `#/flight/${flightId}`;
+/** Сверка термиков владельцем (DoD фазы 2): просмотрщик с панелью сверки. */
+export const reviewHash = (flightId: string): string => `#/flight/${flightId}/review`;
 
 /** id полёта из хэша; null — не полёт (демо, лендинг). */
 const flightIdFromHash = (hash: string): string | null => FLIGHT_HASH.exec(hash)?.[1] ?? null;
@@ -37,7 +39,7 @@ export type Route =
   | { kind: 'logbook' }
   | { kind: 'settings' }
   /** flightId null — демо-трек: его нет в API, аналитики к нему нет. */
-  | { kind: 'flight'; flightId: string | null; trackUrl: string };
+  | { kind: 'flight'; flightId: string | null; trackUrl: string; review?: true };
 
 export function routeFromHash(hash: string): Route {
   if (hash === HEALTH_HASH) return { kind: 'health' };
@@ -45,5 +47,7 @@ export function routeFromHash(hash: string): Route {
   if (hash === SETTINGS_HASH) return { kind: 'settings' };
   if (hash === AUTH_FAILED_HASH) return { kind: 'landing', authFailed: true };
   const trackUrl = trackUrlFromHash(hash);
-  return trackUrl === null ? { kind: 'landing' } : { kind: 'flight', flightId: flightIdFromHash(hash), trackUrl };
+  if (trackUrl === null) return { kind: 'landing' };
+  const review = FLIGHT_HASH.exec(hash)?.[2] !== undefined;
+  return { kind: 'flight', flightId: flightIdFromHash(hash), trackUrl, ...(review ? { review: true as const } : {}) };
 }

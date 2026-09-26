@@ -13,6 +13,7 @@ import {
   SOURCE_FORMATS,
   TURN_DIRECTIONS,
   UNIT_SYSTEMS,
+  type ThermalReviewLabels,
   type WindBand,
 } from '@skyline/core';
 import { sql, type SQL } from 'drizzle-orm';
@@ -354,3 +355,18 @@ export const glides = pgTable(
   },
   (t) => [check('glides_kind_check', oneOf(t.kind, GLIDE_KINDS)), index('glides_flight_seq_idx').on(t.flightId, t.seq)],
 );
+
+/**
+ * Ручная сверка термиков владельцем полёта (DoD фазы 2): одна разметка на
+ * полёт. Из неё — /fixtures/*.labels.json и регрессионный тест детекции.
+ */
+export const thermalReviews = pgTable('thermal_reviews', {
+  flightId: uuid('flight_id')
+    .primaryKey()
+    .references(() => flights.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  labels: jsonb('labels').$type<ThermalReviewLabels>().notNull(),
+  updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+});

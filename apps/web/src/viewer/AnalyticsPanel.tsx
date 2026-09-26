@@ -5,6 +5,7 @@ import type { GliderDto } from '@skyline/core';
 
 import { GliderLine } from '../gliders/GliderLine';
 import { formatLocalStart } from '../logbook/format-logbook';
+import { reviewHash } from '../routing';
 import { SiteLine } from '../sites/SiteLine';
 import type { MessageKey } from '../i18n/messages';
 import type { AnalyticsState, FlightAnalytics } from './flight-analytics';
@@ -138,6 +139,11 @@ export function AnalyticsPanel({
           )}
           {state.status === 'ready' && (
             <Content analytics={state.analytics} timeline={timeline} timeMs={timeMs} tab={tab} onTab={setTab} onSelect={onSelect} embedded={embedded} />
+          )}
+          {state.status === 'ready' && state.analytics.details.canEdit && state.analytics.thermals.length > 0 && (
+            <a href={reviewHash(state.analytics.details.flightId)} className="mt-2 block text-xs text-accent">
+              {t('review.open')}
+            </a>
           )}
           {state.status === 'ready' && state.analytics.thermals.length > 0 && onColumnsShown && (
             <button
