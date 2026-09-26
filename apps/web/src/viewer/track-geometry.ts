@@ -12,6 +12,11 @@ export interface DecodedTrackColumns {
   lon: Float64Array;
   alt: Float64Array;
   vSpeed: Float64Array;
+  /**
+   * Сглаженный трек (track-smooth.ts): индекс исходной точки для каждой точки.
+   * Нет — точки и есть исходные.
+   */
+  sourceIndex?: Int32Array;
 }
 
 export interface TrackGeometry {
@@ -61,9 +66,10 @@ export function buildTrackGeometry(track: DecodedTrackColumns, ground?: GroundSt
     positions[kept * COORDS_PER_POSITION + 2] = alt;
     groundPositions[kept * COORDS_PER_GROUND] = lon;
     groundPositions[kept * COORDS_PER_GROUND + 1] = lat;
-    sourceIndex[kept] = i;
+    const source = track.sourceIndex?.[i] ?? i;
+    sourceIndex[kept] = source;
 
-    const onGround = ground !== undefined && (i < ground.flight.takeoff || i > ground.flight.landing);
+    const onGround = ground !== undefined && (source < ground.flight.takeoff || source > ground.flight.landing);
     const [r, g, b, a] = onGround ? ground.groundRgba : varioRgba(track.vSpeed[i] ?? Number.NaN);
     colors[kept * CHANNELS_PER_COLOR] = r;
     colors[kept * CHANNELS_PER_COLOR + 1] = g;
