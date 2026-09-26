@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { CIRCLE, MOTION, THERMAL, type Thermal } from '@skyline/core';
 import { describe, expect, it } from 'vitest';
 
@@ -25,6 +27,8 @@ const CLIMB_TOLERANCE_MS = 0.05;
 /** Снос по центрам кругов (±3 м) за ~200 с. */
 const DRIFT_TOLERANCE_MS = 0.05;
 const RADIUS_TOLERANCE_M = 3;
+/** Границы в разметке владельца — «на глаз» по профилю высоты: полминуты. */
+const LABEL_BOUNDARY_TOLERANCE_S = 30;
 
 function thermalsOf(name: string): Thermal[] {
   const derived = cleanAndDerive(parseFixture(name));
@@ -137,10 +141,17 @@ describe('detectThermals — условия §6.3', () => {
   });
 
   it('1.6 оборота с набором — термик; оборот с четвертью — нет (порог §6.3 — 1.5)', () => {
-    const oneAndHalf = thermals(flight([glide, { seconds: 32, turnDegS: 18, climbMs: 1.5 }, glide]));
+    // Длительность добирается набором по прямой: порог минуты здесь ни при чём.
+    const straightClimb: Leg = { seconds: 40, turnDegS: 0, climbMs: 1.5 };
+    const oneAndHalf = thermals(flight([glide, { seconds: 32, turnDegS: 18, climbMs: 1.5 }, straightClimb, glide]));
     expect(oneAndHalf).toHaveLength(1);
     expect(oneAndHalf[0]?.turnCount).toBeGreaterThanOrEqual(THERMAL.minTurns);
-    expect(thermals(flight([glide, { seconds: 25, turnDegS: 18, climbMs: 1.5 }, glide]))).toEqual([]);
+    expect(thermals(flight([glide, { seconds: 25, turnDegS: 18, climbMs: 1.5 }, straightClimb, glide]))).toEqual([]);
+  });
+
+  it('короче минуты — не термик, даже с кругами и набором (слабый пузырь)', () => {
+    expect(thermals(flight([glide, { seconds: 45, turnDegS: 18, climbMs: 1 }, glide]))).toEqual([]);
+    expect(thermals(flight([glide, { seconds: 70, turnDegS: 18, climbMs: 1 }, glide]))).toHaveLength(1);
   });
 
   it('разрыв между кругами до 15 с — один термик, больше — два', () => {
@@ -153,12 +164,13 @@ describe('detectThermals — условия §6.3', () => {
 
   it('пауза дольше 15 с, но с набором — перецентровка, тот же термик; со снижением — два', () => {
     // В ветре пилот выпадает из ядра и широко ищет его, продолжая набирать.
-    const climb: Leg = { seconds: 60, turnDegS: 18, climbMs: 1.5 };
+    // Подъёмы по 80 с — с запасом над порогом минуты (THERMAL.minDurationS).
+    const climb: Leg = { seconds: 80, turnDegS: 18, climbMs: 1.5 };
     const searching: Leg = { seconds: 50, turnDegS: 6, climbMs: 1.1 };
     const sinking: Leg = { seconds: 50, turnDegS: 6, climbMs: -1 };
     const merged = thermals(flight([glide, climb, searching, climb, glide]));
     expect(merged).toHaveLength(1);
-    expect(merged[0]?.durationS).toBeGreaterThan(160);
+    expect(merged[0]?.durationS).toBeGreaterThan(200);
     expect(thermals(flight([glide, climb, sinking, climb, glide]))).toHaveLength(2);
   });
 
@@ -196,7 +208,7 @@ describe('detectThermals — условия §6.3', () => {
   });
 
   it('против часовой — ccw; один полный круг — сноса нет (не из чего считать)', () => {
-    const [left] = thermals(flight([glide, { seconds: 32, turnDegS: -18, climbMs: 1.5 }, glide]));
+    const [left] = thermals(flight([glide, { seconds: 32, turnDegS: -18, climbMs: 1.5 }, { seconds: 40, turnDegS: 0, climbMs: 1.5 }, glide]));
     expect(left?.direction).toBe('ccw');
     expect(left?.driftEastMs).toBeNull();
     expect(left?.driftNorthMs).toBeNull();
@@ -225,5 +237,61 @@ describe('detectThermals — условия §6.3', () => {
     expect(found).toHaveLength(1);
     expect(found[0]?.durationS).toBeGreaterThan(250);
     expect(Math.abs((found[0]?.driftEastMs ?? 0) - 9)).toBeLessThan(0.3);
+  });
+});
+
+/* ── Реальный трек с разметкой владельца (fixtures/real-wind-thermals.*) ──── */
+
+interface LabelSpan {
+  start: string;
+  end: string;
+}
+
+interface Labels {
+  confirmed: LabelSpan[];
+  missed: LabelSpan[];
+  notThermals: LabelSpan[];
+}
+
+describe('detectThermals на реальном треке — против ручной разметки владельца', () => {
+  const labels = JSON.parse(
+    readFileSync(new URL('../../../fixtures/real-wind-thermals.labels.json', import.meta.url), 'utf8'),
+  ) as Labels;
+  const derived = cleanAndDerive(parseFixture('real-wind-thermals.igc'));
+  const p = derived.points;
+  const columns: ThermalColumns = { t: p.t, lat: p.lat, lon: p.lon, altitude: p.altitude, heading: p.heading, vSpeed: p.vSpeedDamped };
+  const found = detectThermals(columns, detectCircles(columns, PARAGLIDER), PARAGLIDER);
+  const t0 = p.t[0] ?? 0;
+  /** «h:mm:ss» от начала трека → секунды; время термиков — так же. */
+  const seconds = (clock: string): number => clock.split(':').reduce((sum, part) => sum * 60 + Number(part), 0);
+  const span = (thermal: Thermal) => ({ start: (thermal.startTimeMs - t0) / 1000, end: (thermal.endTimeMs - t0) / 1000 });
+  const overlapS = (a: { start: number; end: number }, label: LabelSpan): number =>
+    Math.max(0, Math.min(a.end, seconds(label.end)) - Math.max(a.start, seconds(label.start)));
+
+  it('каждый подтверждённый термик находится (перекрытие не меньше половины)', () => {
+    for (const label of labels.confirmed) {
+      const duration = seconds(label.end) - seconds(label.start);
+      const best = Math.max(0, ...found.map((thermal) => overlapS(span(thermal), label)));
+      expect(best, `${label.start}–${label.end}`).toBeGreaterThanOrEqual(duration / 2);
+    }
+  });
+
+  it('пропущенный в сильном ветре 1:44:19–1:55:40 — одним термиком, границы ±30 с', () => {
+    for (const label of labels.missed) {
+      const covering = found.filter((thermal) => overlapS(span(thermal), label) > 0);
+      expect(covering, `${label.start}–${label.end}`).toHaveLength(1);
+      const [only] = covering;
+      if (!only) continue;
+      expect(Math.abs(span(only).start - seconds(label.start))).toBeLessThanOrEqual(LABEL_BOUNDARY_TOLERANCE_S);
+      expect(Math.abs(span(only).end - seconds(label.end))).toBeLessThanOrEqual(LABEL_BOUNDARY_TOLERANCE_S);
+    }
+  });
+
+  it('пара кругов в слабом пузыре — не термик', () => {
+    for (const label of labels.notThermals) {
+      const duration = seconds(label.end) - seconds(label.start);
+      const overlapped = found.filter((thermal) => overlapS(span(thermal), label) > duration / 2);
+      expect(overlapped, `${label.start}–${label.end}`).toEqual([]);
+    }
   });
 });

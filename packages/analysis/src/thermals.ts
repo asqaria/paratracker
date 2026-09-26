@@ -203,7 +203,9 @@ export function detectThermals(points: ThermalColumns, circles: readonly Circle[
     const exitAltM = points.altitude[end] ?? Number.NaN;
     const gainM = exitAltM - entryAltM;
     const avgClimbMs = gainM / durationS;
-    if (!(turnCount >= THERMAL.minTurns) || !(avgClimbMs > THERMAL.minAvgClimbMs)) continue;
+    const qualifies =
+      turnCount >= THERMAL.minTurns && avgClimbMs > THERMAL.minAvgClimbMs && durationS >= THERMAL.minDurationS;
+    if (!qualifies) continue;
 
     let maxClimbMs = Number.NEGATIVE_INFINITY;
     for (let i = start; i <= end; i++) maxClimbMs = Math.max(maxClimbMs, points.vSpeed[i] ?? Number.NEGATIVE_INFINITY);
