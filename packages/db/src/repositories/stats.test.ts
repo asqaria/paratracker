@@ -49,6 +49,7 @@ describe.runIf(Boolean(databaseUrl))('статистика сезона на ж�
       timezone: 'Asia/Almaty',
       airtimeS: v.airtimeS ?? 0,
       totalGainM: v.gainM,
+      xc: null,
     });
     // Полёт до задачи 2.12 — без airtime_s: статистика берёт всю запись.
     if (v.airtimeS === null) await connection.db.update(flights).set({ airtimeS: null }).where(eq(flights.id, row.id));

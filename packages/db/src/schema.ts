@@ -15,6 +15,7 @@ import {
   UNIT_SYSTEMS,
   type ThermalReviewLabels,
   type WindBand,
+  type XcScore,
 } from '@skyline/core';
 import { sql, type SQL } from 'drizzle-orm';
 import {
@@ -259,7 +260,8 @@ export const flights = pgTable(
     xcRules: text('xc_rules'),
     /** false — bounded-time оценка (ТЗ §6.6). */
     xcIsOptimal: boolean('xc_is_optimal'),
-    xcTurnpoints: jsonb('xc_turnpoints'),
+    /** Маршрут и замыкание для сцены (задача 3.1): весь XcScore — строка полёта его и так содержит. */
+    xcTurnpoints: jsonb('xc_turnpoints').$type<XcScore>(),
 
     // геометрия
     trackSimplified: geography('track_simplified', { kind: 'LineStringZM' }),

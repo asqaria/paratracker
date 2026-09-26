@@ -58,6 +58,7 @@ describe.runIf(Boolean(databaseUrl))('места старта на живой Б
       timezone: 'Antarctica/Palmer',
       airtimeS: 3000,
       totalGainM: 1234.4,
+      xc: null,
     });
     return flight.id;
   };

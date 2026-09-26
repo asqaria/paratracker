@@ -19,9 +19,13 @@ import {
   type SimplifiedLine,
   type SourceFormat,
   type FlightPoint,
+  type XcScore,
 } from '@skyline/core';
 import { parseGpx, parseIgc, parseKml } from '@skyline/parsing';
 import { writeTrack } from '@skyline/track-format';
+
+// .ts, а не .js: поток в тестах грузит исходник напрямую (tsconfig: rewriteRelativeImportExtensions).
+import { scoreXc } from './xc-score.ts';
 
 /**
  * Точка входа потока конвейера: parse → clean → derive → analyse → pack
@@ -67,6 +71,8 @@ export interface PipelineSuccess {
   airtimeS: number;
   /** Сумма подъёмов в воздухе с гистерезисом GAIN.hysteresisM, м (задача 2.12). */
   totalGainM: number;
+  /** XC-очки по регламенту по умолчанию (задача 3.1); null — считать не по чему. */
+  xc: XcScore | null;
 }
 
 export type PipelineMessage =
@@ -172,6 +178,11 @@ export function runPipeline(message: PipelineTaskMessage, onProgress: (value: nu
       gliderRaw: track.meta.glider?.trim() || null,
       airtimeS: Math.round(((points.t[range.landing] ?? 0) - (points.t[range.takeoff] ?? 0)) / MS_PER_SECOND),
       totalGainM: totalGain(points.altitude, range.takeoff, range.landing),
+      // Скоринг — только у полноценного трека: у редкого (basic) нет точной геометрии.
+      xc:
+        derived.analysisLevel === 'full'
+          ? scoreXc({ t: points.t, lat: points.lat, lon: points.lon, altitude: points.altitude }, range)
+          : null,
     },
   };
 }

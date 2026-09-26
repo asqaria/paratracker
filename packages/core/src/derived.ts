@@ -73,6 +73,42 @@ export interface FlightSummary {
   maxGainM: number;
 }
 
+/**
+ * XC-результат полёта (ТЗ §6.6, задача 3.1). Вид — по коду правила
+ * igc-xc-score: od — свободная дистанция, tri — треугольник, fai — FAI-треугольник.
+ */
+export const XC_TYPES = ['free_distance', 'free_triangle', 'fai_triangle'] as const;
+export type XcType = (typeof XC_TYPES)[number];
+
+export interface XcPoint {
+  lat: number;
+  lon: number;
+  /** UTC, мс. */
+  timeMs: number;
+}
+
+export interface XcScore {
+  /** Регламент: 'XContest', 'FFVL', … */
+  rules: string;
+  type: XcType;
+  /** Название правила регламента: «Closed FAI Triangle» — как в регламенте, не переводится. */
+  name: string;
+  /** Дистанция маршрута, м (без штрафа за незамыкание). */
+  distanceM: number;
+  /** Очки по регламенту: дистанция в км × коэффициент, минус штраф. */
+  score: number;
+  multiplier: number;
+  /** false — бюджет перебора кончился: лучшая найденная оценка, не точный максимум. */
+  optimal: boolean;
+  /**
+   * Маршрут для сцены: свободная дистанция — старт, ППМ, финиш; треугольник —
+   * три вершины. Треугольник на сцене замыкается сам.
+   */
+  route: XcPoint[];
+  /** Замыкание треугольника: где пилот ушёл с маршрута и где вернулся; null — не треугольник. */
+  closing: { in: XcPoint; out: XcPoint; distanceM: number } | null;
+}
+
 /** Точка трека: взлёт или посадка (задача 2.13). Высота над эллипсоидом, м; NaN — нет. */
 export interface FlightPoint {
   lat: number;

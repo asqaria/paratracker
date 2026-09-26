@@ -7,7 +7,7 @@ import { messages, type MessageKey } from '../i18n/messages';
 import { AnalyticsPanel } from './AnalyticsPanel';
 import type { AnalyticsState, FlightAnalytics } from './flight-analytics';
 import { glideRatioText, windText } from './format-analytics';
-import { metres, verticalSpeed } from './units';
+import { kilometres, metres, verticalSpeed } from './units';
 
 /**
  * Панель проверяется серверным рендером: разметка, цифры и выделение текущего
@@ -72,6 +72,7 @@ const analytics = (overrides: Partial<FlightAnalytics['details']> = {}): FlightA
     landingSite: null,
     glider: null,
     gliderRaw: null,
+    xc: null,
     timezone: 'Asia/Almaty',
     canEdit: false,
     ...overrides,
@@ -87,6 +88,33 @@ const render = (state: AnalyticsState, timeMs = START_MS, tab: 'thermals' | 'gli
   );
 
 const ready = (details: Partial<FlightAnalytics['details']> = {}): AnalyticsState => ({ status: 'ready', analytics: analytics(details) });
+
+describe('AnalyticsPanel: XC-очки (задача 3.3)', () => {
+  const xc = {
+    rules: 'XContest',
+    type: 'fai_triangle' as const,
+    name: 'Closed FAI Triangle',
+    distanceM: 87_400,
+    score: 139.84,
+    multiplier: 1.6,
+    optimal: true,
+    route: [],
+    closing: null,
+  };
+
+  it('вид, дистанция, очки и регламент', () => {
+    const html = render(ready({ xc }));
+    expect(html).toContain(text['xc.type.fai_triangle']);
+    expect(html).toContain('XContest');
+    expect(html).toContain(kilometres(87_400, locale, t));
+    expect(html).not.toContain(text['xc.estimate']);
+  });
+
+  it('не точный максимум — пометка «оценка»; без XC — карточки нет', () => {
+    expect(render(ready({ xc: { ...xc, optimal: false } }))).toContain(text['xc.estimate']);
+    expect(render(ready())).not.toContain('data-panel="xc-card"');
+  });
+});
 
 describe('AnalyticsPanel: начало полёта (задача 2.14)', () => {
   it('по часам места взлёта, с поясом', () => {

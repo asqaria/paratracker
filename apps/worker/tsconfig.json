@@ -2,7 +2,12 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node"],
+    // Поток конвейера в тестах запускается из исходника: Node 22 снимает типы
+    // сам, но .js в импорте на .ts не подменяет. Импорт соседних модулей —
+    // с .ts, в сборке tsc перепишет его на .js.
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true
   },
   "include": ["src"]
 }

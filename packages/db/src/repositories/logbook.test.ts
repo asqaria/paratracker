@@ -61,6 +61,7 @@ describe.runIf(Boolean(databaseUrl))('логбук на живой БД', () => 
       timezone: 'Asia/Almaty',
       airtimeS: 3000,
       totalGainM: 1234.4,
+      xc: null,
     });
     return flight.id;
   };

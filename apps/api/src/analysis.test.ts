@@ -16,6 +16,21 @@ const FLIGHT_ID = '11111111-2222-4333-8444-555555555555';
 const T0 = Date.UTC(2026, 6, 15, 10);
 const SITE_ID = '33333333-2222-4333-8444-555555555555';
 const GLIDER_ID = '44444444-2222-4333-8444-555555555555';
+const XC = {
+  rules: 'XContest',
+  type: 'free_triangle' as const,
+  name: 'Closed Free Triangle',
+  distanceM: 70_450,
+  score: 96.91,
+  multiplier: 1.4,
+  optimal: true,
+  route: [
+    { lat: 43.1, lon: 76.4, timeMs: T0 + 1_000_000 },
+    { lat: 43.2, lon: 76.8, timeMs: T0 + 2_000_000 },
+    { lat: 43.0, lon: 76.6, timeMs: T0 + 3_000_000 },
+  ],
+  closing: { in: { lat: 43.1, lon: 76.4, timeMs: T0 + 900_000 }, out: { lat: 43.1, lon: 76.41, timeMs: T0 + 3_500_000 }, distanceM: 1230 },
+};
 
 const details = (overrides: Partial<FlightDetailsRecord> = {}): FlightDetailsRecord => ({
   id: FLIGHT_ID,
@@ -36,6 +51,7 @@ const details = (overrides: Partial<FlightDetailsRecord> = {}): FlightDetailsRec
   landingSite: null,
   glider: { id: GLIDER_ID, manufacturer: 'Ozone', model: 'Rush 6', size: 'ML' },
   gliderRaw: 'OZONE Rush6',
+  xc: XC,
   ...overrides,
 });
 
@@ -114,6 +130,7 @@ describe('GET /api/v1/flights/:id', () => {
       landingSite: null,
       glider: { id: GLIDER_ID, label: 'Ozone Rush 6 ML' },
       gliderRaw: 'OZONE Rush6',
+      xc: XC,
       // Аноним смотрит анонимный полёт — править нечего.
       canEdit: false,
     });

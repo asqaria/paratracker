@@ -5,6 +5,7 @@ import type { GliderDto } from '@skyline/core';
 
 import { GliderLine } from '../gliders/GliderLine';
 import { formatLocalStart } from '../logbook/format-logbook';
+import { XcCard } from './XcCard';
 import { reviewHash } from '../routing';
 import { SiteLine } from '../sites/SiteLine';
 import type { MessageKey } from '../i18n/messages';
@@ -46,6 +47,11 @@ export interface AnalyticsPanelProps {
   /** Крылья владельца и смена крыла полёта (задача 2.13б); без них — только подпись. */
   gliders?: GliderDto[] | undefined;
   onSetGlider?: (gliderId: string | null) => Promise<void>;
+  /** XC-маршрут на сцене (задача 3.3); без обработчика переключателя нет. */
+  xcRouteShown?: boolean;
+  onXcRouteShown?: (shown: boolean) => void;
+  /** Показать весь XC-маршрут камерой сверху. */
+  onShowXcRoute?: () => void;
 }
 
 const TABS: ReadonlyArray<{ id: AnalyticsTab; label: MessageKey }> = [
@@ -75,6 +81,9 @@ export function AnalyticsPanel({
   onCreateSite,
   gliders,
   onSetGlider,
+  xcRouteShown = true,
+  onXcRouteShown,
+  onShowXcRoute,
 }: AnalyticsPanelProps) {
   const t = useT();
   const locale = useLocaleStore((state) => state.locale);
@@ -136,6 +145,14 @@ export function AnalyticsPanel({
                 onSelect={onSetGlider ?? (() => Promise.resolve())}
               />
             </div>
+          )}
+          {state.status === 'ready' && state.analytics.details.xc && (
+            <XcCard
+              xc={state.analytics.details.xc}
+              routeShown={xcRouteShown}
+              {...(onXcRouteShown ? { onRouteShown: onXcRouteShown } : {})}
+              {...(onShowXcRoute ? { onShowRoute: onShowXcRoute } : {})}
+            />
           )}
           {state.status === 'ready' && (
             <Content analytics={state.analytics} timeline={timeline} timeMs={timeMs} tab={tab} onTab={setTab} onSelect={onSelect} embedded={embedded} />
