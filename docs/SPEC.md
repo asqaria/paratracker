@@ -1082,6 +1082,8 @@ flights (
   avg_glide_ratio numeric(6,2) null,   -- null если не было валидных глайдов
   analysis_level text,                 -- full | basic (редкий трек, см. §5.2)
   wind_dir_deg int null, wind_speed_ms numeric(4,2) null,
+  wind_profile jsonb null,             -- слои §6.5: [{altitudeBand, windSpeedMs, windDirDeg,
+                                       -- confidence, circleCount}]; null — анализа нет (basic)
 
   -- XC
   xc_type text null, xc_distance_km numeric(7,2) null,
@@ -1113,10 +1115,10 @@ thermals (
   started_at timestamptz, ended_at timestamptz, duration_s int,
   entry_alt_m int, exit_alt_m int, gain_m int,
   avg_climb_ms numeric(4,2), max_climb_ms numeric(4,2),
-  turn_count numeric(4,1), avg_radius_m int, direction char(3),  -- CW | CCW
+  turn_count numeric(4,1), avg_radius_m int, direction text,     -- cw | ccw (как в core)
   efficiency numeric(3,2),
   entry_point geography(Point,4326), exit_point geography(Point,4326),
-  drift_dir_deg int, drift_speed_ms numeric(4,2)
+  drift_dir_deg int, drift_speed_ms numeric(4,2)   -- метеорологическое «откуда», null — один круг
 )
 CREATE INDEX ON thermals USING GIST (entry_point);  -- для тепловой карты термиков
 

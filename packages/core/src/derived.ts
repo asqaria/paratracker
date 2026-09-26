@@ -84,7 +84,7 @@ export interface Circle {
   endTimeMs: number;
   periodS: number;
   /** cw — по часовой (вправо), ccw — против. */
-  direction: 'cw' | 'ccw';
+  direction: TurnDirection;
   /** Центр — среднее координат за оборот. */
   centerLat: number;
   centerLon: number;
@@ -93,6 +93,10 @@ export interface Circle {
   /** Набор высоты за круг, м (отрицательный — снижение). */
   gainM: number;
 }
+
+/** Направление виража: по часовой (вправо) или против. Одни значения для БД и API. */
+export const TURN_DIRECTIONS = ['cw', 'ccw'] as const;
+export type TurnDirection = (typeof TURN_DIRECTIONS)[number];
 
 /** Сила термика по среднему набору, ТЗ §6.3. */
 export type ThermalStrength = 'weak' | 'medium' | 'strong' | 'powerful';
@@ -120,7 +124,7 @@ export interface Thermal {
   circleCount: number;
   avgRadiusM: number;
   /** Преобладающее направление кругов. */
-  direction: 'cw' | 'ccw';
+  direction: TurnDirection;
   /**
    * Снос термика, м/с — КУДА сносит (куда дует ветер), по центрам первого и
    * последнего круга. Метеорологическое «откуда» — +180°, в оценке ветра (§6.5).
@@ -199,7 +203,8 @@ export interface WindAnalysis {
 }
 
 /** 'dynamic' — высота почти не терялась (ТЗ §6.4): качество не определено. */
-export type GlideKind = 'glide' | 'dynamic';
+export const GLIDE_KINDS = ['glide', 'dynamic'] as const;
+export type GlideKind = (typeof GLIDE_KINDS)[number];
 
 /**
  * Глайд (переход), ТЗ §6.4: от взлёта или конца термика до начала следующего
@@ -228,4 +233,30 @@ export interface Glide {
   headingDeg: number;
   /** Насколько прямо шёл: расстояние по прямой / путь, 0..1. */
   headingConsistency: number;
+}
+
+/** Термик для хранения: с точками входа и выхода и сносом в «откуда дует». */
+export interface ThermalSegment extends Thermal {
+  entryLat: number;
+  entryLon: number;
+  exitLat: number;
+  exitLon: number;
+  /** Снос (метод A, §6.5), метеорологическое направление; null — один круг. */
+  drift: Wind | null;
+}
+
+/**
+ * Анализ полёта целиком (ТЗ §5.2 шаг 5–6, §6.2–6.5): то, что воркер пишет в
+ * thermals, glides и агрегаты flights.
+ */
+export interface FlightAnalysis {
+  thermals: ThermalSegment[];
+  glides: Glide[];
+  /** Σ набор / Σ время в термиках, м/с; null — термиков нет. */
+  avgClimbMs: number | null;
+  /** Σ путь / Σ потеря по глайдам вида 'glide' ('dynamic' не входит, §6.4); null — таких нет. */
+  avgGlideRatio: number | null;
+  /** Ветер полёта (метод B, среднее по кругам); null — кругов нет. */
+  wind: Wind | null;
+  windProfile: WindBand[];
 }

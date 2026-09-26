@@ -1,4 +1,4 @@
-import { PARSER } from '@skyline/core';
+import { PARSER, TRACK_FLAGS } from '@skyline/core';
 import { readTrack } from '@skyline/track-format';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -55,6 +55,36 @@ describe('пул worker_threads', () => {
 
     expect(progress.at(-1)).toBe(1);
     expect(progress).toEqual([...progress].sort((a, b) => a - b));
+  });
+
+  it('анализ полёта — в потоке: термики, глайды, ветер; точки термиков помечены в .track', async () => {
+    pool = createPipelinePool(OPTIONS);
+    const result = await pool.run({ sourceFormat: 'igc', bytes: readFixture('real-wind-thermals.igc'), now: NOW }, () => {});
+
+    expect(result.ok, `code: ${result.ok ? '' : result.errorCode}`).toBe(true);
+    if (!result.ok) return;
+    const { analysis } = result;
+    expect(analysis?.thermals.length).toBeGreaterThan(20);
+    expect(analysis?.glides.length).toBeGreaterThan(20);
+    expect(analysis?.wind?.speedMs).toBeGreaterThan(0);
+    expect(analysis?.windProfile.length).toBeGreaterThan(0);
+
+    const track = readTrack(result.track);
+    const flags = track.flags ?? new Uint8Array();
+    const inThermal = (i: number): boolean => ((flags[i] ?? 0) & TRACK_FLAGS.thermal) !== 0;
+    for (const thermal of analysis?.thermals ?? []) {
+      expect(inThermal(thermal.startIndex)).toBe(true);
+      expect(inThermal(thermal.endIndex)).toBe(true);
+    }
+    const flagged = Array.from(flags).filter((flag) => (flag & TRACK_FLAGS.thermal) !== 0).length;
+    const thermalPoints = (analysis?.thermals ?? []).reduce((sum, t) => sum + t.endIndex - t.startIndex + 1, 0);
+    expect(flagged).toBe(thermalPoints);
+  });
+
+  it('редкий трек (basic) — без анализа: виражи срезаны хордами', async () => {
+    pool = createPipelinePool(OPTIONS);
+    const result = await pool.run({ sourceFormat: 'igc', bytes: readFixture('sparse-10s.igc'), now: NOW }, () => {});
+    expect(result).toMatchObject({ ok: true, analysisLevel: 'basic', analysis: null });
   });
 
   it('битый файл — отказ с кодом, поток остаётся рабочим', async () => {

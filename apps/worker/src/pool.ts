@@ -1,9 +1,9 @@
 import { existsSync } from 'node:fs';
 import { Worker } from 'node:worker_threads';
 
-import type { AltitudeSource, AnalysisLevel, FlightErrorCode, GnssAltitudeDatum, SourceFormat } from '@skyline/core';
+import type { FlightErrorCode, SourceFormat } from '@skyline/core';
 
-import type { PipelineMessage, PipelineTaskMessage } from './pipeline.worker.js';
+import type { PipelineMessage, PipelineSuccess, PipelineTaskMessage } from './pipeline.worker.js';
 
 /**
  * Пул worker_threads: CPU-тяжёлые шаги конвейера исполняются здесь, а основной
@@ -16,20 +16,8 @@ export interface PipelineTask {
   now: number;
 }
 
-export type PipelineResult =
-  | {
-      ok: true;
-      track: ArrayBuffer;
-      pointCount: number;
-      analysisLevel: AnalysisLevel;
-      altitudeSource: AltitudeSource;
-      gnssAltitudeDatum: GnssAltitudeDatum;
-      startedAt: number;
-      endedAt: number;
-      durationS: number;
-      warningCount: number;
-    }
-  | { ok: false; errorCode: FlightErrorCode };
+/** Итог задачи: форма успеха — одна на поток и пул (PipelineSuccess). */
+export type PipelineResult = PipelineSuccess | { ok: false; errorCode: FlightErrorCode };
 
 export type ProgressListener = (value: number) => void;
 
