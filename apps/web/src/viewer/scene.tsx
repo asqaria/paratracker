@@ -6,31 +6,22 @@ import {
   Cartographic,
   CesiumTerrainProvider,
   Color,
-  GeographicTilingScheme,
   GeometryInstance,
   HeadingPitchRange,
-  ImageryLayer,
   JulianDate,
   KeyboardEventModifier,
   Material,
   Math as CesiumMath,
   Matrix4,
   PerspectiveFrustum,
-  NeverTileDiscardPolicy,
   PolylineGeometry,
   PolylineMaterialAppearance,
   Primitive,
   sampleTerrain as sampleTerrainAtLevel,
-  sampleTerrainMostDetailed,
-  type TerrainProvider,
-  type TileProviderError,
   Transforms,
-  UrlTemplateImageryProvider,
   Viewer,
-  WebMapTileServiceImageryProvider,
 } from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
-import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { documentColorTokens } from '../design/tokens';
@@ -46,11 +37,9 @@ import {
   wheelZoomInPx,
   zoomBy,
   type CameraAdjust,
-  type HeadingPitchRangeDeg,
 } from './camera-input';
 import { travelCourse } from './camera-course';
 import { cameraTarget, easeHalfWidth, targetHalfWidthS } from './camera-target';
-import { pitchClearingGround } from './ground-clearance';
 import { addGlider } from './glider';
 import { gliderAttitude, launchHeadingDeg } from './glider-attitude';
 import { gliderPose } from './glider-pose';
@@ -66,30 +55,13 @@ import {
 import type { DecodedTrack } from './decode-track';
 import { setupFlightClock, type FlightClock } from './flight-clock';
 import {
-  calibrateAltitudes,
-  fillTerrain,
   flightRange,
-  groundAnchor,
-  groundOffset,
-  groundWindow,
-  settleOnGround,
-  terrainSampleIndices,
-  type FlightRange,
 } from './ground-calibration';
 import { DEFAULT_PLAYBACK_SPEED, indexAt, MS_PER_SECOND, type PlaybackSpeed, seekBy, timelineOf } from './playback';
-import { fetchImageryCapabilities } from './imagery-capabilities';
 import {
-  availableImagery,
-  collapsedAttribution,
   imagerySourceById,
-  imagerySources,
-  preferredImagery,
   readViewerConfig,
   terrainSource,
-  tileFailureTracker,
-  type AttributionEntry,
-  type ImageryId,
-  type ImagerySource,
   type ViewerConfig,
 } from './providers';
 import { AnalyticsPanel, type SelectedSegment } from './AnalyticsPanel';
@@ -97,6 +69,7 @@ import { BottomSheet } from './BottomSheet';
 import { useCreateSite, useFlightAnalytics, useOwnGliders, usePrivacyControls, useSetFlightGlider } from './flight-analytics';
 import { SummaryLine, SummaryPanel } from './SummaryPanel';
 import { ReviewPanel } from '../review/ReviewPanel';
+import { shareHash } from '../routing';
 import { aglProfile } from './agl';
 import { TimelinePanel } from './TimelinePanel';
 import { VarioLegend } from './VarioLegend';
@@ -108,15 +81,15 @@ import { columnStates, thermalColumns, type ThermalColumn } from './thermal-colu
 import { ThermalLayer } from './thermal-layer';
 import { XcLayer } from './xc-layer';
 import { xcRoute } from './xc-route';
-import { TrackLayer } from './track-layer';
 import {
   COMPACT_MEDIA_QUERY,
   DEFAULT_TRACK_SHOWN,
   TRAIL_GAP_S,
-  trackWidths,
   type TrackShown,
 } from './track-progress';
 import { useHotkeys } from './use-hotkeys';
+import { ImageryButtons, SceneAttribution, useSceneImagery } from './scene-imagery';
+import { calibratedForScene, createSkylineViewer, lookAtAboveGround, sceneTrackLayer } from './scene-kit';
 
 /**
  * Сцена CesiumJS (ТЗ §7.2–§7.5). Весь код Cesium живёт только здесь
@@ -140,19 +113,9 @@ export interface SceneProps {
    * и размывает раскраску по вариометру.
    */
   showGlow?: boolean;
+  /** Встроен в чужой сайт (задача 3.9): сцена, таймлайн, сводка — без аналитики и настроек. */
+  embed?: boolean;
 }
-
-/**
- * Предел плотности пикселей рендера. По умолчанию Cesium рисует в CSS-пикселях
- * (useBrowserRecommendedResolution) — на экранах с масштабом 125–200 % сцена
- * растягивалась, и края линии, тени и занавеса шли грубой лесенкой. Рендер —
- * в пикселях экрана, но не плотнее 2: выше разница глазу почти не видна, а
- * число пикселей и нагрузка на видеокарту растут квадратично (ТЗ §7.7).
- */
-const MAX_PIXEL_RATIO = 2;
-
-/** Проходов подъёма камеры над склоном: после первого она над другой точкой склона. */
-const CAMERA_CLEARANCE_PASSES = 2;
 
 /** Перелёт свободной камеры к сегменту из аналитики: длительность, наклон, дальность в радиусах сегмента. */
 const SEGMENT_FLIGHT_S = 1.2;
@@ -168,101 +131,8 @@ const SEGMENT_RANGE_FACTOR = 3;
 /** ТЗ §7.2: основная линия 3–5 px, свечение — шире и приглушённее. */
 const GLOW_WIDTH_PX = 12;
 const GLOW_INTENSITY = 0.25;
-const SHADOW_ALPHA = 0.42;
 /** Основная кнопка мыши (PointerEvent.button): ею облетают пилота. */
 const PRIMARY_BUTTON = 0;
-
-/** Ответ /api/v1/imagery меняется только с перезапуском API — минуты хватит. */
-const IMAGERY_CAPABILITIES_STALE_MS = 60_000;
-
-/**
- * Высоты рельефа у старта и посадки ждём не дольше 4 с: медленный Re:Earth не
- * должен задерживать сцену. По длинной ходьбе (подъём пешком — часы) — ещё до 6 с.
- */
-const CALIBRATION_TIMEOUT_MS = 4000;
-const WALK_TERRAIN_TIMEOUT_MS = 6000;
-
-/** Высоты рельефа в точках трека или null, если не пришли вовремя. */
-async function sampleTerrain(
-  terrain: TerrainProvider,
-  track: DecodedTrack,
-  indices: readonly number[],
-  timeoutMs: number,
-): Promise<number[] | null> {
-  if (indices.length === 0) return [];
-  const places = indices.map((i) => Cartographic.fromDegrees(track.lon[i] ?? Number.NaN, track.lat[i] ?? Number.NaN));
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<null>((resolve) => {
-    timer = setTimeout(() => resolve(null), timeoutMs);
-  });
-  const sampled = await Promise.race([sampleTerrainMostDetailed(terrain, places), timeout]).catch(() => null);
-  clearTimeout(timer);
-  return sampled ? sampled.map((place) => place.height) : null;
-}
-
-/**
- * Трек для сцены, откалиброванный по земле (ground-calibration.ts): полёт
- * сдвигается поправками старта и посадки, ходьба до взлёта и после посадки
- * ложится ровно на рельеф — тот, который сцена рисует. Рельеф спрашивается
- * в два захода: точно у старта и посадки (без них калибровки нет) и редко по
- * длинной ходьбе (не пришло — ходьба остаётся со сдвигом стартовой поправки).
- * Данные трека не меняются.
- */
-async function calibratedForScene(
-  terrain: TerrainProvider,
-  track: DecodedTrack,
-  range: FlightRange,
-): Promise<DecodedTrack> {
-  const { exact, sparse } = terrainSampleIndices(track.t, range);
-  const exactHeights = await sampleTerrain(terrain, track, exact, CALIBRATION_TIMEOUT_MS);
-  if (!exactHeights) return track;
-
-  const terrainHeights = new Float64Array(track.pointCount).fill(Number.NaN);
-  exact.forEach((i, k) => {
-    terrainHeights[i] = exactHeights[k] ?? Number.NaN;
-  });
-  const [start, end] = (['start', 'end'] as const).map((side) => {
-    const indices = groundWindow(track.t, range, side);
-    const offset = groundOffset(
-      indices.map((i) => track.alt[i] ?? Number.NaN),
-      indices.map((i) => terrainHeights[i] ?? Number.NaN),
-    );
-    return groundAnchor(track.t, indices, offset, side);
-  });
-  const calibrated = calibrateAltitudes(track.t, track.alt, start ?? null, end ?? null);
-
-  const walkHeights = await sampleTerrain(terrain, track, sparse, WALK_TERRAIN_TIMEOUT_MS);
-  if (!walkHeights) return { ...track, alt: settleOnGround(track.t, calibrated, terrainHeights, range) };
-  sparse.forEach((i, k) => {
-    terrainHeights[i] = walkHeights[k] ?? Number.NaN;
-  });
-  const filled = fillTerrain(track.t, terrainHeights, range);
-  return { ...track, alt: settleOnGround(track.t, calibrated, filled, range) };
-}
-
-/**
- * Камера смотрит на цель с позы; если под камерой склон выше неё — наклон
- * круче, камера поднимается над склоном по дуге на той же дальности. Рельеф —
- * тот, что сцена рисует сейчас; два прохода: после подъёма камера над другой
- * точкой склона.
- */
-function lookAtAboveGround(viewer: Viewer, target: Cartesian3, targetM: number, pose: HeadingPitchRangeDeg): void {
-  let pitchDeg = pose.pitchDeg;
-  for (let pass = 0; pass < CAMERA_CLEARANCE_PASSES; pass++) {
-    viewer.camera.lookAt(
-      target,
-      new HeadingPitchRange(CesiumMath.toRadians(pose.headingDeg), CesiumMath.toRadians(pitchDeg), pose.rangeM),
-    );
-    const place = Cartographic.fromCartesian(viewer.camera.positionWC);
-    const next = place ? pitchClearingGround({ pitchDeg, rangeM: pose.rangeM }, targetM, viewer.scene.globe.getHeight(place)) : pitchDeg;
-    if (next === pitchDeg) return;
-    pitchDeg = next;
-  }
-  viewer.camera.lookAt(
-    target,
-    new HeadingPitchRange(CesiumMath.toRadians(pose.headingDeg), CesiumMath.toRadians(pitchDeg), pose.rangeM),
-  );
-}
 
 /** Поправки мыши для следящего режима; у Free их нет — там управляет Cesium. */
 const adjustFor = (mode: CameraMode): CameraAdjust | null => (mode === 'free' ? null : initialAdjust(mode));
@@ -275,43 +145,8 @@ function applyCameraInputs(viewer: Viewer, mode: CameraMode): void {
   viewer.scene.screenSpaceCameraController.enableInputs = mode === 'free';
 }
 
-/**
- * HTTP-статус упавшего тайла. Cesium кладёт в `error` RequestErrorEvent со
- * `statusCode`; у сетевого сбоя статуса нет — undefined.
- */
-function httpStatusOf(error: TileProviderError): number | undefined {
-  const cause: unknown = error.error;
-  if (typeof cause !== 'object' || cause === null || !('statusCode' in cause)) return undefined;
-  return typeof cause.statusCode === 'number' ? cause.statusCode : undefined;
-}
 
-function createImageryProvider(source: ImagerySource): ImageryLayer {
-  if (source.kind === 'wmts') {
-    return new ImageryLayer(
-      new WebMapTileServiceImageryProvider({
-        url: source.url.replace('{layer}', source.layer),
-        layer: source.layer,
-        style: 'default',
-        format: 'image/jpeg',
-        tileMatrixSetID: 'WGS84',
-        tilingScheme: new GeographicTilingScheme(),
-        maximumLevel: source.maximumLevel,
-      }),
-    );
-  }
-  return new ImageryLayer(
-    new UrlTemplateImageryProvider({
-      url: source.url,
-      maximumLevel: source.maximumLevel,
-      // Политика «ничего не отбрасывать» заставляет Cesium грузить тайл через
-      // XHR во всех браузерах — только так в ошибке есть HTTP-статус (httpStatusOf),
-      // и 404 «тайла нет» отличим от отказа подложки. Без неё Safari грузит <img>.
-      tileDiscardPolicy: new NeverTileDiscardPolicy(),
-    }),
-  );
-}
-
-export function Scene({ track, flightId = null, showGlow = false, review = false, share }: SceneProps) {
+export function Scene({ track, flightId = null, showGlow = false, review = false, share, embed = false }: SceneProps) {
   const t = useT();
   const container = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Viewer | null>(null);
@@ -333,29 +168,10 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
     }
   }, []);
   const config = 'config' in configured ? configured.config : null;
-  const sources = useMemo(() => (config ? imagerySources(config) : []), [config]);
-  // Кнопки — только для подложек, которые сервер подтвердил. Сам Viewer строится
-  // по полному списку: смена sources в его зависимостях пересоздала бы сцену
-  // и сбросила бы время проигрывания, когда придёт ответ.
-  const capabilities = useQuery({
-    queryKey: ['imagery-capabilities'],
-    queryFn: ({ signal }) => fetchImageryCapabilities(signal),
-    staleTime: IMAGERY_CAPABILITIES_STALE_MS,
-    retry: false,
-  });
-  const shownSources = useMemo(() => availableImagery(sources, capabilities.data), [sources, capabilities.data]);
-  const [imageryNotice, setImageryNotice] = useState<string | null>(null);
-  const [attributionOpen, setAttributionOpen] = useState(false);
-  const stopTileWatch = useRef<(() => void) | null>(null);
+  const imagery = useSceneImagery(config, viewerRef);
+  const { sources, imageryRef } = imagery;
   const timeline = useMemo(() => timelineOf(track.t), [track]);
 
-  const [imagery, setImagery] = useState<ImageryId>('sentinel2');
-  // Выбранная подложка нужна эффекту только при создании сцены. В зависимостях
-  // её держать нельзя: смена подложки пересоздала бы Viewer вместе с часами,
-  // и время проигрывания сбрасывалось бы в начало.
-  const imageryRef = useRef<ImageryId>(imagery);
-  /** Пользователь сам выбрал подложку — умолчание её больше не меняет. */
-  const imageryChosenRef = useRef(false);
   const [error, setError] = useState<string | null>('config' in configured ? null : configured.message);
   const [timeMs, setTimeMs] = useState<number>(timeline.startMs);
   const [playing, setPlaying] = useState(false);
@@ -390,27 +206,8 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
         if (disposed) return;
 
         const first = imagerySourceById(config, imageryRef.current) ?? sources[0];
-        viewer = new Viewer(element, {
-          terrainProvider: terrain,
-          ...(first ? { baseLayer: createImageryProvider(first) } : {}),
-          // ТЗ §7.7: рендер только при изменениях; на время проигрывания включается непрерывный.
-          requestRenderMode: true,
-          maximumRenderTimeChange: Number.POSITIVE_INFINITY,
-          useBrowserRecommendedResolution: false,
-          baseLayerPicker: false,
-          geocoder: false,
-          homeButton: false,
-          sceneModePicker: false,
-          navigationHelpButton: false,
-          timeline: false,
-          animation: false,
-          fullscreenButton: false,
-          infoBox: false,
-          selectionIndicator: false,
-        });
+        viewer = createSkylineViewer(element, terrain, first ?? null);
         viewerRef.current = viewer;
-        // Толщина линий в пикселях Cesium умножает на ту же плотность — на экране она не меняется.
-        viewer.resolutionScale = Math.min(1, MAX_PIXEL_RATIO / window.devicePixelRatio);
 
         const scene = viewer.scene;
         const controller = scene.screenSpaceCameraController;
@@ -431,13 +228,6 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
           { eventType: CameraEventType.RIGHT_DRAG, modifier: KeyboardEventModifier.CTRL },
         ];
         applyCameraInputs(viewer, cameraModeRef.current);
-        scene.globe.depthTestAgainstTerrain = true;
-        scene.globe.enableLighting = true;
-        scene.debugShowFramesPerSecond = import.meta.env.DEV;
-        // Штатный блок кредитов Cesium скрыт: все обязательные строки лицензий
-        // (Re:Earth, EOX, Esri) выводит наш блок атрибуции, иначе они наложатся.
-        const credits = viewer.cesiumWidget.creditContainer;
-        if (credits instanceof HTMLElement) credits.style.display = 'none';
 
         // Линия и пилот — по высоте, откалиброванной по земле; телеметрия — по данным.
         const range = flightRange(track.t, track.gSpeed);
@@ -480,24 +270,7 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
         }
 
         // Линия и тень — кусками, чтобы показывать только пройденный путь (track-layer.ts).
-        // Толщина — по экрану: на телефоне 4 px — полоса поперёк долины.
-        const widths = trackWidths(window.matchMedia(COMPACT_MEDIA_QUERY).matches);
-        // Время каждой вершины линии — из сглаженного трека (вершины без координат пропущены).
-        const vertexTimes = new Float64Array(geometry.pointCount);
-        {
-          let v = 0;
-          for (let j = 0; j < smooth.t.length && v < geometry.pointCount; j++) {
-            const usable = [smooth.lat[j], smooth.lon[j], smooth.alt[j]].every((x) => Number.isFinite(x ?? Number.NaN));
-            if (!usable) continue;
-            vertexTimes[v] = smooth.t[j] ?? Number.NaN;
-            v += 1;
-          }
-        }
-        const layer = new TrackLayer(scene, geometry, positions, vertexTimes, {
-          linePx: widths.linePx,
-          shadowPx: widths.shadowPx,
-          shadowColor: new Color(0, 0, 0, SHADOW_ALPHA),
-        });
+        const { layer, vertexTimes } = sceneTrackLayer(scene, geometry, positions, smooth);
         // Занавес: низ — рельеф под прореженными точками, грубый уровень тайлов
         // (CURTAIN.terrainLevel). Опрос идёт параллельно, трек его не ждёт.
         const samples = curtainSamples(range);
@@ -929,74 +702,7 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
   );
   useHotkeys(hotkeys);
 
-  /** Переключение подложки: слой пересоздаётся, атрибуция меняется вместе с ним. */
-  const switchImagery = (id: ImageryId, notice: string | null = null): void => {
-    const viewer = viewerRef.current;
-    const source = config ? imagerySourceById(config, id) : null;
-    if (!viewer || !source) return;
-    stopTileWatch.current?.();
-    stopTileWatch.current = null;
-    viewer.imageryLayers.removeAll();
-    const layer = createImageryProvider(source);
-    viewer.imageryLayers.add(layer);
-    // Esri через прокси может перестать отдавать тайлы (истёк ключ, лимит, сбой).
-    // Поток ошибок — откат на Sentinel-2 с объяснением, а не синий шар.
-    // Для Sentinel-2 отката нет: откатываться некуда, пусть будет видно.
-    if (id !== 'sentinel2') {
-      const tracker = tileFailureTracker();
-      stopTileWatch.current = layer.imageryProvider.errorEvent.addEventListener((error: TileProviderError) => {
-        if (tracker.failed(httpStatusOf(error))) switchImagery('sentinel2', t('viewer.imagery.fallback'));
-      });
-    }
-    viewer.scene.requestRender();
-    imageryRef.current = id;
-    setImagery(id);
-    setImageryNotice(notice);
-  };
-
-  // Подложка по умолчанию — Esri, как только сервер её подтвердил: до ответа
-  // сцена стартует на Sentinel-2 (он без ключа и лимитов) и переключается.
-  const preferred = preferredImagery(shownSources);
-  useEffect(() => {
-    if (imageryChosenRef.current || preferred === imageryRef.current) return;
-    if (viewerRef.current) {
-      switchImagery(preferred);
-    } else {
-      imageryRef.current = preferred;
-      setImagery(preferred);
-    }
-    // Зависимость — только preferred: switchImagery пересоздаётся каждый рендер.
-  }, [preferred]);
-
-  const active = (config ? imagerySourceById(config, imagery) : null) ?? sources[0] ?? null;
-  const attribution = config ? [...terrainSource(config).attribution, ...(active?.attribution ?? [])] : [];
-
-  // Переключатель подложки — один на десктопе (панель сверху) и на телефоне (шторка).
-  const imageryButtons = (
-    <>
-      <div role="group" aria-label={t('viewer.imagery')} className="flex gap-1">
-        {shownSources.map((source) => (
-          <button
-            key={source.id}
-            type="button"
-            aria-pressed={source.id === imagery}
-            onClick={() => {
-              imageryChosenRef.current = true;
-              switchImagery(source.id);
-            }}
-            className="rounded px-2 py-1 text-secondary aria-pressed:bg-subtle aria-pressed:text-primary compact:min-h-11"
-          >
-            {source.id === 'esri' ? t('viewer.imagery.esri') : t('viewer.imagery.sentinel2')}
-          </button>
-        ))}
-      </div>
-      {imageryNotice !== null && (
-        <p role="status" className="max-w-48 text-xs text-danger">
-          {imageryNotice}
-        </p>
-      )}
-    </>
-  );
+  const imageryButtons = <ImageryButtons imagery={imagery} />;
 
   return (
     <div className="relative h-dvh w-full">
@@ -1021,8 +727,20 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
           )}
         </div>
 
-        <div className="pointer-events-auto ml-auto flex flex-col items-end gap-2 compact:hidden">
-        <div data-panel="imagery" className="flex flex-col gap-2 rounded-xl glass p-3 text-sm">
+        <div className={`pointer-events-auto ml-auto flex flex-col items-end gap-2 ${embed ? '' : 'compact:hidden'}`}>
+        {/* Встроенный просмотрщик: вместо аналитики — выход на полную страницу полёта. */}
+        {embed && share !== undefined && (
+          <a
+            data-panel="open-in-app"
+            href={`/${shareHash(share)}`}
+            target="_blank"
+            rel="noopener"
+            className="glass flex items-center rounded-xl px-3 py-2 text-sm text-accent compact:min-h-11"
+          >
+            {t('embed.open')}
+          </a>
+        )}
+        <div data-panel="imagery" className="flex flex-col gap-2 rounded-xl glass p-3 text-sm compact:hidden">
           <span className="text-secondary">{t('viewer.imagery')}</span>
           {imageryButtons}
           <span className="numeric text-secondary">
@@ -1032,7 +750,7 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
         {analytics !== null && review && flightId !== null && (
           <ReviewPanel flightId={flightId} analytics={analytics} timeline={timeline} timeMs={timeMs} onSelect={selectSegment} />
         )}
-        {analytics !== null && !review && (
+        {analytics !== null && !review && !embed && (
           <AnalyticsPanel
             state={analytics}
             timeline={timeline}
@@ -1077,7 +795,7 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
                   embedded
                 />
               )}
-              {analytics !== null && !review && (
+              {analytics !== null && !review && !embed && (
                 <AnalyticsPanel
                   state={analytics}
                   timeline={timeline}
@@ -1093,26 +811,7 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
           </BottomSheet>
         </div>
 
-        {/*
-          На телефоне атрибуция свёрнута до названий источников и «Powered by
-          Esri» (collapsedAttribution), полный текст — по кнопке. Не скрывается.
-        */}
-        <div data-panel="attribution" className="flex items-center bg-void/70 text-xs text-secondary compact:text-2xs">
-          <AttributionLine entries={attribution} className={attributionOpen ? '' : 'compact:hidden'} />
-          <AttributionLine
-            entries={collapsedAttribution(attribution)}
-            className={attributionOpen ? 'hidden' : 'hidden compact:block'}
-          />
-          <button
-            type="button"
-            aria-expanded={attributionOpen}
-            aria-label={attributionOpen ? t('viewer.attribution.less') : t('viewer.attribution.more')}
-            onClick={() => setAttributionOpen((open) => !open)}
-            className="hidden min-h-6 px-3 text-primary compact:block"
-          >
-            {attributionOpen ? '▴' : '▾'}
-          </button>
-        </div>
+        <SceneAttribution entries={imagery.attribution} />
 
         <TimelinePanel
           track={track}
@@ -1133,28 +832,6 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
         />
       </div>
     </div>
-  );
-}
-
-/** Строка атрибуции: подпись «Рельеф» / «Подложка» переводится, текст лицензии — дословно. */
-function AttributionLine({ entries, className }: { entries: readonly AttributionEntry[]; className: string }) {
-  const t = useT();
-  return (
-    <p className={`flex-1 px-3 py-1 compact:py-0.5 ${className}`}>
-      {entries.map((entry, index) => (
-        <span key={entry.text}>
-          {index > 0 && ' · '}
-          {entry.label !== undefined && `${t(`viewer.attribution.${entry.label}`)}: `}
-          {entry.href === undefined ? (
-            entry.text
-          ) : (
-            <a href={entry.href} target="_blank" rel="noopener noreferrer" className="text-accent">
-              {entry.text}
-            </a>
-          )}
-        </span>
-      ))}
-    </p>
   );
 }
 

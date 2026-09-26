@@ -1,6 +1,7 @@
 import {
   Cartesian3,
   ClockRange,
+  ExtrapolationType,
   JulianDate,
   LagrangePolynomialApproximation,
   SampledPositionProperty,
@@ -28,12 +29,19 @@ export interface FlightClock {
   setTimeMs(timeMs: number): void;
 }
 
-const toJulian = (timeMs: number): JulianDate => JulianDate.fromDate(new Date(timeMs));
+export const toJulian = (timeMs: number): JulianDate => JulianDate.fromDate(new Date(timeMs));
 
-export function setupFlightClock(viewer: Viewer, track: DecodedTrack): FlightClock {
-  const timeline = timelineOf(track.t);
-
+/**
+ * Позиция пилота по треку. hold — до первой точки и после последней пилот
+ * стоит на краю трека, а не исчезает: в сравнении (задача 3.12) часы общие,
+ * и один ещё на старте, когда другой уже сел.
+ */
+export function trackPosition(track: DecodedTrack, hold = false): SampledPositionProperty {
   const position = new SampledPositionProperty();
+  if (hold) {
+    position.backwardExtrapolationType = ExtrapolationType.HOLD;
+    position.forwardExtrapolationType = ExtrapolationType.HOLD;
+  }
   position.setInterpolationOptions({
     interpolationDegree: INTERPOLATION_DEGREE,
     interpolationAlgorithm: LagrangePolynomialApproximation,
@@ -45,7 +53,11 @@ export function setupFlightClock(viewer: Viewer, track: DecodedTrack): FlightClo
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(alt)) continue;
     position.addSample(toJulian(track.t[i] ?? Number.NaN), Cartesian3.fromDegrees(lon, lat, alt));
   }
+  return position;
+}
 
+/** Часы Cesium на отрезок времени: стоп на краях, не играют до команды. */
+export function setupSceneClock(viewer: Viewer, timeline: { startMs: number; endMs: number }): void {
   const clock: Clock = viewer.clock;
   clock.startTime = toJulian(timeline.startMs);
   clock.stopTime = toJulian(timeline.endMs);
@@ -54,7 +66,12 @@ export function setupFlightClock(viewer: Viewer, track: DecodedTrack): FlightClo
   clock.clockRange = ClockRange.CLAMPED;
   clock.multiplier = DEFAULT_PLAYBACK_SPEED;
   clock.shouldAnimate = false;
+}
 
+export function setupFlightClock(viewer: Viewer, track: DecodedTrack): FlightClock {
+  const timeline = timelineOf(track.t);
+  const position = trackPosition(track);
+  setupSceneClock(viewer, timeline);
   return {
     timeline,
     position,

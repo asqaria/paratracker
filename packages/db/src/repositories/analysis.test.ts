@@ -65,6 +65,7 @@ const analysis = (thermalCount: number): FlightAnalysis => ({
 const processed = (result: FlightAnalysis | null): ProcessedFlight => ({
   trackObjectKey: 'tracks/test.track',
   publicTrackObjectKey: null,
+  previewObjectKey: null,
   altitudeSource: 'baro',
   analysisLevel: result ? 'full' : 'basic',
   startedAt: new Date(T0),
@@ -211,6 +212,11 @@ describe.runIf(Boolean(databaseUrl))('чтение анализа полёта (
     expect(details?.startedAt?.getTime()).toBe(T0);
     expect(details?.windProfile).toEqual(analysis(2).windProfile);
     expect(await findFlightDetails(connection.db, '00000000-0000-4000-8000-000000000000')).toBeNull();
+  });
+
+  it('имя пилота у анонимной загрузки — из заголовка IGC (задача 3.12)', async () => {
+    await connection.db.update(flights).set({ pilotNameRaw: 'Ivan Petrov' }).where(eq(flights.id, flightId));
+    expect((await findFlightDetails(connection.db, flightId))?.pilotName).toBe('Ivan Petrov');
   });
 
   it('термики по порядку, точки входа и выхода — широта и долгота из geography', async () => {

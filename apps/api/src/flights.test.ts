@@ -25,6 +25,7 @@ const record = (overrides: Partial<FlightRecord> = {}): FlightRecord => ({
   privacy: 'unlisted',
   shareToken: null,
   publicTrackObjectKey: null,
+  previewObjectKey: null,
   ...overrides,
 });
 

@@ -5,6 +5,7 @@ import {
   createUserSite,
   ensureShareToken,
   findSharedFlight,
+  findSharePreview,
   deleteGlider,
   createDatabase,
   createSession,
@@ -127,6 +128,11 @@ const app = buildApp({
     details: (id) => findFlightDetails(database.db, id),
     thermals: (flightId) => listThermals(database.db, flightId),
     glides: (flightId) => listGlides(database.db, flightId),
+  },
+  sharePage: {
+    find: (token) => findSharePreview(database.db, token),
+    storage,
+    publicUrl: config.PUBLIC_URL.replace(/\/+$/, ''),
   },
   // Ключ ArcGIS остаётся на сервере; без него подложка Esri просто недоступна.
   tiles: {

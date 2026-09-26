@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 
+import { ComparePage } from './compare/ComparePage';
 import { FlightViewerPage } from './flight/FlightViewerPage';
 import { GlidersPage } from './gliders/GlidersPage';
 import { HealthPage } from './health/HealthPage';
 import { ClaimOnSignIn } from './logbook/ClaimOnSignIn';
 import { LogbookPage } from './logbook/LogbookPage';
 import { SharedFlightPage } from './sharing/SharedFlightPage';
-import { routeFromHash, type Route } from './routing';
+import { routeFromLocation, type Route } from './routing';
 import { UploadPage } from './upload/UploadPage';
 
 /** Экраны по хэшу (ТЗ §8.2). Роутер появится, когда экранов станет больше. */
@@ -14,7 +15,7 @@ import { UploadPage } from './upload/UploadPage';
 const LANDING: Route = { kind: 'landing' };
 
 const currentRoute = (): Route =>
-  typeof window === 'undefined' ? LANDING : routeFromHash(window.location.hash);
+  typeof window === 'undefined' ? LANDING : routeFromLocation(window.location.pathname, window.location.hash);
 
 /**
  * Маршрут пересчитывается на hashchange: редирект после загрузки — это смена
@@ -34,13 +35,13 @@ export function useRoute(): Route {
   return route;
 }
 
-function Screen() {
-  const route = useRoute();
-
+function Screen({ route }: { route: Route }) {
   if (route.kind === 'health') return <HealthPage />;
   if (route.kind === 'logbook') return <LogbookPage />;
   if (route.kind === 'settings') return <GlidersPage />;
   if (route.kind === 'shared') return <SharedFlightPage token={route.token} />;
+  if (route.kind === 'embed') return <SharedFlightPage token={route.token} embed />;
+  if (route.kind === 'compare') return <ComparePage refs={route.refs} />;
   if (route.kind === 'flight') {
     return <FlightViewerPage flightId={route.flightId} trackUrl={route.trackUrl} review={route.review === true} />;
   }
@@ -48,10 +49,12 @@ function Screen() {
 }
 
 export function App() {
+  const route = useRoute();
   return (
     <>
-      <ClaimOnSignIn />
-      <Screen />
+      {/* Во встроенном просмотрщике чужого сайта логбука нет — переносить нечего. */}
+      {route.kind !== 'embed' && <ClaimOnSignIn />}
+      <Screen route={route} />
     </>
   );
 }
