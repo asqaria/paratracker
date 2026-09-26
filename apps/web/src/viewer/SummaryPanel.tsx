@@ -8,6 +8,8 @@ import { formatSummary, type FormattedSummary } from './format-summary';
 
 export interface SummaryPanelProps {
   summary: FlightSummary;
+  /** Внутри шторки: без своей рамки, одной строкой в четыре колонки. */
+  bare?: boolean;
 }
 
 const ITEMS: ReadonlyArray<{ key: keyof FormattedSummary; label: MessageKey }> = [
@@ -17,7 +19,7 @@ const ITEMS: ReadonlyArray<{ key: keyof FormattedSummary; label: MessageKey }> =
   { key: 'maxGain', label: 'viewer.summary.maxGain' },
 ];
 
-export function SummaryPanel({ summary }: SummaryPanelProps) {
+export function SummaryPanel({ summary, bare = false }: SummaryPanelProps) {
   const t = useT();
   const locale = useLocaleStore((state) => state.locale);
   const formatted = formatSummary(summary, locale, t);
@@ -26,7 +28,7 @@ export function SummaryPanel({ summary }: SummaryPanelProps) {
     <section
       aria-label={t('viewer.summary')}
       data-panel="summary"
-      className="rounded-xl glass p-3 text-sm compact:px-2.5 compact:py-1.5"
+      className={bare ? 'px-1 text-sm' : 'rounded-xl glass p-3 text-sm compact:px-2.5 compact:py-1.5'}
     >
       {/*
         Цифры — моноширинные с табличными цифрами (ТЗ §8.4).

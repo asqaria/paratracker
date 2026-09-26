@@ -90,6 +90,7 @@ import {
   type ViewerConfig,
 } from './providers';
 import { AnalyticsPanel, type SelectedSegment } from './AnalyticsPanel';
+import { BottomSheet } from './BottomSheet';
 import { useFlightAnalytics } from './flight-analytics';
 import { SummaryPanel } from './SummaryPanel';
 import { TimelinePanel } from './TimelinePanel';
@@ -837,6 +838,30 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
   const active = (config ? imagerySourceById(config, imagery) : null) ?? sources[0] ?? null;
   const attribution = config ? [...terrainSource(config).attribution, ...(active?.attribution ?? [])] : [];
 
+  // Переключатель подложки — один на десктопе (панель сверху) и на телефоне (шторка).
+  const imageryButtons = (
+    <>
+      <div role="group" aria-label={t('viewer.imagery')} className="flex gap-1">
+        {shownSources.map((source) => (
+          <button
+            key={source.id}
+            type="button"
+            aria-pressed={source.id === imagery}
+            onClick={() => switchImagery(source.id)}
+            className="rounded px-2 py-1 text-secondary aria-pressed:bg-subtle aria-pressed:text-primary compact:min-h-11"
+          >
+            {source.id === 'esri' ? t('viewer.imagery.esri') : t('viewer.imagery.sentinel2')}
+          </button>
+        ))}
+      </div>
+      {imageryNotice !== null && (
+        <p role="status" className="max-w-48 text-xs text-danger">
+          {imageryNotice}
+        </p>
+      )}
+    </>
+  );
+
   return (
     <div className="relative h-dvh w-full">
       {/* touch-none: жесты на сцене — камере, а не прокрутке и зуму страницы. */}
@@ -849,7 +874,10 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
       */}
       <div className="pointer-events-none absolute left-4 right-4 top-4 flex flex-wrap items-start gap-2 compact:left-[max(0.5rem,env(safe-area-inset-left))] compact:right-[max(0.5rem,env(safe-area-inset-right))] compact:top-[max(0.5rem,env(safe-area-inset-top))]">
         <div className="pointer-events-auto flex flex-col gap-2">
-          <SummaryPanel summary={track.summary} />
+          {/* На телефоне сводка, подложка и аналитика — в шторке снизу. */}
+          <div className="compact:hidden">
+            <SummaryPanel summary={track.summary} />
+          </div>
           {error !== null && (
             <p role="alert" className="glass rounded-xl px-3 py-2 text-danger">
               {error}
@@ -857,28 +885,11 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
           )}
         </div>
 
-        <div className="pointer-events-auto ml-auto flex flex-col items-end gap-2">
-        <div data-panel="imagery" className="flex flex-col gap-2 rounded-xl glass p-3 text-sm compact:gap-1 compact:p-1">
-          <span className="text-secondary compact:hidden">{t('viewer.imagery')}</span>
-          <div role="group" aria-label={t('viewer.imagery')} className="flex gap-1">
-            {shownSources.map((source) => (
-              <button
-                key={source.id}
-                type="button"
-                aria-pressed={source.id === imagery}
-                onClick={() => switchImagery(source.id)}
-                className="rounded px-2 py-1 text-secondary aria-pressed:bg-subtle aria-pressed:text-primary compact:min-h-11"
-              >
-                {source.id === 'esri' ? t('viewer.imagery.esri') : t('viewer.imagery.sentinel2')}
-              </button>
-            ))}
-          </div>
-          {imageryNotice !== null && (
-            <p role="status" className="max-w-48 text-xs text-danger">
-              {imageryNotice}
-            </p>
-          )}
-          <span className="numeric text-secondary compact:hidden">
+        <div className="pointer-events-auto ml-auto flex flex-col items-end gap-2 compact:hidden">
+        <div data-panel="imagery" className="flex flex-col gap-2 rounded-xl glass p-3 text-sm">
+          <span className="text-secondary">{t('viewer.imagery')}</span>
+          {imageryButtons}
+          <span className="numeric text-secondary">
             {t('viewer.points')}: {track.pointCount}
           </span>
         </div>
@@ -903,6 +914,29 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
       <div className="absolute bottom-0 left-0 right-0">
         <div className="px-4 pb-2 compact:px-2 compact:pb-1">
           <VarioLegend />
+        </div>
+
+        {/* Телефон: шторка — сводка всегда видна, остальное по жесту (ТЗ §8.3). */}
+        <div className="hidden px-[max(0.5rem,env(safe-area-inset-left))] compact:block">
+          <BottomSheet summary={<SummaryPanel summary={track.summary} bare />}>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <span className="text-secondary">{t('viewer.imagery')}</span>
+                {imageryButtons}
+              </div>
+              {analytics !== null && (
+                <AnalyticsPanel
+                  state={analytics}
+                  timeline={timeline}
+                  timeMs={timeMs}
+                  onSelect={selectSegment}
+                  columnsShown={columnsShown}
+                  onColumnsShown={setColumnsShown}
+                  embedded
+                />
+              )}
+            </div>
+          </BottomSheet>
         </div>
 
         {/*

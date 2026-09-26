@@ -152,6 +152,12 @@ describe('AnalyticsPanel', () => {
     expect(render(ready())).not.toContain(text['viewer.analytics.columns']);
   });
 
+  it('в шторке: без кнопки сворачивания, всегда раскрыта', () => {
+    const html = renderToString(<AnalyticsPanel state={ready()} timeline={timeline} timeMs={START_MS} onSelect={() => {}} embedded />);
+    expect(html).not.toContain('aria-expanded');
+    expect(html).toContain(text['viewer.analytics.thermalCount']);
+  });
+
   it('загрузка и ошибка — своими строками', () => {
     expect(render({ status: 'loading' })).toContain(text['viewer.analytics.loading']);
     expect(render({ status: 'error' })).toContain(text['viewer.analytics.error']);
