@@ -15,9 +15,10 @@ import {
   type SourceFormat,
 } from '@skyline/core';
 import type { FlightRecord } from '@skyline/db';
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
+import { shareOf, viewOf, type FlightView } from './access.js';
 import { hashToken, newRandomToken } from './auth/tokens.js';
 import type { FlightEventListener } from './events.js';
 import { problem, sendProblem } from './problem.js';
@@ -59,6 +60,12 @@ const ACCEPTED = 202;
 const OK = 200;
 /** Пауза между heartbeat-комментариями SSE: прокси рвут простаивающие соединения. */
 const SSE_HEARTBEAT_S = 15;
+/**
+ * Трек полёта неизменен, пока полёт не обработан заново; сутки в личном кэше
+ * браузера — повторные просмотры без запроса, а смена видимости всё равно
+ * закрывает доступ новым зрителям сразу.
+ */
+const TRACK_CACHE_S = 86_400;
 
 const TERMINAL_STATUSES: readonly FlightStatus[] = ['ready', 'failed'];
 const FlightIdParams = z.object({ id: z.uuid() });
@@ -81,13 +88,22 @@ export function registerFlightRoutes(app: FastifyInstance, deps: FlightRoutesDep
 
   void app.register(multipart, { limits: { fileSize: maxFileBytes, files: 1 } });
 
-  const findFlightOr404 = async (id: string, reply: FastifyReply): Promise<FlightRecord | null> => {
+  /**
+   * Полёт, который спрашивающему можно видеть (задача 3.7): владелец, публичный
+   * или «по ссылке» с ?share=. Нельзя — тот же 404, что и для несуществующего.
+   */
+  const findFlightOr404 = async (
+    id: string,
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<{ flight: FlightRecord; view: FlightView } | null> => {
     const flight = await deps.repository.find(id);
-    if (!flight) {
+    const view = flight ? viewOf(flight, request.userId, shareOf(request.query)) : null;
+    if (!flight || !view) {
       await sendProblem(reply, problem(HTTP.notFound, { detail: `Flight ${id} not found` }));
       return null;
     }
-    return flight;
+    return { flight, view };
   };
 
   const readId = async (params: unknown, reply: FastifyReply): Promise<string | null> => {
@@ -155,16 +171,17 @@ export function registerFlightRoutes(app: FastifyInstance, deps: FlightRoutesDep
   app.get('/flights/:id/status', async (request, reply) => {
     const id = await readId(request.params, reply);
     if (id === null) return reply;
-    const flight = await findFlightOr404(id, reply);
-    if (!flight) return reply;
-    return reply.send(toStatusResponse(flight));
+    const found = await findFlightOr404(id, request, reply);
+    if (!found) return reply;
+    return reply.send(toStatusResponse(found.flight));
   });
 
   app.get('/flights/:id/track', async (request, reply) => {
     const id = await readId(request.params, reply);
     if (id === null) return reply;
-    const flight = await findFlightOr404(id, reply);
-    if (!flight) return reply;
+    const found = await findFlightOr404(id, request, reply);
+    if (!found) return reply;
+    const { flight, view } = found;
 
     if (flight.status !== 'ready' || !flight.trackObjectKey) {
       return sendProblem(
@@ -173,19 +190,29 @@ export function registerFlightRoutes(app: FastifyInstance, deps: FlightRoutesDep
       );
     }
 
-    const bytes = await deps.storage.get(flight.trackObjectKey);
-    return reply
-      .code(OK)
-      .type('application/octet-stream')
-      .header('cache-control', 'public, max-age=31536000, immutable')
-      .send(Buffer.from(bytes));
+    // Посторонним — трек без записи на земле (задача 3.7); полёта в записи нет — нечего показать.
+    const key = view === 'owner' ? flight.trackObjectKey : flight.publicTrackObjectKey;
+    if (!key) return sendProblem(reply, problem(HTTP.notFound, { detail: `Flight ${id} not found` }));
+
+    const bytes = await deps.storage.get(key);
+    return (
+      reply
+        .code(OK)
+        .type('application/octet-stream')
+        // Один адрес — разный трек владельцу и постороннему: только личный кэш
+        // браузера и с учётом cookie. Общий кэш отдал бы полный трек чужому.
+        .header('cache-control', `private, max-age=${TRACK_CACHE_S}`)
+        .header('vary', 'Cookie')
+        .send(Buffer.from(bytes))
+    );
   });
 
   app.get('/flights/:id/events', async (request, reply) => {
     const id = await readId(request.params, reply);
     if (id === null) return reply;
-    const flight = await findFlightOr404(id, reply);
-    if (!flight) return reply;
+    const found = await findFlightOr404(id, request, reply);
+    if (!found) return reply;
+    const { flight } = found;
 
     reply.hijack();
     const stream = reply.raw;

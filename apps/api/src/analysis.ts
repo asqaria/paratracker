@@ -8,9 +8,10 @@ import {
   type WindDto,
 } from '@skyline/core';
 import type { FlightDetailsRecord, GlideRecord, ThermalRecord } from '@skyline/db';
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
+import { shareOf, viewOf } from './access.js';
 import { problem, sendProblem } from './problem.js';
 
 /**
@@ -51,6 +52,7 @@ function toDetails(flight: FlightDetailsRecord, viewerId: string | null): Flight
     gliderRaw: flight.gliderRaw,
     xc: flight.xc,
     canEdit: viewerId !== null && viewerId === flight.userId,
+    privacy: flight.privacy,
   });
 }
 
@@ -97,14 +99,15 @@ function toGlides(rows: GlideRecord[]): GlidesResponse {
 
 export function registerAnalysisRoutes(app: FastifyInstance, deps: AnalysisRoutesDeps): void {
   /** Полёт по id из пути; null — ответ с ошибкой уже отправлен. */
-  const flightOf = async (params: unknown, reply: FastifyReply): Promise<FlightDetailsRecord | null> => {
-    const parsed = FlightIdParams.safeParse(params);
+  const flightOf = async (request: FastifyRequest, reply: FastifyReply): Promise<FlightDetailsRecord | null> => {
+    const parsed = FlightIdParams.safeParse(request.params);
     if (!parsed.success) {
       await sendProblem(reply, problem(HTTP.badRequest, { detail: 'Flight id must be a UUID' }));
       return null;
     }
     const flight = await deps.details(parsed.data.id);
-    if (!flight) {
+    // Не видит — тот же 404, что и для несуществующего (задача 3.7).
+    if (!flight || !viewOf(flight, request.userId, shareOf(request.query))) {
       await sendProblem(reply, problem(HTTP.notFound, { detail: `Flight ${parsed.data.id} not found` }));
       return null;
     }
@@ -112,8 +115,8 @@ export function registerAnalysisRoutes(app: FastifyInstance, deps: AnalysisRoute
   };
 
   /** Сегменты и ветер есть только у обработанного полёта — как .track (409). */
-  const readyFlightOf = async (params: unknown, reply: FastifyReply): Promise<FlightDetailsRecord | null> => {
-    const flight = await flightOf(params, reply);
+  const readyFlightOf = async (request: FastifyRequest, reply: FastifyReply): Promise<FlightDetailsRecord | null> => {
+    const flight = await flightOf(request, reply);
     if (!flight) return null;
     if (flight.status !== 'ready') {
       await sendProblem(
@@ -126,22 +129,22 @@ export function registerAnalysisRoutes(app: FastifyInstance, deps: AnalysisRoute
   };
 
   app.get('/flights/:id', async (request, reply) => {
-    const flight = await flightOf(request.params, reply);
+    const flight = await flightOf(request, reply);
     return flight ? reply.send(toDetails(flight, request.userId)) : reply;
   });
 
   app.get('/flights/:id/thermals', async (request, reply) => {
-    const flight = await readyFlightOf(request.params, reply);
+    const flight = await readyFlightOf(request, reply);
     return flight ? reply.send(toThermals(await deps.thermals(flight.id))) : reply;
   });
 
   app.get('/flights/:id/glides', async (request, reply) => {
-    const flight = await readyFlightOf(request.params, reply);
+    const flight = await readyFlightOf(request, reply);
     return flight ? reply.send(toGlides(await deps.glides(flight.id))) : reply;
   });
 
   app.get('/flights/:id/wind', async (request, reply) => {
-    const flight = await readyFlightOf(request.params, reply);
+    const flight = await readyFlightOf(request, reply);
     if (!flight) return reply;
     return reply.send(
       WindResponse.parse({ flight: wind(flight.windDirDeg, flight.windSpeedMs), profile: flight.windProfile ?? [] }),

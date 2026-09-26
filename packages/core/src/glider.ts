@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { Privacy } from './user.js';
+
 /**
  * Крылья пилота (ТЗ §9 gliders, задача 2.13б). Полёт привязывается к крылу:
  * у нового полёта — крыло по умолчанию, пилот может сменить.
@@ -49,8 +51,13 @@ export type GlidersResponse = z.infer<typeof GlidersResponse>;
 export const GliderSummary = z.object({ id: z.uuid(), label: z.string() });
 export type GliderSummary = z.infer<typeof GliderSummary>;
 
-/** PATCH /api/v1/flights/{id}: пока только крыло; null — отвязать. */
-export const FlightPatch = z.object({ gliderId: z.uuid().nullable() });
+/**
+ * PATCH /api/v1/flights/{id}: крыло (null — отвязать) и приватность (задача 3.7).
+ * Хотя бы одно поле.
+ */
+export const FlightPatch = z
+  .object({ gliderId: z.uuid().nullable().optional(), privacy: Privacy.optional() })
+  .refine((patch) => patch.gliderId !== undefined || patch.privacy !== undefined, { message: 'Nothing to change' });
 export type FlightPatch = z.infer<typeof FlightPatch>;
 
 /** «Ozone Rush 6 ML» — как пилоты называют крыло. */

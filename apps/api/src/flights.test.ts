@@ -20,6 +20,11 @@ const record = (overrides: Partial<FlightRecord> = {}): FlightRecord => ({
   rawObjectKey: `raw/anonymous/${FLIGHT_ID}.igc.gz`,
   trackObjectKey: null,
   errorCode: null,
+  // Анонимная загрузка — видна по id, как сразу после загрузки.
+  userId: null,
+  privacy: 'unlisted',
+  shareToken: null,
+  publicTrackObjectKey: null,
   ...overrides,
 });
 
@@ -208,6 +213,55 @@ describe('GET /api/v1/flights/:id/track', () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers['content-type']).toBe('application/octet-stream');
     expect(new Uint8Array(response.rawPayload)).toEqual(Uint8Array.of(83, 75, 84, 82, 1, 2, 3, 4));
+  });
+
+  it('трек не кэшируется общими кэшами: владельцу и постороннему по одному адресу — разный', async () => {
+    const test = harness({ flight: record({ status: 'ready', trackObjectKey: 'tracks/x.track' }) });
+    test.objects.set('tracks/x.track', Uint8Array.of(1));
+    const response = await test.app.inject({ method: 'GET', url: `/api/v1/flights/${FLIGHT_ID}/track` });
+    expect(response.headers['cache-control']).toMatch(/^private/);
+    expect(response.headers.vary).toBe('Cookie');
+  });
+
+  describe('приватность (задача 3.7): посторонний видит трек без записи на земле', () => {
+    const OWNER = '77777777-2222-4333-8444-555555555555';
+    const owned = (overrides: Partial<FlightRecord>) =>
+      record({
+        status: 'ready',
+        trackObjectKey: 'tracks/x.track',
+        publicTrackObjectKey: 'tracks/x.public.track',
+        userId: OWNER,
+        shareToken: 'tok',
+        ...overrides,
+      });
+    const fetchTrack = async (flight: FlightRecord, query = '') => {
+      const test = harness({ flight });
+      test.objects.set('tracks/x.track', Uint8Array.of(1));
+      test.objects.set('tracks/x.public.track', Uint8Array.of(2));
+      const response = await test.app.inject({ method: 'GET', url: `/api/v1/flights/${FLIGHT_ID}/track${query}` });
+      return { status: response.statusCode, body: Array.from(new Uint8Array(response.rawPayload)) };
+    };
+
+    it('публичный — обрезанный трек любому', async () => {
+      expect(await fetchTrack(owned({ privacy: 'public' }))).toEqual({ status: 200, body: [2] });
+    });
+
+    it('«по ссылке» — с верным ?share= обрезанный, без него и с чужим — 404', async () => {
+      expect(await fetchTrack(owned({ privacy: 'unlisted' }), '?share=tok')).toEqual({ status: 200, body: [2] });
+      expect((await fetchTrack(owned({ privacy: 'unlisted' }))).status).toBe(404);
+      expect((await fetchTrack(owned({ privacy: 'unlisted' }), '?share=nope')).status).toBe(404);
+    });
+
+    it('«только я» — 404 даже с токеном; статус тоже закрыт', async () => {
+      expect((await fetchTrack(owned({ privacy: 'private' }), '?share=tok')).status).toBe(404);
+      const test = harness({ flight: owned({ privacy: 'private' }) });
+      const status = await test.app.inject({ method: 'GET', url: `/api/v1/flights/${FLIGHT_ID}/status` });
+      expect(status.statusCode).toBe(404);
+    });
+
+    it('полёта в записи нет (обрезать нечего) — постороннему нечего показать', async () => {
+      expect((await fetchTrack(owned({ privacy: 'public', publicTrackObjectKey: null }))).status).toBe(404);
+    });
   });
 
   it('полёт ещё не обработан — 409; нет полёта — 404', async () => {

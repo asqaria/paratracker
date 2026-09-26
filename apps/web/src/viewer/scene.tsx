@@ -94,7 +94,7 @@ import {
 } from './providers';
 import { AnalyticsPanel, type SelectedSegment } from './AnalyticsPanel';
 import { BottomSheet } from './BottomSheet';
-import { useCreateSite, useFlightAnalytics, useOwnGliders, useSetFlightGlider } from './flight-analytics';
+import { useCreateSite, useFlightAnalytics, useOwnGliders, usePrivacyControls, useSetFlightGlider } from './flight-analytics';
 import { SummaryLine, SummaryPanel } from './SummaryPanel';
 import { ReviewPanel } from '../review/ReviewPanel';
 import { aglProfile } from './agl';
@@ -132,6 +132,8 @@ export interface SceneProps {
   flightId?: string | null;
   /** Режим сверки термиков владельцем (DoD фазы 2): панель сверки вместо «Аналитики». */
   review?: boolean;
+  /** Токен ссылки «по ссылке» (задача 3.7): идёт в запросы аналитики. */
+  share?: string;
   /**
    * Свечение под треком (ТЗ §7.3). По умолчанию выключено: прозрачный примитив
    * рисуется в проходе после непрозрачного, то есть ложится ПОВЕРХ цветной линии
@@ -309,7 +311,7 @@ function createImageryProvider(source: ImagerySource): ImageryLayer {
   );
 }
 
-export function Scene({ track, flightId = null, showGlow = false, review = false }: SceneProps) {
+export function Scene({ track, flightId = null, showGlow = false, review = false, share }: SceneProps) {
   const t = useT();
   const container = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Viewer | null>(null);
@@ -765,7 +767,8 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
     viewerRef.current?.scene.requestRender();
   }, [timeline]);
 
-  const analytics = useFlightAnalytics(flightId);
+  const analytics = useFlightAnalytics(flightId, share ?? null);
+  const privacy = usePrivacyControls(flightId);
   const createSite = useCreateSite(flightId);
   const setGlider = useSetFlightGlider(flightId);
   const ownGliders = useOwnGliders();
@@ -907,6 +910,7 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
     xcRouteShown,
     onXcRouteShown: setXcRouteShown,
     onShowXcRoute: showXcRoute,
+    ...(privacy ? { privacy } : {}),
   };
 
   const togglePlay = useCallback(() => {

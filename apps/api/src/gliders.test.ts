@@ -1,5 +1,5 @@
 import { GliderDto, GlidersResponse, PROBLEM_CONTENT_TYPE, type GliderInput } from '@skyline/core';
-import type { GliderRecord, SetFlightGliderResult } from '@skyline/db';
+import type { GliderRecord } from '@skyline/db';
 import { describe, expect, it } from 'vitest';
 
 import { buildApp } from './app.js';
@@ -9,7 +9,6 @@ import type { GliderRoutesDeps } from './gliders.js';
 
 const SECRET = new TextEncoder().encode('test-secret-that-is-at-least-32-bytes!');
 const USER_ID = '11111111-2222-4333-8444-555555555555';
-const FLIGHT_ID = '22222222-2222-4333-8444-555555555555';
 const GLIDER_ID = '44444444-2222-4333-8444-555555555555';
 const NOW = new Date(Date.UTC(2026, 8, 26, 12));
 
@@ -22,7 +21,7 @@ const RUSH: GliderRecord = {
   isDefault: true,
 };
 
-function harness(options: { create?: GliderRecord | null; update?: GliderRecord | null; remove?: boolean; set?: SetFlightGliderResult } = {}) {
+function harness(options: { create?: GliderRecord | null; update?: GliderRecord | null; remove?: boolean } = {}) {
   const calls: unknown[][] = [];
   const auth: AuthDeps = {
     jwtSecret: SECRET,
@@ -53,10 +52,6 @@ function harness(options: { create?: GliderRecord | null; update?: GliderRecord 
       calls.push(['remove', userId, id]);
       return Promise.resolve(options.remove ?? true);
     },
-    setFlightGlider: (args) => {
-      calls.push(['set', args]);
-      return Promise.resolve(options.set ?? 'ok');
-    },
   };
   return { app: buildApp({ logger: false, auth, gliders }), calls };
 }
@@ -72,7 +67,6 @@ describe('крылья', () => {
       ['POST', '/api/v1/gliders'],
       ['PATCH', `/api/v1/gliders/${GLIDER_ID}`],
       ['DELETE', `/api/v1/gliders/${GLIDER_ID}`],
-      ['PATCH', `/api/v1/flights/${FLIGHT_ID}`],
     ] as const) {
       const res = await h.app.inject({ method, url, payload: {} });
       expect(res.statusCode, `${method} ${url}`).toBe(401);
@@ -104,19 +98,5 @@ describe('крылья', () => {
     expect((await harness({ update: null }).app.inject({ method: 'PATCH', url: `/api/v1/gliders/${GLIDER_ID}`, ...opts })).statusCode).toBe(404);
     expect((await harness({ remove: false }).app.inject({ method: 'DELETE', url: `/api/v1/gliders/${GLIDER_ID}`, cookies: opts.cookies })).statusCode).toBe(404);
     expect((await harness().app.inject({ method: 'DELETE', url: `/api/v1/gliders/${GLIDER_ID}`, cookies: opts.cookies })).statusCode).toBe(204);
-  });
-
-  it('крыло полёта: 204; null отвязывает; чужой полёт или крыло — 404', async () => {
-    const h = harness();
-    const patch = async (app: typeof h.app, gliderId: string | null) =>
-      app.inject({ method: 'PATCH', url: `/api/v1/flights/${FLIGHT_ID}`, cookies: await cookies(), payload: { gliderId } });
-    expect((await patch(h.app, GLIDER_ID)).statusCode).toBe(204);
-    expect((await patch(h.app, null)).statusCode).toBe(204);
-    expect(h.calls).toEqual([
-      ['set', { flightId: FLIGHT_ID, userId: USER_ID, gliderId: GLIDER_ID }],
-      ['set', { flightId: FLIGHT_ID, userId: USER_ID, gliderId: null }],
-    ]);
-    expect((await patch(harness({ set: 'flight_not_found' }).app, GLIDER_ID)).statusCode).toBe(404);
-    expect((await patch(harness({ set: 'glider_not_found' }).app, GLIDER_ID)).statusCode).toBe(404);
   });
 });

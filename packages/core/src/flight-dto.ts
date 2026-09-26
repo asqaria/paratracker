@@ -44,3 +44,11 @@ export const FlightStatusResponse = z.object({
   trackReady: z.boolean(),
 });
 export type FlightStatusResponse = z.infer<typeof FlightStatusResponse>;
+
+/** POST /api/v1/flights/{id}/share и …/share/reset — токен ссылки «по ссылке» (задача 3.7). */
+export const ShareLinkResponse = z.object({ token: z.string().min(1) });
+export type ShareLinkResponse = z.infer<typeof ShareLinkResponse>;
+
+/** GET /api/v1/share/{token} — какой полёт открывает ссылка. */
+export const SharedFlightResponse = z.object({ flightId: z.uuid() });
+export type SharedFlightResponse = z.infer<typeof SharedFlightResponse>;

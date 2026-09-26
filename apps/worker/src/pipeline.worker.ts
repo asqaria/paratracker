@@ -7,6 +7,7 @@ import {
   simplifyTrack,
   summarizeFlight,
   totalGain,
+  visibleRange,
 } from '@skyline/analysis';
 import {
   DEFAULT_AIRCRAFT_TYPE,
@@ -44,6 +45,11 @@ export interface PipelineTaskMessage {
 export interface PipelineSuccess {
   ok: true;
   track: ArrayBuffer;
+  /**
+   * .track для посторонних (задача 3.7): от взлёта до посадки плюс секунды
+   * по краям, без записи на земле; null — полёта нет, посторонним нечего показать.
+   */
+  publicTrack: ArrayBuffer | null;
   pointCount: number;
   analysisLevel: 'full' | 'basic';
   altitudeSource: 'baro' | 'gnss';
@@ -122,7 +128,7 @@ export function runPipeline(message: PipelineTaskMessage, onProgress: (value: nu
   }
   onProgress(PROGRESS.analysed);
 
-  const buffer = writeTrack({
+  const columns = {
     t: points.t,
     lat: points.lat,
     lon: points.lon,
@@ -131,7 +137,8 @@ export function runPipeline(message: PipelineTaskMessage, onProgress: (value: nu
     gSpeed: points.groundSpeed,
     heading: points.heading,
     flags: points.flags,
-  });
+  };
+  const buffer = writeTrack(columns);
   onProgress(PROGRESS.packed);
 
   // Сводка и линия для логбука — по тем же очищенным точкам, что и .track.
@@ -151,6 +158,20 @@ export function runPipeline(message: PipelineTaskMessage, onProgress: (value: nu
     altM: points.altitude[i] ?? Number.NaN,
   });
 
+  const visible = visibleRange(points.t, range);
+  const publicTrack = visible
+    ? writeTrack({
+        t: columns.t.subarray(visible.takeoff, visible.landing + 1),
+        lat: columns.lat.subarray(visible.takeoff, visible.landing + 1),
+        lon: columns.lon.subarray(visible.takeoff, visible.landing + 1),
+        alt: columns.alt.subarray(visible.takeoff, visible.landing + 1),
+        vSpeed: columns.vSpeed.subarray(visible.takeoff, visible.landing + 1),
+        gSpeed: columns.gSpeed.subarray(visible.takeoff, visible.landing + 1),
+        heading: columns.heading.subarray(visible.takeoff, visible.landing + 1),
+        flags: columns.flags.subarray(visible.takeoff, visible.landing + 1),
+      })
+    : null;
+
   const startedAt = points.t[0] ?? Number.NaN;
   const endedAt = points.t[points.t.length - 1] ?? Number.NaN;
   onProgress(PROGRESS.done);
@@ -160,6 +181,7 @@ export function runPipeline(message: PipelineTaskMessage, onProgress: (value: nu
     result: {
       ok: true,
       track: buffer,
+      publicTrack,
       pointCount: points.t.length,
       analysisLevel: derived.analysisLevel,
       altitudeSource: derived.altitudeSource,
@@ -195,7 +217,11 @@ if (parentPort) {
   port.on('message', (message: PipelineTaskMessage) => {
     try {
       const outcome = runPipeline(message, (value) => port.postMessage({ type: 'progress', value }));
-      port.postMessage(outcome, outcome.type === 'result' && outcome.result.ok ? [outcome.result.track] : []);
+      const transfer =
+        outcome.type === 'result' && outcome.result.ok
+          ? [outcome.result.track, ...(outcome.result.publicTrack ? [outcome.result.publicTrack] : [])]
+          : [];
+      port.postMessage(outcome, transfer);
     } catch (cause) {
       // Наружу уходит только код, но причина обязана попасть в логи: пустой
       // catch делал «поток не загрузился» неотличимым от отказа парсера.

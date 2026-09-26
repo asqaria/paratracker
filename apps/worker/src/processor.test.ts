@@ -76,6 +76,10 @@ const record = (overrides: Partial<FlightRecord> = {}): FlightRecord => ({
   rawObjectKey: 'raw/anonymous/flight.igc.gz',
   trackObjectKey: null,
   errorCode: null,
+  userId: null,
+  privacy: 'unlisted',
+  shareToken: null,
+  publicTrackObjectKey: null,
   ...overrides,
 });
 
@@ -111,6 +115,9 @@ describe('обработка одного полёта', { timeout: PROCESSOR_TE
     expect(statuses).toEqual(['parsing', 'ready']);
     // Датум — в лог воркера с flightId: так видно треки с датумом по умолчанию (спек высот).
     expect(processed).toEqual([{ flightId: FLIGHT_ID, gnssAltitudeDatum: 'assumed-geoid' }]);
+    // Трек для посторонних (задача 3.7) — рядом с полным, с суффиксом .public.track.
+    expect(ready[0]?.publicTrackObjectKey).toMatch(/^tracks\/.*\.public\.track$/);
+    expect(objects.has(ready[0]?.publicTrackObjectKey ?? '')).toBe(true);
     const trackKey = ready[0]?.trackObjectKey ?? '';
     expect(trackKey).toMatch(/^tracks\/.*\.track$/);
     expect(readTrack(objects.get(trackKey) ?? new Uint8Array()).pointCount).toBe(960);

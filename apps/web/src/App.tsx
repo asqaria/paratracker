@@ -5,6 +5,7 @@ import { GlidersPage } from './gliders/GlidersPage';
 import { HealthPage } from './health/HealthPage';
 import { ClaimOnSignIn } from './logbook/ClaimOnSignIn';
 import { LogbookPage } from './logbook/LogbookPage';
+import { SharedFlightPage } from './sharing/SharedFlightPage';
 import { routeFromHash, type Route } from './routing';
 import { UploadPage } from './upload/UploadPage';
 
@@ -39,6 +40,7 @@ function Screen() {
   if (route.kind === 'health') return <HealthPage />;
   if (route.kind === 'logbook') return <LogbookPage />;
   if (route.kind === 'settings') return <GlidersPage />;
+  if (route.kind === 'shared') return <SharedFlightPage token={route.token} />;
   if (route.kind === 'flight') {
     return <FlightViewerPage flightId={route.flightId} trackUrl={route.trackUrl} review={route.review === true} />;
   }
