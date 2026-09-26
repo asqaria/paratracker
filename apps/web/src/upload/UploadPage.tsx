@@ -1,6 +1,8 @@
 import type { FlightStatus } from '@skyline/core';
 import { useCallback, useEffect, useState } from 'react';
 
+import { ensureFreshSession, useMe } from '../auth/session';
+import { UserMenu } from '../auth/UserMenu';
 import { LocaleSwitch } from '../i18n/LocaleSwitch';
 import { useLocaleStore, useT } from '../i18n/locale';
 import { flightHash, HEALTH_HASH } from '../routing';
@@ -28,8 +30,14 @@ type Phase =
 
 const PERCENT = 100;
 
-export function UploadPage() {
+interface UploadPageProps {
+  /** Вернулись с неудачного входа через Google. */
+  authFailed?: boolean;
+}
+
+export function UploadPage({ authFailed = false }: UploadPageProps) {
   const t = useT();
+  const me = useMe();
   const locale = useLocaleStore((state) => state.locale);
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const [flightId, setFlightId] = useState<string | null>(null);
@@ -43,7 +51,10 @@ export function UploadPage() {
         return;
       }
       setPhase({ kind: 'uploading', fileName: file.name });
-      void uploadTrack(file).then(
+      // Access-cookie живёт 15 минут: без обновления полёт ушёл бы анонимным.
+      void ensureFreshSession()
+        .then(() => uploadTrack(file))
+        .then(
         (accepted) => {
           setFlightId(accepted.flightId);
           setPhase({ kind: 'processing', fileName: file.name, status: accepted.status });
@@ -97,8 +108,17 @@ export function UploadPage() {
       <section className="w-full max-w-xl rounded-2xl glass p-6">
         <header className="mb-6 flex items-center justify-between">
           <h1 className="text-lg font-semibold">{t('app.name')}</h1>
-          <LocaleSwitch />
+          <div className="flex items-center gap-3">
+            <UserMenu />
+            <LocaleSwitch />
+          </div>
         </header>
+
+        {authFailed && (
+          <p role="alert" className="mb-4 text-danger">
+            {t('auth.failed')}
+          </p>
+        )}
 
         {busy ? (
           <div className="rounded-xl border border-subtle p-8 text-center">
@@ -157,7 +177,9 @@ export function UploadPage() {
         )}
 
         {/* ТЗ §11.2: анонимная загрузка живёт ограниченный срок — пилот знает об этом заранее. */}
-        <p className="mt-3 text-center text-xs text-secondary">{retentionMessage(t, locale)}</p>
+        <p className="mt-3 text-center text-xs text-secondary">
+          {me ? t('auth.savedToLogbook') : retentionMessage(t, locale)}
+        </p>
 
         {phase.kind === 'error' && (
           <div className="mt-4 flex items-center justify-between gap-4">

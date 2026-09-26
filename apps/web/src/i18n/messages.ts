@@ -116,6 +116,11 @@ const ru = {
   'unit.kilometresPerHour': '{value} км/ч',
   'unit.minutes': '{minutes} мин',
   'unit.hoursMinutes': '{hours} ч {minutes} мин',
+  'auth.signIn': 'Войти через Google',
+  'auth.signOut': 'Выйти',
+  'auth.account': 'Аккаунт',
+  'auth.failed': 'Не удалось войти через Google. Попробуйте ещё раз.',
+  'auth.savedToLogbook': 'Полёт сохранится в вашем аккаунте',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -237,6 +242,11 @@ const en: Messages = {
   'unit.kilometresPerHour': '{value} km/h',
   'unit.minutes': '{minutes} min',
   'unit.hoursMinutes': '{hours} h {minutes} min',
+  'auth.signIn': 'Sign in with Google',
+  'auth.signOut': 'Sign out',
+  'auth.account': 'Account',
+  'auth.failed': 'Could not sign in with Google. Please try again.',
+  'auth.savedToLogbook': 'The flight will be saved to your account',
 };
 
 export const messages: Record<Locale, Messages> = { ru, en };

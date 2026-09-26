@@ -1,16 +1,23 @@
 import {
   createChannelListener,
   createDatabase,
+  createSession,
   findFlight,
   findFlightDetails,
+  findUserProfile,
   FLIGHT_STATUS_CHANNEL,
   insertFlight,
   listGlides,
   listThermals,
   notifyFlightQueued,
+  revokeSession,
+  rotateSession,
+  signInWithOAuth,
 } from '@skyline/db';
 
 import { buildApp } from './app.js';
+import { createGoogleOAuth } from './auth/google.js';
+import type { AuthDeps } from './auth/routes.js';
 import { loadConfig } from './config.js';
 import { HEALTH_CHECK_TIMEOUT_S } from './constants.js';
 import { createFlightEventHub } from './events.js';
@@ -22,6 +29,27 @@ const database = createDatabase(config.DATABASE_URL);
 const s3 = createStorageClient(config);
 const storage = createObjectStorage(s3, config.S3_BUCKET);
 
+/** Вход (задача 2.10): без секрета JWT выключен, все загрузки анонимные. */
+const auth: AuthDeps | undefined = config.AUTH_JWT_SECRET
+  ? {
+      jwtSecret: new TextEncoder().encode(config.AUTH_JWT_SECRET),
+      publicUrl: config.PUBLIC_URL.replace(/\/+$/, ''),
+      google:
+        config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET
+          ? createGoogleOAuth({ clientId: config.GOOGLE_CLIENT_ID, clientSecret: config.GOOGLE_CLIENT_SECRET })
+          : null,
+      users: {
+        signIn: (identity) => signInWithOAuth(database.db, identity),
+        profile: (id) => findUserProfile(database.db, id),
+      },
+      sessions: {
+        create: (session) => createSession(database.db, session),
+        rotate: (args) => rotateSession(database.db, args),
+        revoke: (tokenHash, now) => revokeSession(database.db, tokenHash, now),
+      },
+    }
+  : undefined;
+
 /** События конвейера приходят от воркера через LISTEN/NOTIFY, без опроса базы. */
 const events = createFlightEventHub();
 
@@ -30,6 +58,7 @@ const app = buildApp({
     level: config.LOG_LEVEL,
     redact: ['req.headers.authorization', 'req.headers.cookie'],
   },
+  ...(auth ? { auth } : {}),
   health: {
     probe: createHealthProbe({ db: database.db, storage: s3, bucket: config.S3_BUCKET }),
     timeoutS: HEALTH_CHECK_TIMEOUT_S,

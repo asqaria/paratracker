@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { flightHash, HEALTH_HASH, routeFromHash, trackUrlFromHash } from './routing';
+import { AUTH_FAILED_HASH, flightHash, HEALTH_HASH, routeFromHash, trackUrlFromHash } from './routing';
 
 describe('trackUrlFromHash', () => {
   it('полёт по id — .track из API', () => {
@@ -23,6 +23,10 @@ describe('routeFromHash', () => {
     for (const hash of ['', '#/', '#/other']) {
       expect(routeFromHash(hash), hash).toEqual({ kind: 'landing' });
     }
+  });
+
+  it('неудачный вход — лендинг с сообщением', () => {
+    expect(routeFromHash(AUTH_FAILED_HASH)).toEqual({ kind: 'landing', authFailed: true });
   });
 
   it('состояние сервисов — отдельный маршрут', () => {

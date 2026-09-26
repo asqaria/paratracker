@@ -127,11 +127,13 @@ export function registerFlightRoutes(app: FastifyInstance, deps: FlightRoutesDep
     }
 
     const flightId = newFlightId();
-    // Анонимная загрузка (ТЗ §7.1, §11.2): пользователя ещё нет, TTL 30 дней.
-    const rawObjectKey = `raw/anonymous/${flightId}.${fileExtension(file.filename)}.gz`;
+    // Вошедший — полёт его (ТЗ §5.3: raw/{userId}/…); без входа — анонимный,
+    // TTL 30 дней (ТЗ §7.1, §11.2).
+    const { userId } = request;
+    const rawObjectKey = `raw/${userId ?? 'anonymous'}/${flightId}.${fileExtension(file.filename)}.gz`;
     await deps.storage.put(rawObjectKey, await gzipAsync(bytes), 'application/gzip');
 
-    const flight = await deps.repository.insert({ id: flightId, userId: null, sourceFormat: format, rawObjectKey });
+    const flight = await deps.repository.insert({ id: flightId, userId, sourceFormat: format, rawObjectKey });
     await deps.onQueued(flight.id);
 
     return reply

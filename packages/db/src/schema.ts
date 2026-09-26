@@ -1,6 +1,7 @@
 import {
   ALTITUDE_SOURCES,
   ANALYSIS_LEVELS,
+  AUTH_PROVIDERS,
   DEFAULT_PRIVACY,
   FLIGHT_STATUSES,
   GLIDE_KINDS,
@@ -21,6 +22,7 @@ import {
   jsonb,
   numeric,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uuid,
@@ -30,7 +32,8 @@ import {
 import { citext, geography } from './columns.js';
 
 /**
- * Схема по ТЗ §9: users и flights (Фаза 0, задача 0.4), thermals и glides (задача 2.5).
+ * Схема по ТЗ §9: users и flights (Фаза 0, задача 0.4), thermals и glides (задача 2.5),
+ * oauth_accounts и sessions (задача 2.10).
  *
  * Отступления от текста §9, обязательные по CLAUDE.md:
  * - дистанции хранятся в метрах (`*_m integer`), а не в км: внутри системы только СИ;
@@ -65,6 +68,50 @@ export const users = pgTable(
     check('users_locale_check', oneOf(t.locale, LOCALES)),
     check('users_default_privacy_check', oneOf(t.defaultPrivacy, PRIVACY_LEVELS)),
   ],
+);
+
+/**
+ * Вход через провайдера OAuth (задача 2.10). Паролей нет: пользователь — это
+ * одна или несколько внешних учёток. subject — неизменный id у провайдера
+ * (`sub` в id_token Google); email у провайдера может смениться, sub — нет.
+ */
+export const oauthAccounts = pgTable(
+  'oauth_accounts',
+  {
+    provider: text('provider', { enum: AUTH_PROVIDERS }).notNull(),
+    subject: text('subject').notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.provider, t.subject] }),
+    check('oauth_accounts_provider_check', oneOf(t.provider, AUTH_PROVIDERS)),
+    index('oauth_accounts_user_idx').on(t.userId),
+  ],
+);
+
+/**
+ * Сессии: refresh-токены (ТЗ §10). Храним только SHA-256 токена — утёкшая
+ * база не даёт войти. Ротация: при refresh старая строка отзывается и
+ * ссылается на новую (replaced_by); повтор отозванного токена — кража,
+ * гасятся все сессии пользователя.
+ */
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull().unique(),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    expiresAt: timestamptz('expires_at').notNull(),
+    revokedAt: timestamptz('revoked_at'),
+    replacedBy: uuid('replaced_by'),
+  },
+  (t) => [index('sessions_user_idx').on(t.userId)],
 );
 
 export const flights = pgTable(
