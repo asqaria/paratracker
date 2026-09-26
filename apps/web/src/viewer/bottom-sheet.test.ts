@@ -5,21 +5,22 @@ import { SHEET, SHEET_SNAPS, sheetHeights, snapAfterDrag, toggleSnap } from './b
 /** Шторка на телефоне (ТЗ §8.3): три положения — свёрнута, половина, весь экран. */
 
 describe('sheetHeights', () => {
-  it('свёрнута — ручка и сводка; весь экран — доступное место без зазора сверху; половина — половина его', () => {
-    const heights = sheetHeights(600);
+  it('свёрнута — ручка и сводка; весь экран — доступное место без зазора сверху; половина — посередине', () => {
+    // 800 px: 15 % — 120 px, больше предела — зазор 96 px.
+    const heights = sheetHeights(800);
     expect(heights.peek).toBe(SHEET.peekPx);
-    expect(heights.full).toBe(600 - SHEET.topGapPx);
-    expect(heights.half).toBe(Math.round((600 - SHEET.topGapPx) * SHEET.halfFraction));
+    expect(heights.full).toBe(800 - SHEET.topGapPx);
+    expect(heights.half).toBe(Math.round((SHEET.peekPx + 800 - SHEET.topGapPx) / 2));
   });
 
   it('раскрытая шторка не выходит за доступное место — ручка остаётся на экране', () => {
     expect(sheetHeights(600).full).toBeLessThanOrEqual(600);
   });
 
-  it('низкий экран (телефон лёжа) — положения не ниже свёрнутой и по порядку', () => {
-    const heights = sheetHeights(150);
-    expect(heights.half).toBeGreaterThanOrEqual(heights.peek);
-    expect(heights.full).toBeGreaterThanOrEqual(heights.half);
+  it('телефон лёжа (над таймлайном ~240 px) — три разных положения, шторка раскрывается', () => {
+    const heights = sheetHeights(240);
+    expect(heights.half).toBeGreaterThan(heights.peek);
+    expect(heights.full).toBeGreaterThan(heights.half);
   });
 });
 

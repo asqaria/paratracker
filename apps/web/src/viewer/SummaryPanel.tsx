@@ -27,7 +27,7 @@ export function SummaryPanel({ summary, bare = false }: SummaryPanelProps) {
   return (
     <section
       aria-label={t('viewer.summary')}
-      data-panel="summary"
+      data-panel={bare ? 'sheet-summary' : 'summary'}
       className={bare ? 'px-1 text-sm' : 'rounded-xl glass p-3 text-sm compact:px-2.5 compact:py-1.5'}
     >
       {/*

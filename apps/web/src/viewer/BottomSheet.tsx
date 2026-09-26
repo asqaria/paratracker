@@ -107,7 +107,7 @@ export function BottomSheet({ summary, children, defaultSnap = 'peek' }: BottomS
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className="flex min-h-6 w-full shrink-0 touch-none items-center justify-center"
+        className="flex min-h-11 w-full shrink-0 touch-none items-center justify-center"
       >
         <span aria-hidden="true" className="h-1 w-10 rounded-full bg-secondary/60" />
       </button>

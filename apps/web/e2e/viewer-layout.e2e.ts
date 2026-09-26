@@ -13,7 +13,14 @@ const VIEWPORTS = [
   { name: 'десктоп', width: 1440, height: 900, compact: false },
 ] as const;
 
-const PANELS = ['summary', 'imagery', 'legend', 'attribution', 'timeline'] as const;
+/**
+ * Десктоп — панели поверх сцены; телефон — сводка, подложка и аналитика
+ * в шторке снизу (ТЗ §8.3), верхних панелей нет.
+ */
+const PANELS = {
+  compact: ['sheet', 'legend', 'attribution', 'timeline'],
+  wide: ['summary', 'imagery', 'legend', 'attribution', 'timeline'],
+} as const;
 
 /** Apple HIG / WCAG 2.5.5: цель касания не меньше 44 CSS px. */
 const MIN_TAP_PX = 44;
@@ -39,7 +46,8 @@ async function openDemo(page: Page): Promise<void> {
   await page.route('**/api/v1/imagery', (route) => route.fulfill({ json: { esri: true } }));
   await page.goto('/#/demo');
   await expect(page.locator('[data-panel="timeline"]')).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator('[data-panel="imagery"] button')).toHaveCount(2);
+  // Переключатель подложки — в верхней панели (десктоп) и в шторке (телефон), по две кнопки.
+  await expect(page.locator(':is([data-panel="imagery"], [data-panel="sheet-imagery"]) button')).toHaveCount(4);
 }
 
 for (const viewport of VIEWPORTS) {
@@ -48,9 +56,10 @@ for (const viewport of VIEWPORTS) {
 
     test('панели на экране и не наезжают друг на друга', async ({ page }) => {
       await openDemo(page);
+      const panels = viewport.compact ? PANELS.compact : PANELS.wide;
       const boxes = new Map<string, Box>();
-      for (const panel of PANELS) {
-        const box = await page.locator(`[data-panel="${panel}"]`).boundingBox();
+      for (const panel of panels) {
+        const box = await page.locator(`[data-panel="${panel}"]:visible`).boundingBox();
         expect(box, `${panel} не отрисована`).not.toBeNull();
         if (!box) continue;
         expect(box.x, `${panel} за левым краем`).toBeGreaterThanOrEqual(-EPSILON_PX);
@@ -59,8 +68,8 @@ for (const viewport of VIEWPORTS) {
         expect(box.y + box.height, `${panel} за нижним краем`).toBeLessThanOrEqual(viewport.height + EPSILON_PX);
         boxes.set(panel, box);
       }
-      for (const [i, a] of PANELS.entries()) {
-        for (const b of PANELS.slice(i + 1)) {
+      for (const [i, a] of panels.entries()) {
+        for (const b of panels.slice(i + 1)) {
           const boxA = boxes.get(a);
           const boxB = boxes.get(b);
           if (boxA && boxB) expect(overlaps(boxA, boxB), `${a} наезжает на ${b}`).toBe(false);
@@ -86,19 +95,36 @@ for (const viewport of VIEWPORTS) {
     });
 
     if (viewport.compact) {
-      test('кнопки таймлайна и подложки — под палец', async ({ page }) => {
+      test('кнопки таймлайна, ручка шторки и подложка — под палец', async ({ page }) => {
         await openDemo(page);
+        // Подложка — в шторке: раскрыть её тапом по ручке.
+        await page.locator('[data-panel="sheet"] > button').click();
+        await expect(page.locator('[data-panel="sheet"]')).toHaveAttribute('data-snap', 'half');
         // Кнопка «развернуть атрибуцию» — второстепенная, ей хватает строки текста.
         const controls = page.locator(
-          '[data-panel="timeline"] :is(button, select):visible, [data-panel="imagery"] button:visible',
+          '[data-panel="timeline"] :is(button, select):visible, [data-panel="sheet"] > button, [data-panel="sheet-imagery"] button:visible',
         );
         const count = await controls.count();
-        expect(count).toBeGreaterThanOrEqual(5);
+        expect(count).toBeGreaterThanOrEqual(7);
         for (let i = 0; i < count; i++) {
           const box = await controls.nth(i).boundingBox();
           const label = (await controls.nth(i).getAttribute('aria-label')) ?? (await controls.nth(i).innerText());
           expect(box?.height ?? 0, `${label}: высота`).toBeGreaterThanOrEqual(MIN_TAP_PX - EPSILON_PX);
         }
+      });
+
+      test('шторка: тап по ручке — половина экрана, ещё тап — свёрнута; сводка видна всегда', async ({ page }) => {
+        await openDemo(page);
+        const sheet = page.locator('[data-panel="sheet"]');
+        const handle = sheet.locator('> button');
+        await expect(sheet).toHaveAttribute('data-snap', 'peek');
+        await expect(page.locator('[data-panel="sheet-summary"]')).toBeVisible();
+        const peek = (await sheet.boundingBox())?.height ?? 0;
+        await handle.click();
+        await expect(sheet).toHaveAttribute('data-snap', 'half');
+        await expect.poll(async () => (await sheet.boundingBox())?.height ?? 0).toBeGreaterThan(peek);
+        await handle.click();
+        await expect(sheet).toHaveAttribute('data-snap', 'peek');
       });
 
       test('атрибуция: свёрнута в строку и разворачивается по кнопке', async ({ page }) => {

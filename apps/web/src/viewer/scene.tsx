@@ -920,7 +920,7 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
         <div className="hidden px-[max(0.5rem,env(safe-area-inset-left))] compact:block">
           <BottomSheet summary={<SummaryPanel summary={track.summary} bare />}>
             <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-2 text-sm">
+              <div data-panel="sheet-imagery" className="flex items-center justify-between gap-2 text-sm">
                 <span className="text-secondary">{t('viewer.imagery')}</span>
                 {imageryButtons}
               </div>
