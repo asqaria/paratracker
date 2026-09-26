@@ -1,5 +1,5 @@
 import type { FlightStatus } from '@skyline/core';
-import { and, desc, eq, gte, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, lte, or, sql } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import { flights, gliders, sites } from '../schema.js';
@@ -17,6 +17,7 @@ export interface LogbookEntryRecord {
   status: FlightStatus;
   startedAt: Date | null;
   uploadedAt: Date;
+  timezone: string | null;
   durationS: number | null;
   distanceTrackM: number | null;
   maxAltM: number | null;
@@ -67,9 +68,9 @@ export async function listLogbook(
   },
 ): Promise<LogbookPage> {
   const conditions = [eq(flights.userId, query.userId)];
-  // Дата старта в UTC; локальная дата места — с задачей 2.14.
-  if (query.from) conditions.push(gte(flights.startedAt, sql`${query.from}::date`));
-  if (query.to) conditions.push(lt(flights.startedAt, sql`${query.to}::date + 1`));
+  // Дата — местная, по часам места старта (задача 2.14), как её видит пилот.
+  if (query.from) conditions.push(gte(flights.localDate, query.from));
+  if (query.to) conditions.push(lte(flights.localDate, query.to));
   if (query.siteId) conditions.push(eq(flights.takeoffSiteId, query.siteId));
   if (query.gliderId) conditions.push(eq(flights.gliderId, query.gliderId));
   if (query.after) {
@@ -82,6 +83,7 @@ export async function listLogbook(
       status: flights.status,
       startedAt: flights.startedAt,
       uploadedAt: flights.createdAt,
+      timezone: flights.timezone,
       durationS: flights.durationS,
       distanceTrackM: flights.distanceTrackM,
       maxAltM: flights.maxAltM,
@@ -106,6 +108,7 @@ export async function listLogbook(
       status: row.status,
       startedAt: row.startedAt,
       uploadedAt: row.uploadedAt,
+      timezone: row.timezone,
       durationS: row.durationS,
       distanceTrackM: row.distanceTrackM,
       maxAltM: row.maxAltM,

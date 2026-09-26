@@ -2,13 +2,14 @@ import type { LogbookEntry } from '@skyline/core';
 import { describe, expect, it } from 'vitest';
 
 import { messages } from '../i18n/messages';
-import { formatEntry } from './format-logbook';
+import { formatEntry, formatLocalStart } from './format-logbook';
 
 const ENTRY: LogbookEntry = {
   id: '11111111-2222-4333-8444-555555555555',
   status: 'ready',
   startedAt: '2026-07-02T23:30:00.000Z',
   uploadedAt: '2026-07-03T10:00:00.000Z',
+  timezone: 'Asia/Almaty',
   durationS: 17_280,
   distanceTrackM: 176_800,
   maxAltM: 3505,
@@ -29,14 +30,29 @@ describe('formatEntry', () => {
     });
   });
 
-  it('дата — по UTC до задачи 2.14: полночь в Алматы не сдвигает день по часам браузера', () => {
-    expect(formatEntry(ENTRY, 'ru', t).date).toContain('2026');
-    expect(formatEntry(ENTRY, 'en', (key) => messages.en[key]).date).toBe('Jul 2, 2026');
+  it('дата — по часам места взлёта: 23:30 UTC в Алматы — уже следующий день', () => {
+    const en = (key: keyof (typeof messages)['en']) => messages.en[key];
+    expect(formatEntry(ENTRY, 'en', en).date).toBe('Jul 3, 2026');
+    // Без таймзоны — UTC, а не часы браузера.
+    expect(formatEntry({ ...ENTRY, timezone: null }, 'en', en).date).toBe('Jul 2, 2026');
+  });
+
+  it('начало полёта — местное время с поясом', () => {
+    expect(formatLocalStart(ENTRY.startedAt ?? '', 'Asia/Almaty', 'en')).toBe('Jul 3, 2026, 04:30 AM GMT+5');
   });
 
   it('полёт в обработке — дата загрузки и прочерки', () => {
     const pending = formatEntry(
-      { ...ENTRY, status: 'pending', startedAt: null, durationS: null, distanceTrackM: null, maxAltM: null, thermalCount: null },
+      {
+        ...ENTRY,
+        status: 'pending',
+        startedAt: null,
+        timezone: null,
+        durationS: null,
+        distanceTrackM: null,
+        maxAltM: null,
+        thermalCount: null,
+      },
       'en',
       (key) => messages.en[key],
     );

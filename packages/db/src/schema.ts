@@ -218,6 +218,8 @@ export const flights = pgTable(
     endedAt: timestamptz('ended_at'),
     durationS: integer('duration_s'),
     localDate: date('local_date', { mode: 'string' }),
+    /** IANA-таймзона точки взлёта (задача 2.14): местное время — только для показа. */
+    timezone: text('timezone'),
 
     // агрегаты, СИ
     altitudeSource: text('altitude_source', { enum: ALTITUDE_SOURCES }),

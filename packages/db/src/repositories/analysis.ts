@@ -19,6 +19,7 @@ export interface FlightDetailsRecord {
   startedAt: Date | null;
   endedAt: Date | null;
   durationS: number | null;
+  timezone: string | null;
   thermalCount: number | null;
   avgClimbMs: number | null;
   avgGlideRatio: number | null;
@@ -82,6 +83,7 @@ export async function findFlightDetails(db: Database, id: string): Promise<Fligh
       startedAt: flights.startedAt,
       endedAt: flights.endedAt,
       durationS: flights.durationS,
+      timezone: flights.timezone,
       thermalCount: flights.thermalCount,
       avgClimbMs: flights.avgClimbMs,
       avgGlideRatio: flights.avgGlideRatio,

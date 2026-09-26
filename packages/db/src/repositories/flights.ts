@@ -8,7 +8,7 @@ import {
   type SourceFormat,
   type FlightPoint,
 } from '@skyline/core';
-import { and, asc, eq, inArray, isNull, lt, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import { flights, glides, thermals } from '../schema.js';
@@ -57,6 +57,8 @@ export interface ProcessedFlight {
   landing: FlightPoint;
   /** Модель крыла из файла (IGC HFGTY); null — прибор не записал. */
   gliderRaw: string | null;
+  /** IANA-таймзона точки взлёта (задача 2.14); null — точки нет. */
+  timezone: string | null;
 }
 
 const RECORD_COLUMNS = {
@@ -188,6 +190,10 @@ export async function markFlightReady(db: Database, id: string, result: Processe
         // Место — ближайшее известное в SITE.matchRadiusM; нет — null, пилот добавит сам.
         takeoffSiteId: nearestSiteId(result.takeoff),
         gliderRaw: result.gliderRaw,
+        timezone: result.timezone,
+        // Дата полёта для пилота — по часам места старта: вечерний полёт в Алматы
+        // по UTC был бы «вчера». Без таймзоны — дата UTC.
+        localDate: sql`(${result.startedAt.toISOString()}::timestamptz AT TIME ZONE ${result.timezone ?? 'UTC'})::date`,
         landingSiteId: nearestSiteId(result.landing),
         updatedAt: new Date(),
       })
@@ -291,7 +297,8 @@ export async function listUnfinishedFlights(db: Database): Promise<FlightRecord[
 
 /**
  * Разовая догрузка производных данных: полёты, обработанные до задачи 2.11
- * (нет сводки и линии для карты) или 2.13 (нет точки взлёта для места старта),
+ * (нет сводки и линии для карты), 2.13 (нет точки взлёта для места старта)
+ * или 2.14 (нет таймзоны),
  * возвращаются в очередь — их подберёт обычное восстановление при старте
  * воркера. После обработки обе колонки заполнены, повторно полёт не попадёт.
  */
@@ -299,7 +306,12 @@ export async function requeueFlightsForBackfill(db: Database): Promise<number> {
   const rows = await db
     .update(flights)
     .set({ status: 'pending', updatedAt: new Date() })
-    .where(and(eq(flights.status, 'ready'), or(isNull(flights.distanceTrackM), isNull(flights.takeoffPoint))))
+    .where(
+      and(
+        eq(flights.status, 'ready'),
+        or(isNull(flights.distanceTrackM), isNull(flights.takeoffPoint), isNull(flights.timezone)),
+      ),
+    )
     .returning({ id: flights.id });
   return rows.length;
 }

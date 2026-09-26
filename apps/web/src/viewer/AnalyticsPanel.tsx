@@ -4,6 +4,7 @@ import { fill, useLocaleStore, useT } from '../i18n/locale';
 import type { GliderDto } from '@skyline/core';
 
 import { GliderLine } from '../gliders/GliderLine';
+import { formatLocalStart } from '../logbook/format-logbook';
 import { SiteLine } from '../sites/SiteLine';
 import type { MessageKey } from '../i18n/messages';
 import type { AnalyticsState, FlightAnalytics } from './flight-analytics';
@@ -75,6 +76,7 @@ export function AnalyticsPanel({
   onSetGlider,
 }: AnalyticsPanelProps) {
   const t = useT();
+  const locale = useLocaleStore((state) => state.locale);
   const [collapsedOpen, setOpen] = useState(defaultOpen);
   const open = embedded || collapsedOpen;
   const [tab, setTab] = useState<AnalyticsTab>(defaultTab);
@@ -113,6 +115,14 @@ export function AnalyticsPanel({
           )}
           {state.status === 'ready' && (
             <div className="mb-2">
+              {state.analytics.details.startedAt !== null && (
+                <p data-panel="flight-start" className="text-sm">
+                  <span className="text-secondary">{t('flight.start')}: </span>
+                  <span className="numeric text-primary">
+                    {formatLocalStart(state.analytics.details.startedAt, state.analytics.details.timezone, locale)}
+                  </span>
+                </p>
+              )}
               <SiteLine
                 site={state.analytics.details.takeoffSite}
                 canEdit={state.analytics.details.canEdit && onCreateSite !== undefined}
