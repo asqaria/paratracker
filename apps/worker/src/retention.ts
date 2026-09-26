@@ -47,7 +47,9 @@ export function createRetentionSweep(options: RetentionSweepOptions): RetentionS
   const removeObjects = async (flight: ExpiredFlight): Promise<boolean> => {
     try {
       await storage.delete(flight.rawObjectKey);
-      if (flight.trackObjectKey !== null) await storage.delete(flight.trackObjectKey);
+      for (const key of [flight.trackObjectKey, flight.publicTrackObjectKey, flight.previewObjectKey]) {
+        if (key !== null) await storage.delete(key);
+      }
       return true;
     } catch (error) {
       onError(error, flight.id);
