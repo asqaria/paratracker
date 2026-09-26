@@ -44,6 +44,13 @@ export const POSE = {
   lyingLimitsDeg: { min: 30, max: 110 },
   /** Позади пилота по горизонтали — где лежит верх купола, м: canopyTopM · sin 98°. */
   lyingBehindM: 7.1,
+  /**
+   * Законцовки лежащего крыла — в стольких метрах в стороны от центра купола:
+   * дуга радиусом 6.2 м на ±58° (make-paraglider.mjs) — 6.2 · sin 58° ≈ 5.3 м.
+   */
+  lyingHalfSpanM: 5.3,
+  /** Наклон по размаху не круче: на очень крутом косогоре крыло не встаёт на ребро. */
+  lyingMaxRollDeg: 45,
   /** Лежащее крыло сплющено по хорде до этой доли — лежит на земле, а не стоит ребром. */
   lyingFlatten: 0.12,
   /** Размах шага ноги, градусы, и частота шагового цикла, Гц. */
@@ -144,30 +151,67 @@ export function lyingAngleDeg(groundAboveHarnessM: number): number {
 }
 
 /**
- * Купол — маятник вокруг точки подвеса: лежит позади (повёрнут на угол
- * раскладки и сплющен по хорде), поднимается над головой, опадает.
- * Стропы — в том же узле и поворачиваются с ним: всегда идут от пилота.
+ * Наклон лежащего крыла по размаху, градусы: плюс — левая законцовка (+X
+ * модели) выше. По высотам рельефа под законцовками; на косогоре без него одна
+ * половина купола уходила в склон. Неизвестно — ноль.
  */
-function canopyTransform(pose: GliderPose, lyingDeg: number): NodeTransform {
+export function lyingRollDeg(groundLeftM: number, groundRightM: number): number {
+  if (!Number.isFinite(groundLeftM) || !Number.isFinite(groundRightM)) return 0;
+  const roll = Math.atan2(groundLeftM - groundRightM, 2 * POSE.lyingHalfSpanM) / DEG;
+  return Math.max(-POSE.lyingMaxRollDeg, Math.min(POSE.lyingMaxRollDeg, roll));
+}
+
+/** Как лежит крыло на земле: откинуто назад на угол раскладки, наклонено по размаху. */
+export interface LyingWing {
+  angleDeg: number;
+  rollDeg: number;
+}
+
+export const FLAT_GROUND: LyingWing = { angleDeg: POSE.lyingAngleDeg, rollDeg: 0 };
+
+/** Кватернионы (x, y, z, w): произведение a · b — сначала b, потом a. */
+function multiply(a: Quat, b: Quat): Quat {
+  const [ax, ay, az, aw] = a;
+  const [bx, by, bz, bw] = b;
+  return [
+    aw * bx + ax * bw + ay * bz - az * by,
+    aw * by - ax * bz + ay * bw + az * bx,
+    aw * bz + ax * by - ay * bx + az * bw,
+    aw * bw - ax * bx - ay * by - az * bz,
+  ];
+}
+/** Поворот вокруг оси Z модели (нос): плюс — левое крыло (+X) вверх. */
+const aroundZ = (radians: number): Quat => (radians === 0 ? IDENTITY_ROTATION : [0, 0, Math.sin(radians / 2), Math.cos(radians / 2)]);
+
+/**
+ * Купол — маятник вокруг точки подвеса: лежит позади (откинут на угол
+ * раскладки, наклонён по размаху вдоль склона, сплющен по хорде),
+ * поднимается над головой, опадает. Стропы — в том же узле и поворачиваются
+ * с ним: всегда идут от пилота.
+ */
+function canopyTransform(pose: GliderPose, lying: LyingWing): NodeTransform {
   if (pose.wing === 'packed') return HIDDEN;
   if (pose.wing === 'flying') return SHOWN;
   const q = smoothstep(Math.min(1, Math.max(0, pose.wingProgress)));
   if (q === 1) return SHOWN;
+  // Сначала откинуть назад (вокруг X), потом наклонить по размаху (вокруг оси «нос–хвост»).
+  const back = aroundX(-lying.angleDeg * DEG * (1 - q));
+  const across = aroundZ(lying.rollDeg * DEG * (1 - q));
   return {
     translation: [0, 0, 0],
-    rotation: aroundX(-lyingDeg * DEG * (1 - q)),
+    rotation: multiply(across, back),
     scale: [1, 1, POSE.lyingFlatten + (1 - POSE.lyingFlatten) * q],
   };
 }
 
-/** Преобразования всех узлов модели для позы; lyingDeg — угол раскладки по рельефу (lyingAngleDeg). */
-export function nodeTransforms(pose: GliderPose, lyingDeg: number = POSE.lyingAngleDeg): Record<GliderNode, NodeTransform> {
+/** Преобразования всех узлов модели для позы; lying — как крыло легло на рельеф (lyingAngleDeg, lyingRollDeg). */
+export function nodeTransforms(pose: GliderPose, lying: LyingWing = FLAT_GROUND): Record<GliderNode, NodeTransform> {
   const flying = pose.pilot === 'flying';
   const gait = pose.pilot === 'walking' || pose.pilot === 'running' ? POSE.gait[pose.pilot] : null;
   const swing = gait ? gait.amplitudeDeg * DEG * Math.sin(pose.gaitPhase) : 0;
   const leg = (sign: 1 | -1): NodeTransform => (flying ? HIDDEN : { ...SHOWN, rotation: aroundX(sign * swing) });
   return {
-    canopy: canopyTransform(pose, lyingDeg),
+    canopy: canopyTransform(pose, lying),
     'pilot-seated': flying ? SHOWN : HIDDEN,
     'pilot-standing': flying ? HIDDEN : { ...SHOWN, rotation: aroundX(pose.pilot === 'running' ? POSE.runLeanDeg * DEG : 0) },
     'leg-left': leg(1),

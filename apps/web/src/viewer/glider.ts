@@ -17,7 +17,18 @@ import {
 } from 'cesium';
 
 import { PARAGLIDER_MODEL_PATH, type GliderAttitude } from './glider-attitude';
-import { GLIDER_NODES, lyingAngleDeg, nodeTransforms, POSE, type GliderNode, type GliderPose, type NodeTransform } from './glider-pose';
+import {
+  FLAT_GROUND,
+  GLIDER_NODES,
+  lyingAngleDeg,
+  lyingRollDeg,
+  nodeTransforms,
+  POSE,
+  type GliderNode,
+  type GliderPose,
+  type LyingWing,
+  type NodeTransform,
+} from './glider-pose';
 import { liftAboveGround } from './ground-clearance';
 
 /**
@@ -43,17 +54,23 @@ const MODEL_HEADING_OFFSET_DEG = -90;
  */
 function nodeTransformations(
   poseAt: (timeMs: number) => GliderPose,
-  lyingAt: (time: JulianDate) => number,
+  lyingAt: (time: JulianDate) => LyingWing,
+  frameNumber: () => number,
 ): PropertyBag {
+  // Кэш — на кадр, а не на момент полёта: на паузе момент не меняется, и угол
+  // раскладки, посчитанный до загрузки рельефа, оставался навсегда.
+  let cachedFrame = Number.NaN;
   let cachedMs = Number.NaN;
   let cached: Record<GliderNode, NodeTransform> | null = null;
   const transformsAt = (time: JulianDate): Record<GliderNode, NodeTransform> => {
     const ms = JulianDate.toDate(time).getTime();
-    if (!cached || ms !== cachedMs) {
+    const frame = frameNumber();
+    if (!cached || ms !== cachedMs || frame !== cachedFrame) {
+      cachedFrame = frame;
       const pose = poseAt(ms);
       // Рельеф позади спрашивается только когда крыло на земле.
       const lying = pose.wing === 'lying' || pose.wing === 'rising' || pose.wing === 'falling';
-      cached = nodeTransforms(pose, lying ? lyingAt(time) : POSE.lyingAngleDeg);
+      cached = nodeTransforms(pose, lying ? lyingAt(time) : FLAT_GROUND);
       cachedMs = ms;
     }
     return cached;
@@ -119,28 +136,48 @@ export function addGlider(
 
   // Угол раскладки крыла — по рисуемому рельефу позади пилота (против курса):
   // на старте склон за спиной поднимается, и купол уходил в гору.
-  const behind = new Cartographic();
-  const lyingAt = (time: JulianDate): number => {
+  const spot = new Cartographic();
+  const lyingAt = (time: JulianDate): LyingWing => {
     const at = lifted.getValue(time);
     const place = at ? Cartographic.fromCartesian(at) : undefined;
-    if (!at || !place) return POSE.lyingAngleDeg;
+    if (!at || !place) return FLAT_GROUND;
     const heading = CesiumMath.toRadians(lastHeadingDeg);
     const enu = Transforms.eastNorthUpToFixedFrame(at);
-    const offset = new Cartesian3(-Math.sin(heading) * POSE.lyingBehindM, -Math.cos(heading) * POSE.lyingBehindM, 0);
-    const point = Matrix4.multiplyByPoint(enu, offset, new Cartesian3());
-    const spot = Cartographic.fromCartesian(point, undefined, behind);
-    const ground = spot ? globe.getHeight(spot) : undefined;
-    return lyingAngleDeg(ground === undefined ? Number.NaN : ground - place.height);
+    // Позади — против курса; влево — левое крыло модели (+X): курс, повёрнутый на 90° против часовой.
+    const back = [-Math.sin(heading), -Math.cos(heading)] as const;
+    const left = [-Math.cos(heading), Math.sin(heading)] as const;
+    const groundAt = (behindM: number, leftM: number): number => {
+      const offset = new Cartesian3(back[0] * behindM + left[0] * leftM, back[1] * behindM + left[1] * leftM, 0);
+      const point = Matrix4.multiplyByPoint(enu, offset, new Cartesian3());
+      const where = Cartographic.fromCartesian(point, undefined, spot);
+      return (where ? globe.getHeight(where) : undefined) ?? Number.NaN;
+    };
+    return {
+      angleDeg: lyingAngleDeg(groundAt(POSE.lyingBehindM, 0) - place.height),
+      rollDeg: lyingRollDeg(groundAt(POSE.lyingBehindM, POSE.lyingHalfSpanM), groundAt(POSE.lyingBehindM, -POSE.lyingHalfSpanM)),
+    };
   };
+
+  // Номер кадра — ключ кэша поз узлов; счётчик свой: frameState в типах Cesium закрыт.
+  let frame = 0;
+  viewer.scene.preRender.addEventListener(() => {
+    frame += 1;
+  });
 
   return viewer.entities.add({
     position: lifted,
     orientation,
     model: {
       uri: `${import.meta.env.BASE_URL}${PARAGLIDER_MODEL_PATH}`,
-      minimumPixelSize: GLIDER_MIN_PIXEL_SIZE,
+      // Не мельче 48 px — только в воздухе. Cesium увеличивает модель вокруг
+      // точки подвеса, а на земле крыло и ноги ниже неё: издалека они уходили
+      // в склон пропорционально увеличению. На земле — настоящий размер.
+      minimumPixelSize: new CallbackProperty(
+        (time) => (time && poseAt(JulianDate.toDate(time).getTime()).pilot !== 'flying' ? 0 : GLIDER_MIN_PIXEL_SIZE),
+        false,
+      ),
       maximumScale: GLIDER_MAX_SCALE,
-      nodeTransformations: nodeTransformations(poseAt, lyingAt),
+      nodeTransformations: nodeTransformations(poseAt, lyingAt, () => frame),
     },
   });
 }
