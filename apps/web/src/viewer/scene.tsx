@@ -50,7 +50,7 @@ import { travelCourse } from './camera-course';
 import { cameraTarget, easeHalfWidth, targetHalfWidthS } from './camera-target';
 import { pitchClearingGround } from './ground-clearance';
 import { addGlider } from './glider';
-import { gliderAttitude } from './glider-attitude';
+import { gliderAttitude, launchHeadingDeg } from './glider-attitude';
 import { gliderPose } from './glider-pose';
 import {
   CAMERA_POSES,
@@ -483,12 +483,15 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
         clockRef.current = flightClock;
         // Пилот — модель параплана: курс по сглаженной траектории, крен в вираже.
         // На земле (до взлёта, после посадки) — без крена.
+        const launchHeading = launchHeadingDeg(shown, track.t[range.takeoff] ?? Number.NaN);
         addGlider(
           viewer,
           flightClock.position,
           (timeMs) => {
             const at = indexAt(track.t, timeMs);
-            return gliderAttitude(shown, timeMs, at >= range.takeoff && at <= range.landing);
+            const attitude = gliderAttitude(shown, timeMs, at >= range.takeoff && at <= range.landing);
+            // До взлёта стоит на месте — лицом к разбегу: крыло за спиной ляжет вверх по склону.
+            return Number.isNaN(attitude.headingDeg) && at <= range.takeoff ? { ...attitude, headingDeg: launchHeading } : attitude;
           },
           // На земле — стоит, идёт, разбег с подъёмом крыла, посадка (glider-pose.ts).
           (timeMs) => gliderPose(track, range, timeMs),

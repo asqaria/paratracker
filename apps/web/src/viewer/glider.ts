@@ -6,6 +6,7 @@ import {
   HeadingPitchRoll,
   JulianDate,
   Math as CesiumMath,
+  Matrix4,
   PropertyBag,
   Quaternion,
   TranslationRotationScale,
@@ -16,7 +17,7 @@ import {
 } from 'cesium';
 
 import { PARAGLIDER_MODEL_PATH, type GliderAttitude } from './glider-attitude';
-import { GLIDER_NODES, nodeTransforms, type GliderNode, type GliderPose, type NodeTransform } from './glider-pose';
+import { GLIDER_NODES, lyingAngleDeg, nodeTransforms, POSE, type GliderNode, type GliderPose, type NodeTransform } from './glider-pose';
 import { liftAboveGround } from './ground-clearance';
 
 /**
@@ -40,13 +41,19 @@ const MODEL_HEADING_OFFSET_DEG = -90;
  * Узлы модели по позе (glider-pose.ts): поза считается раз на момент времени,
  * преобразования — в объекты Cesium, которые переиспользуются между кадрами.
  */
-function nodeTransformations(poseAt: (timeMs: number) => GliderPose): PropertyBag {
+function nodeTransformations(
+  poseAt: (timeMs: number) => GliderPose,
+  lyingAt: (time: JulianDate) => number,
+): PropertyBag {
   let cachedMs = Number.NaN;
   let cached: Record<GliderNode, NodeTransform> | null = null;
   const transformsAt = (time: JulianDate): Record<GliderNode, NodeTransform> => {
     const ms = JulianDate.toDate(time).getTime();
     if (!cached || ms !== cachedMs) {
-      cached = nodeTransforms(poseAt(ms));
+      const pose = poseAt(ms);
+      // Рельеф позади спрашивается только когда крыло на земле.
+      const lying = pose.wing === 'lying' || pose.wing === 'rising' || pose.wing === 'falling';
+      cached = nodeTransforms(pose, lying ? lyingAt(time) : POSE.lyingAngleDeg);
       cachedMs = ms;
     }
     return cached;
@@ -110,6 +117,22 @@ export function addGlider(
     return Transforms.headingPitchRollQuaternion(at, hpr, undefined, undefined, result as Quaternion | undefined);
   }, false);
 
+  // Угол раскладки крыла — по рисуемому рельефу позади пилота (против курса):
+  // на старте склон за спиной поднимается, и купол уходил в гору.
+  const behind = new Cartographic();
+  const lyingAt = (time: JulianDate): number => {
+    const at = lifted.getValue(time);
+    const place = at ? Cartographic.fromCartesian(at) : undefined;
+    if (!at || !place) return POSE.lyingAngleDeg;
+    const heading = CesiumMath.toRadians(lastHeadingDeg);
+    const enu = Transforms.eastNorthUpToFixedFrame(at);
+    const offset = new Cartesian3(-Math.sin(heading) * POSE.lyingBehindM, -Math.cos(heading) * POSE.lyingBehindM, 0);
+    const point = Matrix4.multiplyByPoint(enu, offset, new Cartesian3());
+    const spot = Cartographic.fromCartesian(point, undefined, behind);
+    const ground = spot ? globe.getHeight(spot) : undefined;
+    return lyingAngleDeg(ground === undefined ? Number.NaN : ground - place.height);
+  };
+
   return viewer.entities.add({
     position: lifted,
     orientation,
@@ -117,7 +140,7 @@ export function addGlider(
       uri: `${import.meta.env.BASE_URL}${PARAGLIDER_MODEL_PATH}`,
       minimumPixelSize: GLIDER_MIN_PIXEL_SIZE,
       maximumScale: GLIDER_MAX_SCALE,
-      nodeTransformations: nodeTransformations(poseAt),
+      nodeTransformations: nodeTransformations(poseAt, lyingAt),
     },
   });
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { gliderPose, nodeTransforms, POSE, type GliderPose } from './glider-pose';
+import { gliderPose, lyingAngleDeg, nodeTransforms, POSE, type GliderPose } from './glider-pose';
 
 /**
  * Позы пилота и крыла по времени (задача «анимация на земле»): до взлёта —
@@ -90,5 +90,37 @@ describe('nodeTransforms', () => {
     expect(Math.abs(walking['leg-left'].rotation[0])).toBeGreaterThan(0.1);
     const still = nodeTransforms(pose({ pilot: 'standing', wing: 'lying', gaitPhase: Math.PI / 2 }));
     expect(still['leg-left'].rotation).toEqual([0, 0, 0, 1]);
+  });
+});
+
+describe('lyingAngleDeg — крыло ложится на рельеф позади пилота', () => {
+  const angleOf = (transform: { rotation: readonly number[] }): number => 2 * Math.asin(transform.rotation[0] ?? 0) * (180 / Math.PI);
+  const heightOfTop = (deg: number): number => POSE.canopyTopM * Math.cos((deg * Math.PI) / 180);
+
+  it('ровная площадка (земля на подвеску ниже) — угол раскладки по умолчанию', () => {
+    expect(lyingAngleDeg(-1)).toBeCloseTo(POSE.lyingAngleDeg, 0);
+  });
+
+  it('склон за спиной выше подвески — угол меньше: верх купола ровно на земле', () => {
+    const angle = lyingAngleDeg(3);
+    expect(angle).toBeLessThan(POSE.lyingAngleDeg);
+    expect(heightOfTop(angle)).toBeCloseTo(3, 6);
+  });
+
+  it('обрыв за спиной — не круче, чем вниз на подвеску с запасом; крутой склон — не выше полусклона', () => {
+    expect(lyingAngleDeg(-50)).toBe(POSE.lyingLimitsDeg.max);
+    expect(lyingAngleDeg(50)).toBe(POSE.lyingLimitsDeg.min);
+  });
+
+  it('рельеф не известен — угол по умолчанию', () => {
+    expect(lyingAngleDeg(Number.NaN)).toBe(POSE.lyingAngleDeg);
+  });
+
+  it('nodeTransforms берёт угол раскладки снаружи', () => {
+    const lying = nodeTransforms(
+      { pilot: 'standing', wing: 'lying', wingProgress: 0, gaitPhase: 0 },
+      70,
+    );
+    expect(angleOf(lying.canopy)).toBeCloseTo(-70, 6);
   });
 });
