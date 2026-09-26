@@ -105,3 +105,11 @@ export function chunkShare(
   const fraction = to > from ? Math.min(1, Math.max(0, (timeMs - from) / (to - from))) : 1;
   return Math.min(1, (done + (lengths[k] ?? 0) * fraction) / total);
 }
+
+/**
+ * В режиме «Пройденный» линия, тень и занавес кончаются на столько секунд
+ * позади пилота: точка трека — подвеска на уровне груди, и линия, доходившая
+ * до неё, прошивала модель насквозь. 0.4 с — ~4 м при 10 м/с, чуть больше
+ * длины кокона.
+ */
+export const TRAIL_GAP_S = 0.4;

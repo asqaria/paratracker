@@ -10,6 +10,7 @@ import {
   GeometryInstance,
   HeadingPitchRange,
   ImageryLayer,
+  JulianDate,
   KeyboardEventModifier,
   Material,
   Math as CesiumMath,
@@ -74,7 +75,7 @@ import {
   terrainSampleIndices,
   type FlightRange,
 } from './ground-calibration';
-import { DEFAULT_PLAYBACK_SPEED, indexAt, type PlaybackSpeed, seekBy, timelineOf } from './playback';
+import { DEFAULT_PLAYBACK_SPEED, indexAt, MS_PER_SECOND, type PlaybackSpeed, seekBy, timelineOf } from './playback';
 import { fetchImageryCapabilities } from './imagery-capabilities';
 import {
   availableImagery,
@@ -97,6 +98,7 @@ import { SummaryLine, SummaryPanel } from './SummaryPanel';
 import { TimelinePanel } from './TimelinePanel';
 import { VarioLegend } from './VarioLegend';
 import { buildTrackGeometry } from './track-geometry';
+import { flownByTime, smoothTrack } from './track-smooth';
 import { CURTAIN, curtainInMode, curtainOnByDefault, curtainPieces, curtainSamples, curtainSegmentsShown } from './curtain';
 import { CurtainLayer } from './curtain-layer';
 import { currentColumn, thermalColumns, type ThermalColumn } from './thermal-columns';
@@ -105,7 +107,7 @@ import { TrackLayer } from './track-layer';
 import {
   COMPACT_MEDIA_QUERY,
   DEFAULT_TRACK_SHOWN,
-  flownVertexCount,
+  TRAIL_GAP_S,
   trackWidths,
   type TrackShown,
 } from './track-progress';
@@ -425,7 +427,10 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
 
         // Ходьба до взлёта и после посадки — серым: вариометр там — шум GPS на месте.
         const [r = 0, g = 0, b = 0, a = 0] = Color.fromCssColorString(documentColorTokens().secondary).toBytes();
-        const geometry = buildTrackGeometry(shown, {
+        // Для отрисовки трек сглажен (track-smooth.ts): запись раз в секунду, и круг
+        // термика был ломаной из 20 отрезков. Линия, тень и пилот — по одной кривой.
+        const smooth = smoothTrack(shown);
+        const geometry = buildTrackGeometry(smooth, {
           flight: range,
           groundRgba: [r, g, b, a],
         });
@@ -457,7 +462,17 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
         // Линия и тень — кусками, чтобы показывать только пройденный путь (track-layer.ts).
         // Толщина — по экрану: на телефоне 4 px — полоса поперёк долины.
         const widths = trackWidths(window.matchMedia(COMPACT_MEDIA_QUERY).matches);
-        const vertexTimes = Float64Array.from(geometry.sourceIndex, (i) => track.t[i] ?? Number.NaN);
+        // Время каждой вершины линии — из сглаженного трека (вершины без координат пропущены).
+        const vertexTimes = new Float64Array(geometry.pointCount);
+        {
+          let v = 0;
+          for (let j = 0; j < smooth.t.length && v < geometry.pointCount; j++) {
+            const usable = [smooth.lat[j], smooth.lon[j], smooth.alt[j]].every((x) => Number.isFinite(x ?? Number.NaN));
+            if (!usable) continue;
+            vertexTimes[v] = smooth.t[j] ?? Number.NaN;
+            v += 1;
+          }
+        }
         const layer = new TrackLayer(scene, geometry, positions, vertexTimes, {
           linePx: widths.linePx,
           shadowPx: widths.shadowPx,
@@ -483,7 +498,8 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
             curtainRef.current = curtain;
             scene.requestRender();
           });
-        const flightClock = setupFlightClock(viewer, shown);
+        // Пилот — по той же сглаженной кривой, что и линия: иначе он съезжал бы с неё в вираже.
+        const flightClock = setupFlightClock(viewer, { ...shown, t: smooth.t, lat: smooth.lat, lon: smooth.lon, alt: smooth.alt, pointCount: smooth.t.length });
         clockRef.current = flightClock;
         // Пилот — модель параплана: курс по сглаженной траектории, крен в вираже.
         // На земле (до взлёта, после посадки) — без крена.
@@ -516,14 +532,12 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
             lastIndex = index;
             setTimeMs(current);
           }
-          // Пройдены точки до пилота включительно: indexAt округляет, и ближайшая
-          // точка может быть ещё впереди — линия забегала бы на полсекунды.
-          const passed = (track.t[index] ?? Infinity) > current ? index - 1 : index;
-          const pilot = viewer ? flightClock.position.getValue(viewer.clock.currentTime) : undefined;
-          layer.update(trackShownRef.current, flownVertexCount(geometry.sourceIndex, passed), pilot, current);
-          // Край занавеса — по времени пилота в этом кадре, а не по точке трека:
-          // между точками он идёт вместе с пилотом, без ступенек.
-          curtainRef.current?.update(trackShownRef.current === 'all' ? null : current);
+          // «Пройденный»: линия, тень и занавес кончаются чуть позади пилота (TRAIL_GAP_S) —
+          // не прошивают модель. Конец — по времени этого кадра: между вершинами без ступенек.
+          const trailEndMs = Math.max(timeline.startMs, current - TRAIL_GAP_S * MS_PER_SECOND);
+          const trailEnd = viewer ? flightClock.position.getValue(JulianDate.fromDate(new Date(trailEndMs))) : undefined;
+          layer.update(trackShownRef.current, flownByTime(vertexTimes, trailEndMs), trailEnd, trailEndMs);
+          curtainRef.current?.update(trackShownRef.current === 'all' ? null : trailEndMs);
           if (layer.pending) scene.requestRender();
 
           const mode = cameraModeRef.current;
