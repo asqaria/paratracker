@@ -33,6 +33,8 @@ export interface AnalyticsPanelProps {
   /** Колонны термиков на сцене (ТЗ §7.2); без обработчика переключателя нет. */
   columnsShown?: boolean;
   onColumnsShown?: (shown: boolean) => void;
+  /** Внутри шторки на телефоне: без своей рамки и кнопки сворачивания — сворачивает шторка. */
+  embedded?: boolean;
 }
 
 const TABS: ReadonlyArray<{ id: AnalyticsTab; label: MessageKey }> = [
@@ -58,13 +60,20 @@ export function AnalyticsPanel({
   defaultTab = 'thermals',
   columnsShown = true,
   onColumnsShown,
+  embedded = false,
 }: AnalyticsPanelProps) {
   const t = useT();
-  const [open, setOpen] = useState(defaultOpen);
+  const [collapsedOpen, setOpen] = useState(defaultOpen);
+  const open = embedded || collapsedOpen;
   const [tab, setTab] = useState<AnalyticsTab>(defaultTab);
 
   return (
-    <section aria-label={t('viewer.analytics')} data-panel="analytics" className="w-80 rounded-xl glass text-sm compact:max-h-[45dvh] compact:w-72 compact:overflow-y-auto">
+    <section
+      aria-label={t('viewer.analytics')}
+      data-panel="analytics"
+      className={embedded ? 'text-sm' : 'w-80 rounded-xl glass text-sm compact:max-h-[45dvh] compact:w-72 compact:overflow-y-auto'}
+    >
+      {!embedded && (
       <button
         type="button"
         aria-expanded={open}
@@ -77,8 +86,9 @@ export function AnalyticsPanel({
           {open ? '▴' : '▾'}
         </span>
       </button>
+      )}
       {open && (
-        <div className="border-t border-subtle px-3 pb-3 pt-2">
+        <div className={embedded ? 'pt-1' : 'border-t border-subtle px-3 pb-3 pt-2'}>
           {state.status === 'loading' && (
             <p role="status" className="text-secondary">
               {t('viewer.analytics.loading')}
@@ -90,7 +100,7 @@ export function AnalyticsPanel({
             </p>
           )}
           {state.status === 'ready' && (
-            <Content analytics={state.analytics} timeline={timeline} timeMs={timeMs} tab={tab} onTab={setTab} onSelect={onSelect} />
+            <Content analytics={state.analytics} timeline={timeline} timeMs={timeMs} tab={tab} onTab={setTab} onSelect={onSelect} embedded={embedded} />
           )}
           {state.status === 'ready' && state.analytics.thermals.length > 0 && onColumnsShown && (
             <button
@@ -118,9 +128,11 @@ interface ContentProps {
   tab: AnalyticsTab;
   onTab: (tab: AnalyticsTab) => void;
   onSelect: (segment: SelectedSegment) => void;
+  /** Внутри шторки — список без своей прокрутки: прокручивает шторка. */
+  embedded: boolean;
 }
 
-function Content({ analytics, timeline, timeMs, tab, onTab, onSelect }: ContentProps) {
+function Content({ analytics, timeline, timeMs, tab, onTab, onSelect, embedded }: ContentProps) {
   const t = useT();
   const locale = useLocaleStore((s) => s.locale);
   const { details } = analytics;
@@ -212,7 +224,7 @@ function Content({ analytics, timeline, timeMs, tab, onTab, onSelect }: ContentP
               <span key={column}>{t(column)}</span>
             ))}
           </div>
-          <ul className="max-h-[40vh] overflow-y-auto compact:max-h-none">
+          <ul className={embedded ? '' : 'max-h-[40vh] overflow-y-auto compact:max-h-none'}>
             {rows.map((row) => {
               const current = timeMs >= row.startMs && timeMs <= row.endMs;
               return (
