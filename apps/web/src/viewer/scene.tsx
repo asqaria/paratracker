@@ -97,6 +97,7 @@ import { BottomSheet } from './BottomSheet';
 import { useCreateSite, useFlightAnalytics, useOwnGliders, usePrivacyControls, useSetFlightGlider } from './flight-analytics';
 import { SummaryLine, SummaryPanel } from './SummaryPanel';
 import { ReviewPanel } from '../review/ReviewPanel';
+import { shareHash } from '../routing';
 import { aglProfile } from './agl';
 import { TimelinePanel } from './TimelinePanel';
 import { VarioLegend } from './VarioLegend';
@@ -140,6 +141,8 @@ export interface SceneProps {
    * и размывает раскраску по вариометру.
    */
   showGlow?: boolean;
+  /** Встроен в чужой сайт (задача 3.9): сцена, таймлайн, сводка — без аналитики и настроек. */
+  embed?: boolean;
 }
 
 /**
@@ -311,7 +314,7 @@ function createImageryProvider(source: ImagerySource): ImageryLayer {
   );
 }
 
-export function Scene({ track, flightId = null, showGlow = false, review = false, share }: SceneProps) {
+export function Scene({ track, flightId = null, showGlow = false, review = false, share, embed = false }: SceneProps) {
   const t = useT();
   const container = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Viewer | null>(null);
@@ -1021,8 +1024,20 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
           )}
         </div>
 
-        <div className="pointer-events-auto ml-auto flex flex-col items-end gap-2 compact:hidden">
-        <div data-panel="imagery" className="flex flex-col gap-2 rounded-xl glass p-3 text-sm">
+        <div className={`pointer-events-auto ml-auto flex flex-col items-end gap-2 ${embed ? '' : 'compact:hidden'}`}>
+        {/* Встроенный просмотрщик: вместо аналитики — выход на полную страницу полёта. */}
+        {embed && share !== undefined && (
+          <a
+            data-panel="open-in-app"
+            href={`/${shareHash(share)}`}
+            target="_blank"
+            rel="noopener"
+            className="glass flex items-center rounded-xl px-3 py-2 text-sm text-accent compact:min-h-11"
+          >
+            {t('embed.open')}
+          </a>
+        )}
+        <div data-panel="imagery" className="flex flex-col gap-2 rounded-xl glass p-3 text-sm compact:hidden">
           <span className="text-secondary">{t('viewer.imagery')}</span>
           {imageryButtons}
           <span className="numeric text-secondary">
@@ -1032,7 +1047,7 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
         {analytics !== null && review && flightId !== null && (
           <ReviewPanel flightId={flightId} analytics={analytics} timeline={timeline} timeMs={timeMs} onSelect={selectSegment} />
         )}
-        {analytics !== null && !review && (
+        {analytics !== null && !review && !embed && (
           <AnalyticsPanel
             state={analytics}
             timeline={timeline}
@@ -1077,7 +1092,7 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
                   embedded
                 />
               )}
-              {analytics !== null && !review && (
+              {analytics !== null && !review && !embed && (
                 <AnalyticsPanel
                   state={analytics}
                   timeline={timeline}

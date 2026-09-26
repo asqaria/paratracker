@@ -12,8 +12,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
 import { useMe } from '../auth/session';
+import { useT } from '../i18n/locale';
 import { fetchGliders, GLIDERS_QUERY_KEY, setFlightGlider } from '../gliders/gliders-api';
-import { setPrivacy, shareToken, shareUrl, withShare } from '../sharing/sharing-api';
+import { embedCode, setPrivacy, shareToken, shareUrl, withShare } from '../sharing/sharing-api';
 import { createSite } from '../sites/create-site';
 
 /**
@@ -103,6 +104,7 @@ export function useOwnGliders(): GliderDto[] | undefined {
 /** Приватность и ссылка своего полёта (задача 3.7); null — демо-трек. */
 export function usePrivacyControls(flightId: string | null) {
   const client = useQueryClient();
+  const frameTitle = useT()('embed.frameTitle');
   const onPrivacy = useCallback(
     async (privacy: Privacy) => {
       if (flightId === null) return;
@@ -115,8 +117,12 @@ export function usePrivacyControls(flightId: string | null) {
     async (reset: boolean) => shareUrl(window.location.origin, await shareToken(flightId ?? '', reset)),
     [flightId],
   );
+  const embed = useCallback(
+    async () => embedCode(window.location.origin, await shareToken(flightId ?? '', false), frameTitle),
+    [flightId, frameTitle],
+  );
   if (flightId === null) return null;
-  return { onPrivacy, onShareLink: () => link(false), onResetLink: () => link(true) };
+  return { onPrivacy, onShareLink: () => link(false), onResetLink: () => link(true), onEmbedCode: embed };
 }
 
 /** null — демо-трек: его нет в API, панели нет. */

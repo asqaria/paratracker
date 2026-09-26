@@ -215,6 +215,10 @@ const ru = {
   'share.resetDone': 'Новая ссылка скопирована, старая больше не работает',
   'share.error': 'Не получилось — попробуйте ещё раз',
   'share.notFound': 'Ссылка не работает: её сбросили или полёт скрыт',
+  'share.embed': 'Код для сайта',
+  'share.embedCopied': 'Код для сайта скопирован — вставьте его в HTML страницы',
+  'embed.open': 'Открыть в Skyline ↗',
+  'embed.frameTitle': 'Полёт в Skyline',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -435,6 +439,10 @@ const en: Messages = {
   'share.resetDone': 'New link copied, the old one no longer works',
   'share.error': 'Something went wrong — try again',
   'share.notFound': 'This link does not work: it was reset or the flight is hidden',
+  'share.embed': 'Embed code',
+  'share.embedCopied': 'Embed code copied — paste it into your page HTML',
+  'embed.open': 'Open in Skyline ↗',
+  'embed.frameTitle': 'Flight on Skyline',
 };
 
 export const messages: Record<Locale, Messages> = { ru, en };

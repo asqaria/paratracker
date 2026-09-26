@@ -58,6 +58,7 @@ export interface AnalyticsPanelProps {
     onPrivacy: (privacy: Privacy) => Promise<void>;
     onShareLink: () => Promise<string>;
     onResetLink: () => Promise<string>;
+    onEmbedCode: () => Promise<string>;
   };
 }
 

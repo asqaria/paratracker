@@ -6,6 +6,7 @@ import {
   HEALTH_HASH,
   LOGBOOK_HASH,
   routeFromHash,
+  routeFromLocation,
   SETTINGS_HASH,
   trackUrlFromHash,
 } from './routing';
@@ -76,5 +77,18 @@ describe('flightHash', () => {
     const hash = flightHash('11111111-2222-4333-8444-555555555555');
     expect(hash).toBe('#/flight/11111111-2222-4333-8444-555555555555');
     expect(routeFromHash(hash).kind).toBe('flight');
+  });
+});
+
+describe('routeFromLocation — встраиваемый просмотрщик (задача 3.9)', () => {
+  it('/embed/{токен} — по пути, хэш не важен', () => {
+    expect(routeFromLocation('/embed/abcdEFGH_-12', '')).toEqual({ kind: 'embed', token: 'abcdEFGH_-12' });
+    expect(routeFromLocation('/embed/abcdEFGH_-12/', '#/logbook')).toEqual({ kind: 'embed', token: 'abcdEFGH_-12' });
+  });
+
+  it('остальные пути — маршрут по хэшу, как раньше', () => {
+    expect(routeFromLocation('/', '#/logbook')).toEqual({ kind: 'logbook' });
+    expect(routeFromLocation('/embed/short', '')).toEqual({ kind: 'landing' });
+    expect(routeFromLocation('/embed/', '#/s/abcdEFGH12')).toEqual({ kind: 'shared', token: 'abcdEFGH12' });
   });
 });

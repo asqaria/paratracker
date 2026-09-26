@@ -18,6 +18,16 @@ export const LOGBOOK_HASH = '#/logbook';
 export const SETTINGS_HASH = '#/settings';
 /** Ссылка «по ссылке» (задача 3.7): #/s/{токен}. */
 const SHARE_HASH = /^#\/s\/([\w-]{8,64})$/;
+/**
+ * Встраиваемый просмотрщик (задача 3.9): путь /embed/{токен}, а не хэш —
+ * сервер видит путь и разрешает встраивать в чужие сайты только его.
+ */
+const EMBED_PATH = /^\/embed\/([\w-]{8,64})\/?$/;
+
+/** Адрес iframe для чужого сайта. */
+export const embedPath = (token: string): string => `/embed/${token}`;
+/** Полная страница полёта по ссылке — из встроенного просмотрщика «Открыть в Skyline». */
+export const shareHash = (token: string): string => `#/s/${token}`;
 
 /** Адрес просмотрщика загруженного полёта — им же делается редирект. */
 export const flightHash = (flightId: string): string => `#/flight/${flightId}`;
@@ -41,8 +51,16 @@ export type Route =
   | { kind: 'logbook' }
   | { kind: 'settings' }
   | { kind: 'shared'; token: string }
+  /** Встроенный в чужой сайт просмотрщик (задача 3.9): облегчённый, без входа. */
+  | { kind: 'embed'; token: string }
   /** flightId null — демо-трек: его нет в API, аналитики к нему нет. */
   | { kind: 'flight'; flightId: string | null; trackUrl: string; review?: true };
+
+/** Маршрут по адресу страницы: встраивание — по пути, остальное — по хэшу. */
+export function routeFromLocation(pathname: string, hash: string): Route {
+  const embed = EMBED_PATH.exec(pathname)?.[1];
+  return embed === undefined ? routeFromHash(hash) : { kind: 'embed', token: embed };
+}
 
 export function routeFromHash(hash: string): Route {
   if (hash === HEALTH_HASH) return { kind: 'health' };

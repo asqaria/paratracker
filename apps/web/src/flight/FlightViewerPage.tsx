@@ -19,9 +19,11 @@ export interface FlightViewerPageProps {
   review?: boolean;
   /** Токен ссылки «по ссылке» (задача 3.7): посторонний без него полёт не увидит. */
   share?: string;
+  /** Встроен в чужой сайт (задача 3.9): облегчённая сцена, без баннера сохранения. */
+  embed?: boolean;
 }
 
-export function FlightViewerPage({ flightId, trackUrl, review = false, share }: FlightViewerPageProps) {
+export function FlightViewerPage({ flightId, trackUrl, review = false, share, embed = false }: FlightViewerPageProps) {
   const t = useT();
   const track = useTrack(trackUrl);
 
@@ -52,8 +54,8 @@ export function FlightViewerPage({ flightId, trackUrl, review = false, share }: 
         </p>
       }
     >
-      <Scene track={track.track} flightId={flightId} review={review} {...(share ? { share } : {})} />
-      {flightId !== null && <SaveFlightBanner flightId={flightId} />}
+      <Scene track={track.track} flightId={flightId} review={review} embed={embed} {...(share ? { share } : {})} />
+      {flightId !== null && !embed && <SaveFlightBanner flightId={flightId} />}
     </Suspense>
   );
 }
