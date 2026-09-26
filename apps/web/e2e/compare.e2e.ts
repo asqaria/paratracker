@@ -108,3 +108,15 @@ test('недоступная ссылка — пометка в списке, о
   await expect(page.locator('[data-panel="compare-list"] li')).toHaveCount(1);
   await expect(page.locator('[data-panel="compare-toolbar"]')).toContainText(/недоступен|unavailable/);
 });
+
+test('гонка: в середине полёта — один лидер, идущий вровень — «+0:00»', async ({ page }) => {
+  await openCompare(page);
+  const slider = page.locator('[data-panel="timeline"] input[type="range"]');
+  const [min, max] = await Promise.all([slider.getAttribute('min'), slider.getAttribute('max')]);
+  // Значение — на шаге ползунка (секунда от начала), иначе браузер его не примет.
+  await slider.fill(String(Number(min) + Math.round((Number(max) - Number(min)) / 2 / 1000) * 1000));
+  const gaps = page.locator('[data-panel="compare-list"] [data-race-gap]');
+  await expect(gaps).toHaveCount(2);
+  await expect(gaps.nth(0)).toHaveText(/лидер|leader/);
+  await expect(gaps.nth(1)).toHaveText('+0:00');
+});

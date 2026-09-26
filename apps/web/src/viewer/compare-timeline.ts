@@ -55,3 +55,22 @@ export function defaultAlignment(tracks: readonly CompareTrackTimes[]): CompareA
   if (takeoffs.length < 2) return 'absolute';
   return Math.max(...takeoffs) - Math.min(...takeoffs) > SAME_DAY_SPREAD_MS ? 'takeoff' : 'absolute';
 }
+
+const MS_PER_SECOND = 1000;
+const SECONDS_PER_MINUTE = 60;
+const MINUTES_PER_HOUR = 60;
+
+/** «1:23:45» или «3:40» (меньше часа — без часов). */
+function clock(ms: number, withHours: boolean): string {
+  const total = Math.round(Math.abs(ms) / MS_PER_SECOND);
+  const h = Math.floor(total / (SECONDS_PER_MINUTE * MINUTES_PER_HOUR));
+  const m = Math.floor(total / SECONDS_PER_MINUTE) % MINUTES_PER_HOUR;
+  const s = String(total % SECONDS_PER_MINUTE).padStart(2, '0');
+  return withHours || h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
+}
+
+/** Время от взлёта первого трека (режим «по взлёту»): «+1:23:45», до взлёта — «−0:00:30». */
+export const elapsedLabel = (ms: number): string => `${ms < 0 ? '−' : '+'}${clock(ms, true)}`;
+
+/** Отставание от лидера (задача 3.12б): «+3:40», больше часа — «+1:03:40». */
+export const gapLabel = (ms: number): string => `+${clock(ms, false)}`;

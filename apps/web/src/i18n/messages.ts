@@ -242,6 +242,7 @@ const ru = {
   'compare.landed': 'сел',
   'compare.loading': 'Загружаем треки…',
   'compare.slider': 'Момент полёта',
+  'compare.leader': 'лидер',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -489,6 +490,7 @@ const en: Messages = {
   'compare.landed': 'landed',
   'compare.loading': 'Loading tracks…',
   'compare.slider': 'Flight moment',
+  'compare.leader': 'leader',
 };
 
 export const messages: Record<Locale, Messages> = { ru, en };

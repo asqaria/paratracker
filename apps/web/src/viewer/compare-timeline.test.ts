@@ -4,6 +4,8 @@ import {
   alignmentOffsets,
   compareTimeline,
   defaultAlignment,
+  elapsedLabel,
+  gapLabel,
   SAME_DAY_SPREAD_MS,
   type CompareTrackTimes,
 } from './compare-timeline';
@@ -57,5 +59,15 @@ describe('compareColor', () => {
     expect(new Set(COMPARE_COLORS).size).toBe(8);
     expect(compareColor(0)).toBe(COMPARE_COLORS[0]);
     expect(compareColor(8)).toBe(COMPARE_COLORS[0]);
+  });
+});
+
+describe('подписи времени', () => {
+  it('от взлёта — со знаком и часами; отставание — без часов, пока меньше часа', () => {
+    expect(elapsedLabel(H + 23 * 60_000 + 45_000)).toBe('+1:23:45');
+    expect(elapsedLabel(-30_000)).toBe('−0:00:30');
+    expect(gapLabel(3 * 60_000 + 40_000)).toBe('+3:40');
+    expect(gapLabel(H + 3 * 60_000 + 40_000)).toBe('+1:03:40');
+    expect(gapLabel(0)).toBe('+0:00');
   });
 });
