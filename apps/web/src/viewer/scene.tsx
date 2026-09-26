@@ -92,7 +92,7 @@ import { SummaryPanel } from './SummaryPanel';
 import { TimelinePanel } from './TimelinePanel';
 import { VarioLegend } from './VarioLegend';
 import { buildTrackGeometry } from './track-geometry';
-import { CURTAIN, curtainOnByDefault, curtainSamples, curtainSegmentsShown, flownSegments } from './curtain';
+import { CURTAIN, curtainInMode, curtainOnByDefault, curtainPieces, curtainSamples, curtainSegmentsShown } from './curtain';
 import { CurtainLayer } from './curtain-layer';
 import { currentColumn, thermalColumns, type ThermalColumn } from './thermal-columns';
 import { ThermalLayer } from './thermal-layer';
@@ -429,8 +429,10 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
           .catch(() => samples.map(() => Number.NaN))
           .then((ground) => {
             if (disposed) return;
-            const curtain = new CurtainLayer(scene, shown, samples, ground, curtainSegmentsShown(samples, shown.flags), curtainColor);
-            curtain.setVisible(curtainOnRef.current);
+            const pieces = curtainPieces(samples, curtainSegmentsShown(samples, shown.flags), shown.lat, shown.lon);
+            const groundAt = new Map(samples.map((i, k) => [i, ground[k] ?? Number.NaN]));
+            const curtain = new CurtainLayer(scene, shown, pieces, groundAt, curtainColor);
+            curtain.setVisible(curtainOnRef.current && curtainInMode(cameraModeRef.current));
             curtainRef.current = curtain;
             scene.requestRender();
           });
@@ -458,13 +460,15 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
             lastIndex = index;
             setTimeMs(current);
           }
-          layer.update(trackShownRef.current, flownVertexCount(geometry.sourceIndex, index));
-          const curtain = curtainRef.current;
-          curtain?.update(
-            trackShownRef.current === 'all' ? samples.length - 1 : flownSegments(track.t, samples, current),
-          );
-          // Тень строится асинхронно: пока её куски не готовы, кадры нужны и в покое.
-          if (layer.pending || curtain?.pending) scene.requestRender();
+          // Пройдены точки до пилота включительно: indexAt округляет, и ближайшая
+          // точка может быть ещё впереди — линия забегала бы на полсекунды.
+          const passed = (track.t[index] ?? Infinity) > current ? index - 1 : index;
+          const pilot = viewer ? flightClock.position.getValue(viewer.clock.currentTime) : undefined;
+          layer.update(trackShownRef.current, flownVertexCount(geometry.sourceIndex, passed), pilot);
+          // Край занавеса — по времени пилота в этом кадре, а не по точке трека:
+          // между точками он идёт вместе с пилотом, без ступенек.
+          curtainRef.current?.update(trackShownRef.current === 'all' ? null : current);
+          if (layer.pending) scene.requestRender();
 
           const mode = cameraModeRef.current;
           const modePose = CAMERA_POSES[mode];
@@ -535,9 +539,9 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
 
   useEffect(() => {
     curtainOnRef.current = curtainOn;
-    curtainRef.current?.setVisible(curtainOn);
+    curtainRef.current?.setVisible(curtainOn && curtainInMode(cameraMode));
     viewerRef.current?.scene.requestRender();
-  }, [curtainOn]);
+  }, [curtainOn, cameraMode]);
 
   /** «Весь / Пройденный»: применяется в кадре (onPreRender), здесь — только перерисовка. */
   useEffect(() => {
@@ -889,7 +893,7 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
           trackShown={trackShown}
           onTrackShown={setTrackShown}
           curtainOn={curtainOn}
-          onCurtainOn={setCurtainOn}
+          {...(curtainInMode(cameraMode) ? { onCurtainOn: setCurtainOn } : {})}
           onTogglePlay={togglePlay}
           onSeekTo={seekTo}
           onSpeed={setSpeed}
