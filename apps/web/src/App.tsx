@@ -35,5 +35,5 @@ export function App() {
 
   if (route.kind === 'health') return <HealthPage />;
   if (route.kind === 'flight') return <FlightViewerPage flightId={route.flightId} trackUrl={route.trackUrl} />;
-  return <UploadPage />;
+  return <UploadPage authFailed={route.kind === 'landing' && route.authFailed === true} />;
 }

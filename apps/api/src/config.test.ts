@@ -20,4 +20,22 @@ describe('loadConfig', () => {
   it('называет отсутствующую переменную в ошибке', () => {
     expect(() => loadConfig({ ...valid, DATABASE_URL: undefined })).toThrow(/DATABASE_URL/);
   });
+
+  it('вход выключен по умолчанию', () => {
+    const config = loadConfig(valid);
+    expect(config.AUTH_JWT_SECRET).toBeUndefined();
+    expect(config.GOOGLE_CLIENT_ID).toBeUndefined();
+    expect(config.PUBLIC_URL).toBe('http://localhost:5173');
+  });
+
+  it('короткий секрет JWT не принимает', () => {
+    expect(() => loadConfig({ ...valid, AUTH_JWT_SECRET: 'short' })).toThrow(/AUTH_JWT_SECRET/);
+  });
+
+  it('Google без секрета JWT или без client secret — ошибка конфига, а не молчаливо выключенный вход', () => {
+    const secret = 'x'.repeat(32);
+    expect(() => loadConfig({ ...valid, GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 's' })).toThrow(/AUTH_JWT_SECRET/);
+    expect(() => loadConfig({ ...valid, AUTH_JWT_SECRET: secret, GOOGLE_CLIENT_ID: 'id' })).toThrow(/GOOGLE_CLIENT_SECRET/);
+    expect(loadConfig({ ...valid, AUTH_JWT_SECRET: secret, GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 's' }).GOOGLE_CLIENT_ID).toBe('id');
+  });
 });

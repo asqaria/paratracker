@@ -29,6 +29,13 @@
       "when": 1790418942752,
       "tag": "0003_analysis_segments",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790439558889,
+      "tag": "0004_auth_sessions",
+      "breakpoints": true
     }
   ]
 }

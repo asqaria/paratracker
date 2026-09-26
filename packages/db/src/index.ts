@@ -33,4 +33,15 @@ export {
   type ThermalRecord,
 } from './repositories/analysis.js';
 export { readPostgisVersion } from './repositories/health.js';
+export {
+  createSession,
+  findUserProfile,
+  revokeSession,
+  rotateSession,
+  signInWithOAuth,
+  type NewSession,
+  type OAuthIdentity,
+  type RotateResult,
+  type UserProfile,
+} from './repositories/users.js';
 export * from './schema.js';

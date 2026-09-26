@@ -19,10 +19,12 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1133.0",
+    "@fastify/cookie": "^11.1.2",
     "@fastify/multipart": "^10.1.1",
     "@skyline/core": "workspace:*",
     "@skyline/db": "workspace:*",
     "fastify": "^5.12.4",
+    "jose": "^6.2.12",
     "zod": "^4.6.5"
   },
   "devDependencies": {

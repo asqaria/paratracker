@@ -1177,16 +1177,31 @@ comparisons (
 
 REST, JSON, версионирование через путь `/api/v1`. Аутентификация — JWT в httpOnly cookie + refresh.
 
+**Вход — только через OAuth-провайдеров, паролей нет** (решение владельца 26.09.2026,
+задача 2.10): нет хэшей паролей, перебора, восстановления и писем. Сейчас — Google;
+Apple — вместе с нативным приложением (Фаза 5).
+
+- Access — JWT HS256 на 15 мин, cookie `skyline_at` на `/api/v1`.
+- Refresh — случайные 256 бит на 30 дней, cookie `skyline_rt` только на `/api/v1/auth`;
+  в БД (`sessions`) — лишь SHA-256. Ротация на каждый refresh; повтор уже сменённого
+  токена позже 30 с — кража, гасятся все сессии пользователя; раньше — соседняя
+  вкладка, ответ 409 «повтори».
+- Google: authorization code + PKCE S256 + nonce, состояние входа — в подписанной
+  cookie на 10 мин. Аккаунт создаётся или привязывается только по подтверждённому
+  email; пользователь опознаётся по `sub`, не по email.
+- Cookie — httpOnly, SameSite=Lax, Secure на https: фронт и API на одном origin.
+
 ```
 # Служебные
 GET    /api/v1/health                     состояние БД и объектного хранилища
 
 # Аутентификация
-POST   /api/v1/auth/register              { email, password, username }
-POST   /api/v1/auth/login
-POST   /api/v1/auth/refresh
-POST   /api/v1/auth/logout
-GET    /api/v1/auth/oauth/{provider}      google | apple  (Фаза 2)
+GET    /api/v1/auth/providers             → { google: bool } — какие кнопки входа показывать
+GET    /api/v1/auth/oauth/{provider}      ?returnTo=#/… → 302 к провайдеру; google (apple — Фаза 5)
+GET    /api/v1/auth/oauth/{provider}/callback  → 302 на returnTo или #/auth-failed
+POST   /api/v1/auth/refresh               204 | 401 | 409 (соседняя вкладка уже обновила)
+POST   /api/v1/auth/logout                204
+GET    /api/v1/me                         → профиль вошедшего | 401
 
 # Загрузка и обработка
 POST   /api/v1/flights/upload             multipart; → { flightId, status }
@@ -1495,7 +1510,7 @@ Chrome/Edge 120+, Safari 17+, Firefox 120+. WebGL2 обязателен для 3
 2.7  Фронт: маркеры термиков в 3D (спирали/цилиндры), цвет по усилению
 2.8  Фронт: curtain wall под треком
 2.9  Фронт: glTF-модель параплана с ориентацией и креном
-2.10 Аутентификация: регистрация, вход, JWT, OAuth Google
+2.10 Аутентификация: вход через Google (без паролей), JWT + refresh, /me
 2.11 Логбук: список полётов, фильтры, карта всех полётов (MapLibre)
 2.12 Статистика сезона: часы, км, набор, число полётов, топ-мест, график по месяцам
 2.13 Привязка крыльев, автоопределение места старта (таблица sites + сидинг)
