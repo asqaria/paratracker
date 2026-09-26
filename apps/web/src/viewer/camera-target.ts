@@ -79,24 +79,25 @@ function interpolated(track: TargetTrack, timeMs: number): TargetPoint {
   return { lat: lerp(track.lat), lon: lerp(track.lon), alt: lerp(track.alt) };
 }
 
-/**
- * Сглаженная позиция в момент timeMs. halfWidthS — полуширина окна в секундах
- * полёта (targetHalfWidthS). Мало точек в окне (разрыв записи, край трека) —
- * линейно между соседними фиксами.
- */
-export function cameraTarget(track: TargetTrack, timeMs: number, halfWidthS: number): TargetPoint {
-  const count = track.t.length;
-  if (count === 0) return { lat: Number.NaN, lon: Number.NaN, alt: Number.NaN };
-  const half = halfWidthS * MS_PER_S;
-  const from = lowerBound(track.t, timeMs - half);
+/** Локальная прямая по каналам lat, lon, alt: значение в t и наклон в единицах за секунду. */
+interface LocalFit {
+  value: [number, number, number];
+  slopePerS: [number, number, number];
+}
 
-  // Взвешенные суммы для прямой p(τ) = a + b·(τ − t); значение в t — это a.
+/**
+ * Взвешенная прямая p(τ) = a + b·(τ − t) по фиксам в окне ±halfWidthS:
+ * a — сглаженное значение в t, b — скорость. null — точек мало (разрыв, край).
+ */
+function localFit(track: TargetTrack, timeMs: number, halfWidthS: number): LocalFit | null {
+  const count = track.t.length;
+  const half = halfWidthS * MS_PER_S;
   let s0 = 0;
   let s1 = 0;
   let s2 = 0;
   const sp = [0, 0, 0];
   const stp = [0, 0, 0];
-  for (let i = from; i < count; i++) {
+  for (let i = lowerBound(track.t, timeMs - half); i < count; i++) {
     const dt = (track.t[i] ?? Number.NaN) - timeMs;
     if (dt > half) break;
     const u = dt / half;
@@ -114,10 +115,50 @@ export function cameraTarget(track: TargetTrack, timeMs: number, halfWidthS: num
   }
 
   const determinant = s0 * s2 - s1 * s1;
-  if (!(determinant > MIN_DETERMINANT * Math.max(1, s0 * s0))) return interpolated(track, timeMs);
-  const at = (k: number): number => (s2 * (sp[k] ?? 0) - s1 * (stp[k] ?? 0)) / determinant;
-  const point = { lat: at(0), lon: at(1), alt: at(2) };
-  return [point.lat, point.lon, point.alt].every(Number.isFinite) ? point : interpolated(track, timeMs);
+  if (!(determinant > MIN_DETERMINANT * Math.max(1, s0 * s0))) return null;
+  const a = (k: number): number => (s2 * (sp[k] ?? 0) - s1 * (stp[k] ?? 0)) / determinant;
+  const b = (k: number): number => (s0 * (stp[k] ?? 0) - s1 * (sp[k] ?? 0)) / determinant;
+  const fit: LocalFit = { value: [a(0), a(1), a(2)], slopePerS: [b(0), b(1), b(2)] };
+  return [...fit.value, ...fit.slopePerS].every(Number.isFinite) ? fit : null;
+}
+
+/**
+ * Сглаженная позиция в момент timeMs. halfWidthS — полуширина окна в секундах
+ * полёта (targetHalfWidthS). Мало точек в окне (разрыв записи, край трека) —
+ * линейно между соседними фиксами.
+ */
+export function cameraTarget(track: TargetTrack, timeMs: number, halfWidthS: number): TargetPoint {
+  if (track.t.length === 0) return { lat: Number.NaN, lon: Number.NaN, alt: Number.NaN };
+  const fit = localFit(track, timeMs, halfWidthS);
+  if (!fit) return interpolated(track, timeMs);
+  const [lat, lon, alt] = fit.value;
+  return { lat, lon, alt };
+}
+
+export interface TrackVelocity {
+  eastMs: number;
+  northMs: number;
+  upMs: number;
+}
+
+const EARTH_RADIUS_M = 6_371_000;
+const DEG = Math.PI / 180;
+
+/**
+ * Скорость по сглаженной траектории, м/с (восток, север, верх) — наклон той же
+ * локальной прямой. Без рывков на фиксах, в отличие от разности соседних точек.
+ * null — в окне мало точек.
+ */
+export function trackVelocity(track: TargetTrack, timeMs: number, halfWidthS: number): TrackVelocity | null {
+  const fit = localFit(track, timeMs, halfWidthS);
+  if (!fit) return null;
+  const [lat] = fit.value;
+  const [dLat, dLon, dAlt] = fit.slopePerS;
+  return {
+    eastMs: dLon * DEG * EARTH_RADIUS_M * Math.cos(lat * DEG),
+    northMs: dLat * DEG * EARTH_RADIUS_M,
+    upMs: dAlt,
+  };
 }
 
 /**
