@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildChartGeometry, chartStep } from './altitude-chart';
+import { buildChartGeometry, buildSeriesGeometry, channelSeries, chartStep } from './altitude-chart';
 import { varioCss } from './vario-palette';
 
 const SIZE = { width: 1000, height: 100 };
@@ -64,5 +64,59 @@ describe('buildChartGeometry', () => {
     const geometry = buildChartGeometry(input([], []), SIZE);
     expect(geometry.fill).toEqual([]);
     expect(geometry.segments).toEqual([]);
+  });
+});
+
+describe('каналы графика (задача 2.15)', () => {
+  const track = {
+    alt: Float64Array.from([1000, 1500, 1200]),
+    vSpeed: Float64Array.from([2, -3, 1]),
+    gSpeed: Float64Array.from([8, 12, 10]),
+  };
+
+  it('варио — шкала вокруг нуля, без заливки, линия нуля посередине', () => {
+    const series = channelSeries('vario', track, null);
+    if (!series) throw new Error('vario series expected');
+    const geometry = buildSeriesGeometry(series, SIZE);
+    expect(geometry).toMatchObject({ minAlt: -3, maxAlt: 3, fill: [] });
+    expect(geometry.zeroY).toBeCloseTo((SIZE.height - 8 - 6) / 2 + 8, 9);
+  });
+
+  it('скорость — от нуля, один цвет (акцент)', () => {
+    const series = channelSeries('speed', track, null);
+    if (!series) throw new Error('speed series expected');
+    const geometry = buildSeriesGeometry(series, SIZE);
+    expect(geometry).toMatchObject({ minAlt: 0, maxAlt: 12 });
+    expect(geometry.segments.every((s) => s.color === null)).toBe(true);
+  });
+
+  it('над рельефом: без рельефа канала нет; пустые места — без сегментов', () => {
+    expect(channelSeries('agl', track, null)).toBeNull();
+    const agl = Float64Array.from([Number.NaN, 300, 150]);
+    const series = channelSeries('agl', track, agl);
+    if (!series) throw new Error('agl series expected');
+    const geometry = buildSeriesGeometry(series, SIZE);
+    expect(geometry.minAlt).toBe(0);
+    expect(geometry.segments).toHaveLength(1);
+  });
+
+  it('высота — прежний график: шкала по данным, ноль вне шкалы', () => {
+    const series = channelSeries('altitude', track, null);
+    if (!series) throw new Error('altitude series expected');
+    expect(buildSeriesGeometry(series, SIZE)).toEqual(buildChartGeometry({ alt: track.alt, vSpeed: track.vSpeed }, SIZE));
+    expect(buildSeriesGeometry(series, SIZE).zeroY).toBeNull();
+  });
+});
+
+describe('выборка на пиксель', () => {
+  it('среднее по корзине, а не случайная точка: частокол скорости сглаживается', () => {
+    // 4000 точек на 1000 px: по 4 на пиксель, значения 0, 20, 0, 20 — среднее 10.
+    const values = Float64Array.from({ length: 4000 }, (_, i) => (i % 2) * 20);
+    const geometry = buildSeriesGeometry(
+      { values, vSpeed: new Float64Array(4000), color: 'plain', scale: 'fromZero', fill: false },
+      SIZE,
+    );
+    const ys = new Set(geometry.segments.slice(0, -1).map((s) => s.y1.toFixed(6)));
+    expect(ys.size).toBe(1);
   });
 });

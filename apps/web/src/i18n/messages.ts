@@ -178,6 +178,11 @@ const ru = {
   'stats.byMonth': 'Время в воздухе по месяцам',
   'stats.topSites': 'Места старта',
   'stats.siteFlights': 'полётов: {count}',
+  'viewer.channel': 'График',
+  'viewer.channel.altitude': 'Высота',
+  'viewer.channel.vario': 'Варио',
+  'viewer.channel.speed': 'Скорость',
+  'viewer.channel.agl': 'Над рельефом',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -361,6 +366,11 @@ const en: Messages = {
   'stats.byMonth': 'Airtime by month',
   'stats.topSites': 'Takeoff sites',
   'stats.siteFlights': 'flights: {count}',
+  'viewer.channel': 'Chart',
+  'viewer.channel.altitude': 'Altitude',
+  'viewer.channel.vario': 'Vario',
+  'viewer.channel.speed': 'Speed',
+  'viewer.channel.agl': 'Above ground',
 };
 
 export const messages: Record<Locale, Messages> = { ru, en };

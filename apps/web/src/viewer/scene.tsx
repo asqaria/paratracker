@@ -95,6 +95,7 @@ import { AnalyticsPanel, type SelectedSegment } from './AnalyticsPanel';
 import { BottomSheet } from './BottomSheet';
 import { useCreateSite, useFlightAnalytics, useOwnGliders, useSetFlightGlider } from './flight-analytics';
 import { SummaryLine, SummaryPanel } from './SummaryPanel';
+import { aglProfile } from './agl';
 import { TimelinePanel } from './TimelinePanel';
 import { VarioLegend } from './VarioLegend';
 import { buildTrackGeometry } from './track-geometry';
@@ -354,6 +355,8 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
   const curtainRef = useRef<CurtainLayer | null>(null);
   /** Трек сцены — откалиброванный по земле; колонны термиков строятся по нему. */
   const [sceneTrack, setSceneTrack] = useState<DecodedTrack | null>(null);
+  /** Высота над рельефом для графика (задача 2.15); null — рельеф под полётом ещё не пришёл. */
+  const [agl, setAgl] = useState<Float64Array | null>(null);
   const [columnsShown, setColumnsShown] = useState(true);
   const thermalLayerRef = useRef<ThermalLayer | null>(null);
   const columnsRef = useRef<ThermalColumn[]>([]);
@@ -493,6 +496,8 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
             if (disposed) return;
             const pieces = curtainPieces(samples, curtainSegmentsShown(samples, shown.flags), shown.lat, shown.lon);
             const groundAt = new Map(samples.map((i, k) => [i, ground[k] ?? Number.NaN]));
+            // Высота над рельефом для графика (задача 2.15) — по тому же рельефу, что и занавес.
+            setAgl(aglProfile(shown.alt, groundAt));
             const curtain = new CurtainLayer(scene, shown, pieces, groundAt, curtainColor);
             curtain.setVisible(curtainOnRef.current && curtainInMode(cameraModeRef.current));
             curtainRef.current = curtain;
@@ -1023,6 +1028,7 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
           onSeekTo={seekTo}
           onSpeed={setSpeed}
           onCameraMode={setCameraMode}
+          agl={agl}
         />
       </div>
     </div>

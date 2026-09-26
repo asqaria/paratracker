@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { documentColorTokens, withAlpha } from '../design/tokens';
 import { useLocaleStore, useT } from '../i18n/locale';
-import { buildChartGeometry } from './altitude-chart';
+import { buildSeriesGeometry, CHART_CHANNELS, channelSeries, type ChartChannel } from './altitude-chart';
 import { CAMERA_MODES, type CameraMode } from './camera-modes';
 import type { DecodedTrack } from './decode-track';
 import {
@@ -41,12 +41,17 @@ export interface TimelinePanelProps {
   onSeekTo: (timeMs: number) => void;
   onSpeed: (speed: PlaybackSpeed) => void;
   onCameraMode: (mode: CameraMode) => void;
+  /** Высота над рельефом по точкам трека (задача 2.15); null — рельеф ещё не пришёл. */
+  agl?: Float64Array | null;
 }
 
 /** Заливка под графиком — акцентный токен, сверху полупрозрачный, книзу в ноль. */
 const FILL_TOP_ALPHA = 0.26;
 const FILL_BOTTOM_ALPHA = 0;
 const LINE_WIDTH_PX = 2.2;
+/** Линия нуля (варио — ноль, над рельефом — земля): тонкая и приглушённая. */
+const ZERO_LINE_WIDTH_PX = 1;
+const ZERO_LINE_ALPHA = 0.5;
 
 export function TimelinePanel(props: TimelinePanelProps) {
   const t = useT();
@@ -54,6 +59,10 @@ export function TimelinePanel(props: TimelinePanelProps) {
   const canvas = useRef<HTMLCanvasElement | null>(null);
   const chartBox = useRef<HTMLDivElement | null>(null);
   const dragging = useRef(false);
+  /** Канал графика (задача 2.15): высота по умолчанию — как было до каналов. */
+  const [channel, setChannel] = useState<ChartChannel>('altitude');
+  const agl = props.agl ?? null;
+  const available = (c: ChartChannel): boolean => channelSeries(c, props.track, agl) !== null;
 
   const index = indexAt(props.track.t, props.timeMs);
   const altitude = props.track.alt[index] ?? Number.NaN;
@@ -81,9 +90,22 @@ export function TimelinePanel(props: TimelinePanelProps) {
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
       context.clearRect(0, 0, width, height);
 
-      const geometry = buildChartGeometry({ alt: props.track.alt, vSpeed: props.track.vSpeed }, { width, height });
-      if (geometry.fill.length === 0) return;
+      const series = channelSeries(channel, props.track, agl) ?? channelSeries('altitude', props.track, agl);
+      if (!series) return;
+      const geometry = buildSeriesGeometry(series, { width, height });
+      if (geometry.segments.length === 0 && geometry.fill.length === 0) return;
+      const { accent, secondary } = documentColorTokens();
 
+      if (geometry.zeroY !== null) {
+        context.beginPath();
+        context.moveTo(0, geometry.zeroY);
+        context.lineTo(width, geometry.zeroY);
+        context.lineWidth = ZERO_LINE_WIDTH_PX;
+        context.strokeStyle = withAlpha(secondary, ZERO_LINE_ALPHA);
+        context.stroke();
+      }
+
+      if (geometry.fill.length > 0) {
       context.beginPath();
       for (const [i, point] of geometry.fill.entries()) {
         if (i === 0) context.moveTo(point.x, point.y);
@@ -91,11 +113,11 @@ export function TimelinePanel(props: TimelinePanelProps) {
       }
       context.closePath();
       const gradient = context.createLinearGradient(0, 0, 0, height);
-      const { accent } = documentColorTokens();
       gradient.addColorStop(0, withAlpha(accent, FILL_TOP_ALPHA));
       gradient.addColorStop(1, withAlpha(accent, FILL_BOTTOM_ALPHA));
       context.fillStyle = gradient;
       context.fill();
+      }
 
       context.lineWidth = LINE_WIDTH_PX;
       context.lineJoin = 'round';
@@ -104,7 +126,7 @@ export function TimelinePanel(props: TimelinePanelProps) {
         context.beginPath();
         context.moveTo(segment.x1, segment.y1);
         context.lineTo(segment.x2, segment.y2);
-        context.strokeStyle = segment.color;
+        context.strokeStyle = segment.color ?? accent;
         context.stroke();
       }
     };
@@ -113,7 +135,7 @@ export function TimelinePanel(props: TimelinePanelProps) {
     const observer = new ResizeObserver(draw);
     observer.observe(box);
     return () => observer.disconnect();
-  }, [props.track]);
+  }, [props.track, channel, agl]);
 
   const seekFromPointer = useCallback(
     (event: React.PointerEvent<HTMLDivElement>): void => {
@@ -152,6 +174,22 @@ export function TimelinePanel(props: TimelinePanelProps) {
         >
           {`×${props.speed}`}
         </button>
+
+        <select
+          aria-label={t('viewer.channel')}
+          value={channel}
+          onChange={(event) => {
+            const next = CHART_CHANNELS.find((value) => value === event.target.value);
+            if (next) setChannel(next);
+          }}
+          className="hidden min-h-11 rounded bg-subtle px-2 text-primary compact:block"
+        >
+          {CHART_CHANNELS.map((c) => (
+            <option key={c} value={c} disabled={!available(c)}>
+              {t(`viewer.channel.${c}`)}
+            </option>
+          ))}
+        </select>
 
         <select
           aria-label={t('viewer.camera')}
@@ -288,6 +326,26 @@ export function TimelinePanel(props: TimelinePanelProps) {
         }}
       >
         <canvas ref={canvas} className="h-full w-full" />
+        {/* Каналы графика на десктопе — в углу графика; на телефоне — список в строке управления. */}
+        <div
+          role="group"
+          aria-label={t('viewer.channel')}
+          className="absolute left-1 top-1 flex gap-1 text-xs compact:hidden"
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          {CHART_CHANNELS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              aria-pressed={c === channel}
+              disabled={!available(c)}
+              onClick={() => setChannel(c)}
+              className="rounded bg-void/60 px-2 py-0.5 text-secondary aria-pressed:bg-subtle aria-pressed:text-primary disabled:opacity-40"
+            >
+              {t(`viewer.channel.${c}`)}
+            </button>
+          ))}
+        </div>
         <span
           aria-hidden
           className="pointer-events-none absolute top-0 h-full w-px bg-primary"
