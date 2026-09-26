@@ -5,6 +5,7 @@ import {
   type AnalysisLevel,
   type FlightAnalysis,
   type FlightStatus,
+  type Privacy,
   type SimplifiedLine,
   type SourceFormat,
   type FlightPoint,
@@ -37,11 +38,18 @@ export interface FlightRecord {
   rawObjectKey: string;
   trackObjectKey: string | null;
   errorCode: string | null;
+  /** Доступ (задача 3.7): владелец (null — анонимная загрузка), видимость, токен ссылки. */
+  userId: string | null;
+  privacy: Privacy;
+  shareToken: string | null;
+  publicTrackObjectKey: string | null;
 }
 
 /** Результат конвейера: то, что известно после parse → clean → derive → pack. */
 export interface ProcessedFlight {
   trackObjectKey: string;
+  /** .track для посторонних; null — полёта в записи нет. */
+  publicTrackObjectKey: string | null;
   altitudeSource: AltitudeSource;
   analysisLevel: AnalysisLevel;
   startedAt: Date;
@@ -75,6 +83,10 @@ const RECORD_COLUMNS = {
   rawObjectKey: flights.rawObjectKey,
   trackObjectKey: flights.trackObjectKey,
   errorCode: flights.errorCode,
+  userId: flights.userId,
+  privacy: flights.privacy,
+  shareToken: flights.shareToken,
+  publicTrackObjectKey: flights.publicTrackObjectKey,
 } as const;
 
 export async function insertFlight(db: Database, flight: NewFlight): Promise<FlightRecord> {
@@ -175,6 +187,7 @@ export async function markFlightReady(db: Database, id: string, result: Processe
         status: 'ready',
         errorCode: null,
         trackObjectKey: result.trackObjectKey,
+        publicTrackObjectKey: result.publicTrackObjectKey,
         altitudeSource: result.altitudeSource,
         analysisLevel: result.analysisLevel,
         startedAt: result.startedAt,
@@ -316,7 +329,7 @@ export async function listUnfinishedFlights(db: Database): Promise<FlightRecord[
  * Разовая догрузка производных данных: полёты, обработанные до задачи 2.11
  * (нет сводки и линии для карты), 2.13 (нет точки взлёта для места старта)
  * 2.14 (нет таймзоны), 2.12 (нет времени в воздухе и суммарного набора)
- * или 3.1 (нет XC-очков у полноценного трека),
+ * 3.1 (нет XC-очков у полноценного трека) или 3.7 (нет трека для посторонних),
  * возвращаются в очередь — их подберёт обычное восстановление при старте
  * воркера. После обработки обе колонки заполнены, повторно полёт не попадёт.
  */
@@ -332,6 +345,8 @@ export async function requeueFlightsForBackfill(db: Database): Promise<number> {
           isNull(flights.takeoffPoint),
           isNull(flights.timezone),
           isNull(flights.airtimeS),
+          // Полёт в записи есть (время в воздухе > 0), а трека для посторонних нет — до задачи 3.7.
+          and(sql`${flights.airtimeS} > 0`, isNull(flights.publicTrackObjectKey)),
           // Полноценный трек без XC — обработан до задачи 3.1.
           and(eq(flights.analysisLevel, 'full'), isNull(flights.xcRules)),
         ),

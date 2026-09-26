@@ -17,9 +17,11 @@ export interface FlightViewerPageProps {
   trackUrl: string;
   /** Режим сверки термиков (DoD фазы 2). */
   review?: boolean;
+  /** Токен ссылки «по ссылке» (задача 3.7): посторонний без него полёт не увидит. */
+  share?: string;
 }
 
-export function FlightViewerPage({ flightId, trackUrl, review = false }: FlightViewerPageProps) {
+export function FlightViewerPage({ flightId, trackUrl, review = false, share }: FlightViewerPageProps) {
   const t = useT();
   const track = useTrack(trackUrl);
 
@@ -50,7 +52,7 @@ export function FlightViewerPage({ flightId, trackUrl, review = false }: FlightV
         </p>
       }
     >
-      <Scene track={track.track} flightId={flightId} review={review} />
+      <Scene track={track.track} flightId={flightId} review={review} {...(share ? { share } : {})} />
       {flightId !== null && <SaveFlightBanner flightId={flightId} />}
     </Suspense>
   );

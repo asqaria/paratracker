@@ -199,6 +199,11 @@ export const flights = pgTable(
      */
     claimTokenHash: text('claim_token_hash'),
     trackObjectKey: text('track_object_key'),
+    /**
+     * .track для посторонних (задача 3.7): без записи на земле, от взлёта до
+     * посадки плюс PRIVACY.groundMarginS. null — полёта в записи нет.
+     */
+    publicTrackObjectKey: text('public_track_object_key'),
     previewObjectKey: text('preview_object_key'),
     device: text('device'),
     pilotNameRaw: text('pilot_name_raw'),

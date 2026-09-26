@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { flightRange } from './flight-range.js';
+import { flightRange, visibleRange } from './flight-range.js';
 import { parseFixture } from './testing/tracks.js';
 import { cleanAndDerive } from './clean-derive.js';
 
@@ -59,5 +59,22 @@ describe('flightRange — взлёт и посадка по скорости', (
   it('baseline.igc — запись от первой до последней точки в воздухе', () => {
     const p = cleanAndDerive(parseFixture('baseline.igc')).points;
     expect(flightRange(p.t, p.groundSpeed)).toEqual({ takeoff: 0, landing: p.t.length - 1 });
+  });
+});
+
+describe('visibleRange — что видят посторонние (задача 3.7)', () => {
+  const t = Float64Array.from({ length: 100 }, (_, i) => i * 1000);
+
+  it('от взлёта до посадки плюс 5 с до и после', () => {
+    expect(visibleRange(t, { takeoff: 30, landing: 70 })).toEqual({ takeoff: 25, landing: 75 });
+  });
+
+  it('у краёв записи — не дальше первой и последней точки', () => {
+    expect(visibleRange(t, { takeoff: 2, landing: 98 })).toEqual({ takeoff: 0, landing: 99 });
+  });
+
+  it('полёта нет — показывать нечего', () => {
+    expect(visibleRange(t, { takeoff: 99, landing: 99 })).toBeNull();
+    expect(visibleRange(new Float64Array(), { takeoff: -1, landing: -1 })).toBeNull();
   });
 });

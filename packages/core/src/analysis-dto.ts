@@ -4,6 +4,7 @@ import { GLIDE_KINDS, THERMAL_STRENGTHS, TURN_DIRECTIONS, XC_TYPES } from './der
 import { AnalysisLevel, FlightStatus } from './flight.js';
 import { GliderSummary } from './glider.js';
 import { SiteSummary } from './site-dto.js';
+import { Privacy } from './user.js';
 
 /**
  * Контракт аналитики полёта (ТЗ §10): GET /flights/{id}, /thermals, /glides,
@@ -67,6 +68,8 @@ export const FlightDetailsResponse = z.object({
   gliderRaw: z.string().nullable(),
   /** Спрашивающий — владелец полёта: может добавить место, править полёт. */
   canEdit: z.boolean(),
+  /** Видимость полёта (задача 3.7); у анонимной загрузки — «по ссылке». */
+  privacy: Privacy,
 });
 export type FlightDetailsResponse = z.infer<typeof FlightDetailsResponse>;
 

@@ -1,0 +1,1 @@
+ALTER TABLE "flights" ADD COLUMN "public_track_object_key" text;

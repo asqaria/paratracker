@@ -64,6 +64,7 @@ const analysis = (thermalCount: number): FlightAnalysis => ({
 
 const processed = (result: FlightAnalysis | null): ProcessedFlight => ({
   trackObjectKey: 'tracks/test.track',
+  publicTrackObjectKey: null,
   altitudeSource: 'baro',
   analysisLevel: result ? 'full' : 'basic',
   startedAt: new Date(T0),

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 
 import { fill, useLocaleStore, useT } from '../i18n/locale';
-import type { GliderDto } from '@skyline/core';
+import type { GliderDto, Privacy } from '@skyline/core';
 
 import { GliderLine } from '../gliders/GliderLine';
 import { formatLocalStart } from '../logbook/format-logbook';
+import { PrivacyControl } from '../sharing/PrivacyControl';
 import { XcCard } from './XcCard';
 import { reviewHash } from '../routing';
 import { SiteLine } from '../sites/SiteLine';
@@ -52,6 +53,12 @@ export interface AnalyticsPanelProps {
   onXcRouteShown?: (shown: boolean) => void;
   /** Показать весь XC-маршрут камерой сверху. */
   onShowXcRoute?: () => void;
+  /** Приватность и ссылка своего полёта (задача 3.7); без них — не показываются. */
+  privacy?: {
+    onPrivacy: (privacy: Privacy) => Promise<void>;
+    onShareLink: () => Promise<string>;
+    onResetLink: () => Promise<string>;
+  };
 }
 
 const TABS: ReadonlyArray<{ id: AnalyticsTab; label: MessageKey }> = [
@@ -84,6 +91,7 @@ export function AnalyticsPanel({
   xcRouteShown = true,
   onXcRouteShown,
   onShowXcRoute,
+  privacy,
 }: AnalyticsPanelProps) {
   const t = useT();
   const locale = useLocaleStore((state) => state.locale);
@@ -122,6 +130,9 @@ export function AnalyticsPanel({
             <p role="alert" className="text-danger">
               {t('viewer.analytics.error')}
             </p>
+          )}
+          {state.status === 'ready' && state.analytics.details.canEdit && privacy && (
+            <PrivacyControl privacy={state.analytics.details.privacy} {...privacy} />
           )}
           {state.status === 'ready' && (
             <div className="mb-2">

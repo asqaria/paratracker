@@ -106,6 +106,10 @@ function harness(options: { google?: boolean } = {}): Harness {
           rawObjectKey: flight.rawObjectKey,
           trackObjectKey: null,
           errorCode: null,
+          userId: flight.userId,
+          privacy: 'unlisted',
+          shareToken: null,
+          publicTrackObjectKey: null,
         });
       },
       find: () => Promise.resolve(null),

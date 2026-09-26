@@ -1,4 +1,4 @@
-import { FLIGHT, TIME, type FlightRange } from '@skyline/core';
+import { FLIGHT, PRIVACY, TIME, type FlightRange } from '@skyline/core';
 
 const medianOf = (values: number[]): number => {
   const sorted = values.map((v) => (Number.isFinite(v) ? v : 0)).sort((a, b) => a - b);
@@ -31,5 +31,23 @@ export function flightRange(t: Float64Array, speed: Float64Array): FlightRange {
   let landing = n - 1;
   while (landing > takeoff && !(medianOf(windowFrom(landing, -1)) > FLIGHT.flyingSpeedMs)) landing--;
   while (landing > takeoff && !flying(landing)) landing--;
+  return { takeoff, landing };
+}
+
+/**
+ * Какие точки трека показывать посторонним (задача 3.7): от взлёта до посадки
+ * плюс marginS до и после. Запись на земле — дом, дорога, подъём пешком —
+ * личные данные; секунды у старта оставляют разбег. Полёта нет — весь трек
+ * земля, посторонним нечего показать: null.
+ */
+export function visibleRange(t: Float64Array, range: FlightRange, marginS: number = PRIVACY.groundMarginS): FlightRange | null {
+  if (range.takeoff < 0 || range.landing <= range.takeoff) return null;
+  const marginMs = marginS * TIME.msPerSecond;
+  const fromMs = (t[range.takeoff] ?? 0) - marginMs;
+  const toMs = (t[range.landing] ?? 0) + marginMs;
+  let takeoff = range.takeoff;
+  while (takeoff > 0 && (t[takeoff - 1] ?? -Infinity) >= fromMs) takeoff--;
+  let landing = range.landing;
+  while (landing < t.length - 1 && (t[landing + 1] ?? Infinity) <= toMs) landing++;
   return { takeoff, landing };
 }

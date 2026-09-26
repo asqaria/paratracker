@@ -105,8 +105,14 @@ export function createFlightProcessor(deps: FlightProcessorDeps): FlightProcesso
 
         const key = keyFor(flightId);
         await deps.storage.put(key, new Uint8Array(result.track), 'application/octet-stream');
+        // Для посторонних — без записи на земле (задача 3.7): рядом с полным, с суффиксом.
+        const publicKey = result.publicTrack ? key.replace(/\.track$/, '.public.track') : null;
+        if (publicKey && result.publicTrack) {
+          await deps.storage.put(publicKey, new Uint8Array(result.publicTrack), 'application/octet-stream');
+        }
         await deps.repository.markReady(flightId, {
           trackObjectKey: key,
+          publicTrackObjectKey: publicKey,
           altitudeSource: result.altitudeSource,
           analysisLevel: result.analysisLevel,
           startedAt: new Date(result.startedAt),

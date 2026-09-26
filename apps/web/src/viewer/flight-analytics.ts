@@ -5,6 +5,7 @@ import {
   WindResponse,
   type GlideDto,
   type GliderDto,
+  type Privacy,
   type ThermalDto,
 } from '@skyline/core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -12,6 +13,7 @@ import { useCallback } from 'react';
 
 import { useMe } from '../auth/session';
 import { fetchGliders, GLIDERS_QUERY_KEY, setFlightGlider } from '../gliders/gliders-api';
+import { setPrivacy, shareToken, shareUrl, withShare } from '../sharing/sharing-api';
 import { createSite } from '../sites/create-site';
 
 /**
@@ -47,13 +49,16 @@ export async function fetchFlightAnalytics(
   flightId: string,
   signal: AbortSignal,
   fetchImpl: typeof fetch = fetch,
+  share: string | null = null,
 ): Promise<FlightAnalytics> {
   const base = `/api/v1/flights/${flightId}`;
+  // Посторонний видит полёт «по ссылке» только с токеном (задача 3.7).
+  const url = (path: string) => withShare(`${base}${path}`, share);
   const [details, thermals, glides, wind] = await Promise.all([
-    fetchJson(base, FlightDetailsResponse, signal, fetchImpl),
-    fetchJson(`${base}/thermals`, ThermalsResponse, signal, fetchImpl),
-    fetchJson(`${base}/glides`, GlidesResponse, signal, fetchImpl),
-    fetchJson(`${base}/wind`, WindResponse, signal, fetchImpl),
+    fetchJson(url(''), FlightDetailsResponse, signal, fetchImpl),
+    fetchJson(url('/thermals'), ThermalsResponse, signal, fetchImpl),
+    fetchJson(url('/glides'), GlidesResponse, signal, fetchImpl),
+    fetchJson(url('/wind'), WindResponse, signal, fetchImpl),
   ]);
   return { details, thermals: thermals.thermals, glides: glides.glides, wind };
 }
@@ -95,14 +100,33 @@ export function useOwnGliders(): GliderDto[] | undefined {
   return useQuery({ queryKey: GLIDERS_QUERY_KEY, queryFn: () => fetchGliders(), enabled: Boolean(me) }).data;
 }
 
+/** Приватность и ссылка своего полёта (задача 3.7); null — демо-трек. */
+export function usePrivacyControls(flightId: string | null) {
+  const client = useQueryClient();
+  const onPrivacy = useCallback(
+    async (privacy: Privacy) => {
+      if (flightId === null) return;
+      await setPrivacy(flightId, privacy);
+      await client.invalidateQueries({ queryKey: ['flight-analytics', flightId] });
+    },
+    [client, flightId],
+  );
+  const link = useCallback(
+    async (reset: boolean) => shareUrl(window.location.origin, await shareToken(flightId ?? '', reset)),
+    [flightId],
+  );
+  if (flightId === null) return null;
+  return { onPrivacy, onShareLink: () => link(false), onResetLink: () => link(true) };
+}
+
 /** null — демо-трек: его нет в API, панели нет. */
-export function useFlightAnalytics(flightId: string | null): AnalyticsState | null {
+export function useFlightAnalytics(flightId: string | null, share: string | null = null): AnalyticsState | null {
   // Вход меняет ответ (canEdit): ждём, пока станет известно, кто смотрит, и
   // держим его в ключе — после входа или выхода панель перезапросится.
   const me = useMe();
   const query = useQuery({
     queryKey: analyticsKey(flightId, me?.id ?? null),
-    queryFn: ({ signal }) => fetchFlightAnalytics(flightId ?? '', signal),
+    queryFn: ({ signal }) => fetchFlightAnalytics(flightId ?? '', signal, fetch, share),
     enabled: flightId !== null && me !== undefined,
     // Анализ готового полёта не меняется до повторной обработки.
     staleTime: Number.POSITIVE_INFINITY,

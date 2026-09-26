@@ -205,6 +205,16 @@ const ru = {
   'xc.estimate': 'оценка',
   'xc.route': 'Маршрут XC',
   'xc.showRoute': 'Показать весь',
+  'privacy.label': 'Кто видит',
+  'privacy.public': 'Все',
+  'privacy.unlisted': 'По ссылке',
+  'privacy.private': 'Только я',
+  'share.copy': 'Скопировать ссылку',
+  'share.reset': 'Сбросить ссылку',
+  'share.copied': 'Ссылка скопирована',
+  'share.resetDone': 'Новая ссылка скопирована, старая больше не работает',
+  'share.error': 'Не получилось — попробуйте ещё раз',
+  'share.notFound': 'Ссылка не работает: её сбросили или полёт скрыт',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -415,6 +425,16 @@ const en: Messages = {
   'xc.estimate': 'estimate',
   'xc.route': 'XC route',
   'xc.showRoute': 'Show all',
+  'privacy.label': 'Who can see',
+  'privacy.public': 'Everyone',
+  'privacy.unlisted': 'Link only',
+  'privacy.private': 'Only me',
+  'share.copy': 'Copy link',
+  'share.reset': 'Reset link',
+  'share.copied': 'Link copied',
+  'share.resetDone': 'New link copied, the old one no longer works',
+  'share.error': 'Something went wrong — try again',
+  'share.notFound': 'This link does not work: it was reset or the flight is hidden',
 };
 
 export const messages: Record<Locale, Messages> = { ru, en };

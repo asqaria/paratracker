@@ -3,6 +3,7 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastif
 import { registerAnalysisRoutes, type AnalysisRoutesDeps } from './analysis.js';
 import { registerAuthHook, registerAuthRoutes, type AuthDeps } from './auth/routes.js';
 import { API_V1_PREFIX } from './constants.js';
+import { registerFlightSettingsRoutes, type FlightSettingsDeps } from './flight-settings.js';
 import { registerFlightRoutes, type FlightRoutesDeps } from './flights.js';
 import { registerGliderRoutes, type GliderRoutesDeps } from './gliders.js';
 import { registerHealthRoutes, type HealthRouteOptions } from './health.js';
@@ -32,6 +33,8 @@ export interface AppOptions {
   gliders?: GliderRoutesDeps;
   /** Сверка термиков владельцем (DoD фазы 2); только со входом. */
   reviews?: ReviewRoutesDeps;
+  /** Настройки своего полёта (крыло, приватность, ссылка) и открытие ссылки (задача 3.7). */
+  flightSettings?: FlightSettingsDeps;
 }
 
 export function buildApp(options: AppOptions): FastifyInstance {
@@ -47,6 +50,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       if (options.auth && options.sites) registerSiteRoutes(v1, options.sites);
       if (options.auth && options.gliders) registerGliderRoutes(v1, options.gliders);
       if (options.auth && options.reviews) registerReviewRoutes(v1, options.reviews);
+      if (options.auth && options.flightSettings) registerFlightSettingsRoutes(v1, options.flightSettings);
       if (options.flights) registerFlightRoutes(v1, options.flights);
       if (options.analysis) registerAnalysisRoutes(v1, options.analysis);
       if (options.tiles) registerTileRoutes(v1, options.tiles);

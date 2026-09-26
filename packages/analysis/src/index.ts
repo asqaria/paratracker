@@ -12,7 +12,7 @@ export { totalGain } from './total-gain.js';
 export { verticalSpeed, type VerticalSpeedOptions } from './vertical-speed.js';
 export { detectCircles, headingTurns, minTurningRate, type CircleColumns, type HeadingTurns } from './circles.js';
 export { detectThermals, type ThermalColumns } from './thermals.js';
-export { flightRange } from './flight-range.js';
+export { flightRange, visibleRange } from './flight-range.js';
 export { detectGlides, type GlideColumns } from './glides.js';
 export { estimateWind, fitVelocityCircle, type VelocityCircleFit, type WindColumns } from './wind.js';
 export { analyseFlight } from './flight-analysis.js';

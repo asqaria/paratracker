@@ -47,6 +47,8 @@ const details = (overrides: Partial<FlightDetailsRecord> = {}): FlightDetailsRec
   windSpeedMs: 3.63,
   windProfile: [{ altitudeBand: [1500, 1750], windSpeedMs: 5.1, windDirDeg: 55, confidence: 0.4, circleCount: 12 }],
   userId: null,
+  privacy: 'unlisted',
+  shareToken: null,
   takeoffSite: { id: SITE_ID, name: 'Ush Konyr', countryCode: 'kz', source: 'seed' },
   landingSite: null,
   glider: { id: GLIDER_ID, manufacturer: 'Ozone', model: 'Rush 6', size: 'ML' },
@@ -133,6 +135,7 @@ describe('GET /api/v1/flights/:id', () => {
       xc: XC,
       // Аноним смотрит анонимный полёт — править нечего.
       canEdit: false,
+      privacy: 'unlisted',
     });
   });
 

@@ -47,6 +47,11 @@ describe('routeFromHash', () => {
     expect(routeFromHash(AUTH_FAILED_HASH)).toEqual({ kind: 'landing', authFailed: true });
   });
 
+  it('ссылка «по ссылке» — токен из хэша; мусор — лендинг', () => {
+    expect(routeFromHash('#/s/Abc_-123456789')).toEqual({ kind: 'shared', token: 'Abc_-123456789' });
+    expect(routeFromHash('#/s/x')).toEqual({ kind: 'landing' });
+  });
+
   it('логбук и настройки — отдельные маршруты', () => {
     expect(routeFromHash(LOGBOOK_HASH)).toEqual({ kind: 'logbook' });
     expect(routeFromHash(SETTINGS_HASH)).toEqual({ kind: 'settings' });

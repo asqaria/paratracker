@@ -1,4 +1,4 @@
-import type { AnalysisLevel, FlightStatus, GlideKind, TurnDirection, WindBand, XcScore } from '@skyline/core';
+import type { AnalysisLevel, FlightStatus, GlideKind, Privacy, TurnDirection, WindBand, XcScore } from '@skyline/core';
 import { asc, eq, sql, type AnyColumn } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
@@ -29,6 +29,9 @@ export interface FlightDetailsRecord {
   windProfile: WindBand[] | null;
   /** Владелец; null — анонимная загрузка. */
   userId: string | null;
+  /** Видимость и токен ссылки (задача 3.7). */
+  privacy: Privacy;
+  shareToken: string | null;
   takeoffSite: SiteRecord | null;
   landingSite: SiteRecord | null;
   glider: GliderRef | null;
@@ -93,6 +96,8 @@ export async function findFlightDetails(db: Database, id: string): Promise<Fligh
       windSpeedMs: flights.windSpeedMs,
       windProfile: flights.windProfile,
       userId: flights.userId,
+      privacy: flights.privacy,
+      shareToken: flights.shareToken,
       // Drizzle отдаёт вложенный объект left join как null, если места нет.
       takeoffSite: {
         id: takeoffSites.id,

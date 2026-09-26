@@ -73,6 +73,7 @@ const analytics = (overrides: Partial<FlightAnalytics['details']> = {}): FlightA
     glider: null,
     gliderRaw: null,
     xc: null,
+    privacy: 'unlisted',
     timezone: 'Asia/Almaty',
     canEdit: false,
     ...overrides,
