@@ -166,6 +166,18 @@ const ru = {
   'gliders.noClass': 'класс не указан',
   'gliders.error': 'Не удалось сохранить крыло',
   'flight.start': 'Начало',
+  'stats.title': 'Сезон',
+  'stats.year': 'Год',
+  'stats.flights': 'Полётов',
+  'stats.airtime': 'В воздухе',
+  'stats.distance': 'Дистанция',
+  'stats.gain': 'Набор',
+  'stats.maxAlt': 'Макс. высота',
+  'stats.longest': 'Самый долгий',
+  'stats.farthest': 'Самый дальний',
+  'stats.byMonth': 'Время в воздухе по месяцам',
+  'stats.topSites': 'Места старта',
+  'stats.siteFlights': 'полётов: {count}',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -337,6 +349,18 @@ const en: Messages = {
   'gliders.noClass': 'class not set',
   'gliders.error': 'Could not save the glider',
   'flight.start': 'Start',
+  'stats.title': 'Season',
+  'stats.year': 'Year',
+  'stats.flights': 'Flights',
+  'stats.airtime': 'Airtime',
+  'stats.distance': 'Distance',
+  'stats.gain': 'Climb',
+  'stats.maxAlt': 'Max altitude',
+  'stats.longest': 'Longest',
+  'stats.farthest': 'Farthest',
+  'stats.byMonth': 'Airtime by month',
+  'stats.topSites': 'Takeoff sites',
+  'stats.siteFlights': 'flights: {count}',
 };
 
 export const messages: Record<Locale, Messages> = { ru, en };

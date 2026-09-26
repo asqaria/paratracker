@@ -230,7 +230,8 @@
         720,
         959
       ]
-    }
+    },
+    "totalGainM": 1126
   },
   "no-baro.igc": {
     "description": "Прибор не пишет барометрическую высоту — все поля 00000.",
@@ -386,7 +387,8 @@
         240,
         479
       ]
-    }
+    },
+    "totalGainM": 416.9924233480001
   },
   "alg-geo-phone.igc": {
     "description": "Телефон (XCTrack): HFALG:GEO, баро нет — высота над геоидом, как в реальных треках пилотов.",
@@ -505,7 +507,8 @@
         117,
         119
       ]
-    }
+    },
+    "totalGainM": 206.9967396500001
   },
   "alg-ell.igc": {
     "description": "Логгер объявляет эллипсоид: HFALGALTGPS:ELL (как требует IGC FR Specification).",
@@ -624,7 +627,8 @@
         117,
         119
       ]
-    }
+    },
+    "totalGainM": 205
   },
   "midnight.igc": {
     "description": "Полёт через полночь UTC: старт 23:50, финиш после 00:10 следующих суток.",
@@ -954,7 +958,8 @@
         1496,
         1499
       ]
-    }
+    },
+    "totalGainM": 2218
   },
   "gaps.igc": {
     "description": "Два разрыва связи: 90 секунд и 12 минут.",
@@ -1185,7 +1190,8 @@
         716,
         719
       ]
-    }
+    },
+    "totalGainM": 1121
   },
   "south-west.igc": {
     "description": "Аргентинские Анды: отрицательная широта И отрицательная долгота.",
@@ -1378,7 +1384,8 @@
         596,
         599
       ]
-    }
+    },
+    "totalGainM": 911
   },
   "date-modern.igc": {
     "description": "Современный формат даты HFDTEDATE:DDMMYY,NN (с 2016 года).",
@@ -1534,7 +1541,8 @@
         240,
         479
       ]
-    }
+    },
+    "totalGainM": 420
   },
   "lad-lod.igc": {
     "description": "Расширения LAD и LOD — дополнительные знаки минут широты и долготы.",
@@ -1695,7 +1703,8 @@
         240,
         479
       ]
-    }
+    },
+    "totalGainM": 420
   },
   "sparse-10s.igc": {
     "description": "Шаг фиксов 10 секунд — типично для GPX с телефона и часов Garmin.",
@@ -1839,7 +1848,8 @@
         196,
         199
       ]
-    }
+    },
+    "totalGainM": 347
   },
   "v-fixes.igc": {
     "description": "Каждый десятый фикс — 2D (флаг V вместо A).",
@@ -1995,7 +2005,8 @@
         240,
         479
       ]
-    }
+    },
+    "totalGainM": 420
   },
   "negative-alt.igc": {
     "description": "Высоты ниже уровня моря — формат -NNNN. Мёртвое море.",
@@ -2154,7 +2165,8 @@
         240,
         359
       ]
-    }
+    },
+    "totalGainM": 420
   },
   "extensions-full.igc": {
     "description": "Полный набор расширений B-записи: FXA, SIU, GSP, ENL.",
@@ -2310,7 +2322,8 @@
         240,
         479
       ]
-    }
+    },
+    "totalGainM": 420
   },
   "broken-lines.igc": {
     "description": "Битые строки посреди валидного трека: обрезанная B-запись, мусор, неизвестный тип записи, пустая строка.",
@@ -2466,7 +2479,8 @@
         240,
         479
       ]
-    }
+    },
+    "totalGainM": 420
   },
   "baseline.gpx": {
     "description": "Нормальный GPX 1.1 как у Garmin: trkpt с ele и time, расширения TrackPointExtension, метаданные с автором по-русски.",
@@ -2537,7 +2551,8 @@
       "metresPerDegreeLat": 111320
     },
     "summary": null,
-    "simplified": null
+    "simplified": null,
+    "totalGainM": null
   },
   "no-ele.gpx": {
     "description": "Телефон не записал высоту: ни у одной точки нет <ele>.",
@@ -2608,7 +2623,8 @@
       "metresPerDegreeLat": 111320
     },
     "summary": null,
-    "simplified": null
+    "simplified": null,
+    "totalGainM": null
   },
   "time-offset.gpx": {
     "description": "Время с часовым поясом (+05:00) и долями секунды (.500) — так пишут многие телефонные трекеры.",
@@ -2679,7 +2695,8 @@
       "metresPerDegreeLat": 111320
     },
     "summary": null,
-    "simplified": null
+    "simplified": null,
+    "totalGainM": null
   },
   "segments.gpx": {
     "description": "Два <trkseg> с разрывом 90 секунд между ними.",
@@ -2750,7 +2767,8 @@
       "metresPerDegreeLat": 111320
     },
     "summary": null,
-    "simplified": null
+    "simplified": null,
+    "totalGainM": null
   },
   "fix-2d.gpx": {
     "description": "Каждая десятая точка — <fix>2d</fix>; у всех точек <sat>7</sat>.",
@@ -2821,7 +2839,8 @@
       "metresPerDegreeLat": 111320
     },
     "summary": null,
-    "simplified": null
+    "simplified": null,
+    "totalGainM": null
   },
   "broken.gpx": {
     "description": "Битые точки посреди трека (широта 95°, нет времени, время не ISO), текстовый мусор между точками и файл, оборванный посреди последней точки.",
@@ -2892,7 +2911,8 @@
       "metresPerDegreeLat": 111320
     },
     "summary": null,
-    "simplified": null
+    "simplified": null,
+    "totalGainM": null
   },
   "gx-track.kml": {
     "description": "Google Earth KML с <gx:Track>: списки <when> и <gx:coord>, altitudeMode absolute.",
@@ -2963,7 +2983,8 @@
       "metresPerDegreeLat": 111320
     },
     "summary": null,
-    "simplified": null
+    "simplified": null,
+    "totalGainM": null
   },
   "multitrack.kml": {
     "description": "<gx:MultiTrack> из двух сегментов с разрывом 90 с, записанных в документ в обратном порядке, и рядом метка с LineString того же пути без времени.",
@@ -3034,7 +3055,8 @@
       "metresPerDegreeLat": 111320
     },
     "summary": null,
-    "simplified": null
+    "simplified": null,
+    "totalGainM": null
   },
   "linestring-timespan.kml": {
     "description": "Старый прибор: только <LineString> без времени у точек, у метки <TimeSpan> (после геометрии).",
@@ -3105,7 +3127,8 @@
       "metresPerDegreeLat": 111320
     },
     "summary": null,
-    "simplified": null
+    "simplified": null,
+    "totalGainM": null
   },
   "gx-track.kmz": {
     "description": "KMZ — zip-архив (deflate) с doc.kml внутри; doc.kml лежит не первым файлом.",
@@ -3176,6 +3199,7 @@
       "metresPerDegreeLat": 111320
     },
     "summary": null,
-    "simplified": null
+    "simplified": null,
+    "totalGainM": null
   }
 }

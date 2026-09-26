@@ -44,6 +44,7 @@ export {
   type SetFlightGliderResult,
 } from './repositories/gliders.js';
 export { readPostgisVersion } from './repositories/health.js';
+export { seasonStats, type SeasonStats, type SeasonTotals } from './repositories/stats.js';
 export {
   attachNearbyFlights,
   createUserSite,

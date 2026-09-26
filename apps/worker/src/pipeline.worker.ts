@@ -1,6 +1,13 @@
 import { parentPort } from 'node:worker_threads';
 
-import { analyseFlight, cleanAndDerive, flightRange, simplifyTrack, summarizeFlight } from '@skyline/analysis';
+import {
+  analyseFlight,
+  cleanAndDerive,
+  flightRange,
+  simplifyTrack,
+  summarizeFlight,
+  totalGain,
+} from '@skyline/analysis';
 import {
   DEFAULT_AIRCRAFT_TYPE,
   TRACK_FLAGS,
@@ -56,6 +63,10 @@ export interface PipelineSuccess {
   landing: FlightPoint;
   /** Модель крыла из заголовка файла (IGC HFGTY); null — прибор не записал. */
   gliderRaw: string | null;
+  /** Время в воздухе от взлёта до посадки, с (задача 2.12): без подъёма пешком и сборов. */
+  airtimeS: number;
+  /** Сумма подъёмов в воздухе с гистерезисом GAIN.hysteresisM, м (задача 2.12). */
+  totalGainM: number;
 }
 
 export type PipelineMessage =
@@ -159,6 +170,8 @@ export function runPipeline(message: PipelineTaskMessage, onProgress: (value: nu
       takeoff: pointAt(range.takeoff),
       landing: pointAt(range.landing),
       gliderRaw: track.meta.glider?.trim() || null,
+      airtimeS: Math.round(((points.t[range.landing] ?? 0) - (points.t[range.takeoff] ?? 0)) / MS_PER_SECOND),
+      totalGainM: totalGain(points.altitude, range.takeoff, range.landing),
     },
   };
 }

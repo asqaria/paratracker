@@ -19,6 +19,7 @@ import {
   listThermals,
   notifyFlightQueued,
   revokeSession,
+  seasonStats,
   rotateSession,
   setFlightGlider,
   signInWithOAuth,
@@ -77,6 +78,7 @@ const app = buildApp({
           list: (query) => listLogbook(database.db, query),
           map: (userId) => listLogbookMap(database.db, userId),
           sites: (userId) => listLogbookSites(database.db, userId),
+          stats: (userId, year) => seasonStats(database.db, userId, year),
           claim: (userId, claims) => claimFlights(database.db, userId, claims),
         },
         sites: {

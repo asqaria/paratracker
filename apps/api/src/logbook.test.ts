@@ -1,4 +1,10 @@
-import { ClaimResponse, LogbookMapResponse, LogbookResponse, PROBLEM_CONTENT_TYPE } from '@skyline/core';
+import {
+  ClaimResponse,
+  LogbookMapResponse,
+  LogbookResponse,
+  PROBLEM_CONTENT_TYPE,
+  SeasonStatsResponse,
+} from '@skyline/core';
 import type { LogbookCursor, LogbookEntryRecord, LogbookPage } from '@skyline/db';
 import { describe, expect, it } from 'vitest';
 
@@ -32,6 +38,7 @@ const entry = (id: string, startedAt: Date | null): LogbookEntryRecord => ({
 function harness(page: LogbookPage = { items: [], next: null }) {
   const listed: Parameters<LogbookRoutesDeps['list']>[0][] = [];
   const claims: { userId: string; claims: { flightId: string; tokenHash: string }[] }[] = [];
+  const statsCalls: [string, number | undefined][] = [];
   const auth: AuthDeps = {
     jwtSecret: SECRET,
     publicUrl: 'https://skyline.example',
@@ -55,12 +62,16 @@ function harness(page: LogbookPage = { items: [], next: null }) {
       ]),
     sites: () =>
       Promise.resolve([{ id: SITE_ID, name: 'Ush Konyr', countryCode: 'kz', source: 'seed', flightCount: 13 }]),
+    stats: (userId, year) => {
+      statsCalls.push([userId, year]);
+      return Promise.resolve(STATS);
+    },
     claim: (userId, list) => {
       claims.push({ userId, claims: [...list] });
       return Promise.resolve(list.filter((c) => c.tokenHash === hashToken('good')).map((c) => c.flightId));
     },
   };
-  return { app: buildApp({ logger: false, auth, logbook }), listed, claims };
+  return { app: buildApp({ logger: false, auth, logbook }), listed, claims, statsCalls };
 }
 
 const signedIn = async () => ({ skyline_at: await signAccessToken(USER_ID, SECRET, NOW) });
@@ -114,6 +125,33 @@ describe('GET /logbook', () => {
       const res = await h.app.inject({ url: `/api/v1/logbook?${query}`, cookies: await signedIn() });
       expect(res.statusCode, query).toBe(400);
     }
+  });
+});
+
+const STATS = {
+  year: 2026,
+  years: [2026, 2025],
+  totals: { flights: 3, airtimeS: 10_800, distanceM: 55_000, gainM: 1900, maxAltM: 3200, longestAirtimeS: 5400, longestDistanceM: 40_000 },
+  byMonth: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, flights: i === 4 ? 3 : 0, airtimeS: i === 4 ? 10_800 : 0, distanceM: i === 4 ? 55_000 : 0 })),
+  topSites: [{ id: SITE_ID, name: 'Ush Konyr', countryCode: 'kz', source: 'seed' as const, flights: 3, airtimeS: 10_800 }],
+};
+
+describe('GET /logbook/stats', () => {
+  it('статистика по контракту; год из запроса или последний', async () => {
+    const h = harness();
+    const res = await h.app.inject({ url: '/api/v1/logbook/stats?year=2025', cookies: await signedIn() });
+    expect(SeasonStatsResponse.parse(res.json())).toEqual(STATS);
+    await h.app.inject({ url: '/api/v1/logbook/stats', cookies: await signedIn() });
+    expect(h.statsCalls).toEqual([
+      [USER_ID, 2025],
+      [USER_ID, undefined],
+    ]);
+  });
+
+  it('без входа — 401; кривой год — 400', async () => {
+    const h = harness();
+    expect((await h.app.inject('/api/v1/logbook/stats')).statusCode).toBe(401);
+    expect((await h.app.inject({ url: '/api/v1/logbook/stats?year=abc', cookies: await signedIn() })).statusCode).toBe(400);
   });
 });
 

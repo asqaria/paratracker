@@ -1,4 +1,4 @@
-import { ClaimResponse, LogbookMapResponse, LogbookResponse } from '@skyline/core';
+import { ClaimResponse, LogbookMapResponse, LogbookResponse, SeasonStatsResponse } from '@skyline/core';
 
 import { fetchWithSession } from '../auth/session';
 
@@ -7,6 +7,13 @@ import { fetchWithSession } from '../auth/session';
 export const LOGBOOK_URL = '/api/v1/logbook';
 export const LOGBOOK_MAP_URL = '/api/v1/logbook/map';
 export const CLAIM_URL = '/api/v1/flights/claim';
+export const STATS_URL = '/api/v1/logbook/stats';
+
+/** Статистика сезона (задача 2.12); null — последний год с полётами. */
+export async function fetchSeasonStats(year: number | null, fetchImpl: typeof fetch = fetch): Promise<SeasonStatsResponse> {
+  const url = year === null ? STATS_URL : `${STATS_URL}?year=${year}`;
+  return SeasonStatsResponse.parse(await ok(await fetchWithSession(url, { method: 'GET' }, fetchImpl), 'Season stats'));
+}
 
 async function ok(response: Response, what: string): Promise<unknown> {
   if (!response.ok) throw new Error(`${what} failed: HTTP ${response.status}`);

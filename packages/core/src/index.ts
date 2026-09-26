@@ -12,5 +12,6 @@ export * from './parse.js';
 export * from './problem.js';
 export * from './site.js';
 export * from './site-dto.js';
+export * from './stats-dto.js';
 export * from './track.js';
 export * from './user.js';
