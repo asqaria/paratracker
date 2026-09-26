@@ -1,12 +1,22 @@
 import { parentPort } from 'node:worker_threads';
 
-import { cleanAndDerive } from '@skyline/analysis';
-import type { FlightErrorCode, GnssAltitudeDatum, ParsedTrack, ParseResult, SourceFormat } from '@skyline/core';
+import { analyseFlight, cleanAndDerive } from '@skyline/analysis';
+import {
+  DEFAULT_AIRCRAFT_TYPE,
+  TRACK_FLAGS,
+  type FlightAnalysis,
+  type FlightErrorCode,
+  type GnssAltitudeDatum,
+  type ParsedTrack,
+  type ParseResult,
+  type SourceFormat,
+} from '@skyline/core';
 import { parseGpx, parseIgc, parseKml } from '@skyline/parsing';
 import { writeTrack } from '@skyline/track-format';
 
 /**
- * Точка входа потока конвейера: parse → clean → derive → pack (ТЗ §5.2, шаги 2–4, 9).
+ * Точка входа потока конвейера: parse → clean → derive → analyse → pack
+ * (ТЗ §5.2, шаги 2–6, 9).
  * Всё CPU-тяжёлое исполняется здесь, а не в основном потоке воркера.
  * Сеть и база — снаружи: сюда приходят байты, отсюда уходит готовый .track.
  */
@@ -31,6 +41,8 @@ export interface PipelineSuccess {
   endedAt: number;
   durationS: number;
   warningCount: number;
+  /** Термики, глайды, ветер; null — трек 'basic', анализ не делался. */
+  analysis: FlightAnalysis | null;
 }
 
 export type PipelineMessage =
@@ -40,7 +52,7 @@ export type PipelineMessage =
   | { type: 'result'; result: PipelineSuccess | { ok: false; errorCode: FlightErrorCode } };
 
 /** Доли выполненного по шагам — их видит пользователь в SSE. */
-const PROGRESS = { parsed: 0.4, derived: 0.75, packed: 0.95, done: 1 } as const;
+const PROGRESS = { parsed: 0.4, derived: 0.6, analysed: 0.85, packed: 0.95, done: 1 } as const;
 const MS_PER_SECOND = 1000;
 
 function parse(message: PipelineTaskMessage): ParseResult | null {
@@ -70,6 +82,15 @@ export function runPipeline(message: PipelineTaskMessage, onProgress: (value: nu
 
   const { points } = derived;
   if (points.t.length === 0) return { type: 'result', result: { ok: false, errorCode: 'no_fixes' } };
+
+  const analysis = analyseFlight(derived, DEFAULT_AIRCRAFT_TYPE);
+  // Точки термиков — флагом в .track: просмотрщик рисует термики без отдельного запроса.
+  for (const thermal of analysis?.thermals ?? []) {
+    for (let i = thermal.startIndex; i <= thermal.endIndex; i++) {
+      points.flags[i] = (points.flags[i] ?? 0) | TRACK_FLAGS.thermal;
+    }
+  }
+  onProgress(PROGRESS.analysed);
 
   const buffer = writeTrack({
     t: points.t,
@@ -101,6 +122,7 @@ export function runPipeline(message: PipelineTaskMessage, onProgress: (value: nu
       endedAt,
       durationS: Math.round((endedAt - startedAt) / MS_PER_SECOND),
       warningCount: track.warnings.length,
+      analysis,
     },
   };
 }

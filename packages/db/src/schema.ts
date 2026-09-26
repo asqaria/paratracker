@@ -3,10 +3,13 @@ import {
   ANALYSIS_LEVELS,
   DEFAULT_PRIVACY,
   FLIGHT_STATUSES,
+  GLIDE_KINDS,
   LOCALES,
   PRIVACY_LEVELS,
   SOURCE_FORMATS,
+  TURN_DIRECTIONS,
   UNIT_SYSTEMS,
+  type WindBand,
 } from '@skyline/core';
 import { sql, type SQL } from 'drizzle-orm';
 import {
@@ -27,7 +30,7 @@ import {
 import { citext, geography } from './columns.js';
 
 /**
- * Схема по ТЗ §9 — только users и flights (Фаза 0, задача 0.4).
+ * Схема по ТЗ §9: users и flights (Фаза 0, задача 0.4), thermals и glides (задача 2.5).
  *
  * Отступления от текста §9, обязательные по CLAUDE.md:
  * - дистанции хранятся в метрах (`*_m integer`), а не в км: внутри системы только СИ;
@@ -115,6 +118,11 @@ export const flights = pgTable(
     /** Метеорологическое направление, «откуда дует». */
     windDirDeg: integer('wind_dir_deg'),
     windSpeedMs: numeric('wind_speed_ms', { precision: 4, scale: 2, mode: 'number' }),
+    /**
+     * Профиль ветра по слоям (ТЗ §6.5): единицы записей на полёт, читается целиком
+     * вместе с полётом — отдельная таблица не окупается.
+     */
+    windProfile: jsonb('wind_profile').$type<WindBand[]>(),
 
     // XC
     xcType: text('xc_type'),
@@ -157,4 +165,65 @@ export const flights = pgTable(
       .on(t.privacy, t.startedAt.desc())
       .where(sql`${t.privacy} = 'public'`),
   ],
+);
+
+/** Термики полёта, ТЗ §6.3. Направление сноса — метеорологическое, «откуда». */
+export const thermals = pgTable(
+  'thermals',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    flightId: uuid('flight_id')
+      .notNull()
+      .references(() => flights.id, { onDelete: 'cascade' }),
+    /** Порядковый номер в полёте, с нуля. */
+    seq: integer('seq').notNull(),
+    startedAt: timestamptz('started_at').notNull(),
+    endedAt: timestamptz('ended_at').notNull(),
+    durationS: integer('duration_s').notNull(),
+    entryAltM: integer('entry_alt_m').notNull(),
+    exitAltM: integer('exit_alt_m').notNull(),
+    gainM: integer('gain_m').notNull(),
+    avgClimbMs: numeric('avg_climb_ms', { precision: 4, scale: 2, mode: 'number' }).notNull(),
+    maxClimbMs: numeric('max_climb_ms', { precision: 4, scale: 2, mode: 'number' }).notNull(),
+    turnCount: numeric('turn_count', { precision: 4, scale: 1, mode: 'number' }).notNull(),
+    avgRadiusM: integer('avg_radius_m').notNull(),
+    direction: text('direction', { enum: TURN_DIRECTIONS }).notNull(),
+    efficiency: numeric('efficiency', { precision: 3, scale: 2, mode: 'number' }).notNull(),
+    entryPoint: geography('entry_point', { kind: 'Point' }).notNull(),
+    exitPoint: geography('exit_point', { kind: 'Point' }).notNull(),
+    /** null — один круг, сносу не из чего взяться. */
+    driftDirDeg: integer('drift_dir_deg'),
+    driftSpeedMs: numeric('drift_speed_ms', { precision: 4, scale: 2, mode: 'number' }),
+  },
+  (t) => [
+    check('thermals_direction_check', oneOf(t.direction, TURN_DIRECTIONS)),
+    index('thermals_flight_seq_idx').on(t.flightId, t.seq),
+    // Тепловая карта термиков (ТЗ §9).
+    index('thermals_entry_point_gist').using('gist', t.entryPoint),
+  ],
+);
+
+/** Глайды (переходы) полёта, ТЗ §6.4. */
+export const glides = pgTable(
+  'glides',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    flightId: uuid('flight_id')
+      .notNull()
+      .references(() => flights.id, { onDelete: 'cascade' }),
+    seq: integer('seq').notNull(),
+    startedAt: timestamptz('started_at').notNull(),
+    endedAt: timestamptz('ended_at').notNull(),
+    distanceM: integer('distance_m').notNull(),
+    /** Отрицательная — пилот на переходе набрал. */
+    altLossM: integer('alt_loss_m').notNull(),
+    /** null — 'dynamic', потеря меньше 50 м (ТЗ §6.4); numeric(6,2) — клип на 60. */
+    glideRatio: numeric('glide_ratio', { precision: 6, scale: 2, mode: 'number' }),
+    kind: text('kind', { enum: GLIDE_KINDS }).notNull(),
+    avgSpeedMs: numeric('avg_speed_ms', { precision: 5, scale: 2, mode: 'number' }).notNull(),
+    /** null — вернулся в точку старта перехода, курса нет. */
+    headingDeg: integer('heading_deg'),
+    headingConsistency: numeric('heading_consistency', { precision: 3, scale: 2, mode: 'number' }).notNull(),
+  },
+  (t) => [check('glides_kind_check', oneOf(t.kind, GLIDE_KINDS)), index('glides_flight_seq_idx').on(t.flightId, t.seq)],
 );

@@ -57,6 +57,11 @@ export const MOTION = {
 /** Тип ЛА: пороги детекции у них разные — радиусы виражей и скорости (CLAUDE.md). */
 export const AIRCRAFT_TYPES = ['paraglider', 'hangglider', 'sailplane'] as const;
 export type AircraftType = (typeof AIRCRAFT_TYPES)[number];
+/**
+ * Тип ЛА, пока полёт к крылу не привязан: тип придёт с профилем крыла
+ * (задача 2.13), а до тех пор в сервисе летают на парапланах.
+ */
+export const DEFAULT_AIRCRAFT_TYPE: AircraftType = 'paraglider';
 
 export interface CircleLimits {
   minRadiusM: number;

@@ -109,6 +109,9 @@ describe('обработка одного полёта', () => {
     expect(trackKey).toMatch(/^tracks\/.*\.track$/);
     expect(readTrack(objects.get(trackKey) ?? new Uint8Array()).pointCount).toBe(960);
     expect(ready[0]).toMatchObject({ analysisLevel: 'full', altitudeSource: 'baro', durationS: 959 });
+    // Анализ из потока доходит до репозитория: две спирали генератора — два термика.
+    expect(ready[0]?.analysis?.thermals).toHaveLength(2);
+    expect(ready[0]?.analysis?.glides.length).toBeGreaterThan(0);
 
     // Между переходами идут события прогресса — тоже со статусом parsing.
     expect(events[0]).toMatchObject({ flightId: FLIGHT_ID, status: 'parsing', progress: 0, trackReady: false });
