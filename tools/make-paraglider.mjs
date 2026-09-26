@@ -4,14 +4,26 @@
  *
  * Модель своя, из геометрии, а не скачанная: без лицензии и атрибуции,
  * размером в десятки КБ и в цветах дизайн-системы. Генератор детерминирован:
- * тот же код — те же байты, поэтому результат лежит в репозитории.
+ * тот же код — те же байты, поэтому результат лежит в репозитории
+ * (paraglider-model.test.ts сверяет файл с выводом генератора).
  *
  * Запуск:   node tools/make-paraglider.mjs [выходной_файл]
  * По умолчанию пишет apps/web/public/models/paraglider.glb
  *
  * Оси glTF: +Y вверх, +Z — нос (передняя кромка), +X — левое крыло.
- * Единицы — метры. Начало координат — точка подвеса пилота: модель стоит
- * ровно в точке трека, купол — над ней на стропах.
+ * Единицы — метры. Начало координат — точка подвеса пилота (карабины): модель
+ * стоит ровно в точке трека, купол — над ней на стропах.
+ *
+ * Что делает модель похожей на настоящее крыло:
+ *   - ячейки: верх надут между нервюрами, гладкие нормали дают полосы света;
+ *   - входные отверстия — тёмная полоса по низу передней кромки;
+ *   - рисунок верха: передняя часть — акцент, шеврон, белое поле сзади;
+ *     шеврон смотрит в сторону полёта — курс читается и сверху;
+ *   - стропы каскадом: верхние ветвятся к куполу, к свободным концам идут
+ *     по одной на ряд; тёмные и полупрозрачные — не спорят с куполом;
+ *   - пилот полулёжа в обтекаемом коконе, шлем — светлое пятно под куполом.
+ * Каждая область раскраски купола — свой материал (canopy-*): выбор
+ * расцветки крыла (задача 2.13) меняет только цвета этих материалов.
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -37,29 +49,194 @@ const TIP_SWEEP_M = 0.35;
 /** Относительная толщина профиля (NACA 00xx) и кривизна средней линии. */
 const THICKNESS = 0.14;
 const CAMBER = 0.03;
-/** Секций в размахе (визуально — секции купола) и точек по хорде. */
-const CELLS = 28;
-const CHORD_SAMPLES = 8;
-/** Доля хорды, окрашенная акцентом: полоса вдоль передней кромки. */
-const LEADING_BAND = 0.28;
 
-/* ── Цвета: светлый купол, акцент дизайн-системы (--color-accent) ────────── */
+/** Ячеек в размахе: у крыльев EN-B 40–55; меньше — крупнее и читаемее на экране. */
+const CELLS = 36;
+/** Точек поперёк ячейки на верхе: между нервюрами купол надут. */
+const CELL_SAMPLES = 3;
+/** Надув ячейки: подъём верха в середине ячейки, доля хорды. */
+const INFLATION = 0.018;
+/** Законцовок (стабилизаторов) с каждой стороны, ячеек — тёмные. */
+const TIP_CELLS = 2;
 
-const COLORS = {
-  canopy: [0.93, 0.95, 0.97],
-  underside: [0.68, 0.73, 0.8],
-  accent: [0.302, 0.639, 1.0],
-  lines: [0.3, 0.33, 0.38],
-  harness: [0.17, 0.18, 0.21],
-  pilot: [0.23, 0.29, 0.37],
-  helmet: [0.95, 0.95, 0.95],
+/**
+ * Шеврон: ось полосы на доле хорды в центре и у законцовок (стреловидная —
+ * «галочка» носом вперёд), полуширина полосы. Точки хорды сгущаются к полосе,
+ * её края лежат ровно по рёбрам сетки — края рисунка без лесенки.
+ */
+const CHEVRON_ROOT_U = 0.2;
+const CHEVRON_TIP_U = 0.66;
+const CHEVRON_HALF_WIDTH = 0.06;
+/**
+ * Задняя кромка — полоса акцента от этой доли хорды: сзади (камера Chase)
+ * видна задняя часть верха, и без полосы крыло оттуда — белое пятно.
+ */
+const TRAILING_BAND_U = 0.86;
+/** Точек по хорде: до полосы (гуще у кромки), в полосе, белое поле, задняя полоса. */
+const FRONT_SAMPLES = 7;
+const STRIPE_SAMPLES = 2;
+const REAR_SAMPLES = 4;
+const TRAILING_SAMPLES = 2;
+/** Входные отверстия: низ передней кромки до этой доли хорды. */
+const INTAKE_U = 0.04;
+
+/* ── Цвета: sRGB дизайн-системы → линейные, как требует glTF ────────────── */
+
+/** sRGB-компонента → линейная (baseColorFactor в glTF — линейный). */
+const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const rgb = (hex) => [16, 8, 0].map((shift) => +toLinear(((hex >> shift) & 0xff) / 255).toFixed(6));
+
+/** Ткань — атласная, не пластмасса; подвеска — нейлон с блеском; визор — глянец. */
+const FABRIC = { metallicFactor: 0, roughnessFactor: 0.6 };
+const NYLON = { metallicFactor: 0, roughnessFactor: 0.45 };
+
+const MATERIALS = {
+  /** Акцент дизайн-системы (--color-accent, #4DA3FF). */
+  'canopy-primary': { color: rgb(0x4da3ff), ...FABRIC },
+  'canopy-secondary': { color: rgb(0xf4f6f8), ...FABRIC },
+  /** Шеврон и законцовки — глубокий синий, контраст к обоим полям. */
+  'canopy-trim': { color: rgb(0x1b2a41), ...FABRIC },
+  /** Низ — светлее акцента: снизу и сзади крыло читается голубым, а не серым. */
+  'canopy-underside': { color: rgb(0x8fbbea), ...FABRIC },
+  'canopy-intake': { color: rgb(0x14171c), ...FABRIC },
+  /**
+   * Стропы: серые, полупрозрачные — пучок, а не сплошной веер. Линия всегда
+   * в пиксель толщиной, и издалека тёмные стропы перебивали купол.
+   */
+  lines: { color: rgb(0x5d6470), alpha: 0.45, ...FABRIC },
+  risers: { color: rgb(0x22252b), ...NYLON },
+  harness: { color: rgb(0x2a2d33), ...NYLON },
+  'harness-accent': { color: rgb(0x4da3ff), ...NYLON },
+  pilot: { color: rgb(0x39475a), ...FABRIC },
+  helmet: { color: rgb(0xf2f4f7), metallicFactor: 0, roughnessFactor: 0.35 },
+  visor: { color: rgb(0x0e1116), metallicFactor: 0.2, roughnessFactor: 0.15 },
 };
 
-/* ── Геометрия ───────────────────────────────────────────────────────────── */
+/* ── Векторы ─────────────────────────────────────────────────────────────── */
 
 const DEG = Math.PI / 180;
 /** Удвоенная площадь, м², меньше которой треугольник считается вырожденным. */
 const MIN_DOUBLE_AREA_M2 = 1e-9;
+
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const scale = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const lerp = (a, b, t) => add(a, scale(sub(b, a), t));
+const normalize = (v) => {
+  const l = Math.hypot(...v) || 1;
+  return [v[0] / l, v[1] / l, v[2] / l];
+};
+const centroid = (points) => scale(points.reduce(add, [0, 0, 0]), 1 / points.length);
+
+/* ── Сетки и материалы ───────────────────────────────────────────────────── */
+
+/** Индексированный набор треугольников одного материала. */
+function part() {
+  return { positions: [], normals: [], indices: [], vertexOf: new Map() };
+}
+const parts = Object.fromEntries(Object.keys(MATERIALS).filter((name) => name !== 'lines').map((name) => [name, part()]));
+
+let surfaceCount = 0;
+
+/**
+ * Поверхность из сетки точек grid[i][j] с гладкими нормалями: нормаль вершины —
+ * сумма нормалей соседних граней (взвешенных площадью). wrap — столбцы замкнуты
+ * в кольцо. outward(i, j) — направление «наружу» у точки: по нему выбирается
+ * обход, чтобы нормали смотрели из тела. pick(i, j) — материал грани (i, j)
+ * или null — грань не рисуется. Вершины общие внутри материала: на границе
+ * областей рисунка они дублируются с той же нормалью — стык не виден.
+ */
+function surface(grid, { wrap = false, outward, pick }) {
+  const id = surfaceCount++;
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const quadCols = wrap ? cols : cols - 1;
+  const corners = (i, j) => [grid[i][j], grid[i][(j + 1) % cols], grid[i + 1][(j + 1) % cols], grid[i + 1][j]];
+  const faceNormal = ([a, b, c, d]) => add(cross(sub(b, a), sub(d, a)), cross(sub(d, c), sub(b, c)));
+
+  // Обход: большинство граней должно смотреть наружу.
+  let vote = 0;
+  for (let i = 0; i < rows - 1; i++) {
+    for (let j = 0; j < quadCols; j++) vote += Math.sign(dot(faceNormal(corners(i, j)), outward(i, j)));
+  }
+  const flip = vote < 0;
+
+  const normals = grid.map((row) => row.map(() => [0, 0, 0]));
+  for (let i = 0; i < rows - 1; i++) {
+    for (let j = 0; j < quadCols; j++) {
+      const n = scale(faceNormal(corners(i, j)), flip ? -1 : 1);
+      for (const [di, dj] of [
+        [0, 0],
+        [0, 1],
+        [1, 1],
+        [1, 0],
+      ]) {
+        const target = normals[i + di][(j + dj) % cols];
+        target[0] += n[0];
+        target[1] += n[1];
+        target[2] += n[2];
+      }
+    }
+  }
+
+  const vertex = (target, i, j) => {
+    const key = `${id}:${i}:${j % cols}`;
+    let index = target.vertexOf.get(key);
+    if (index === undefined) {
+      index = target.positions.length / 3;
+      target.vertexOf.set(key, index);
+      target.positions.push(...grid[i][j % cols]);
+      target.normals.push(...normalize(normals[i][j % cols]));
+    }
+    return index;
+  };
+  const triangle = (target, [ia, ja], [ib, jb], [ic, jc]) => {
+    const a = grid[ia][ja % cols];
+    const b = grid[ib][jb % cols];
+    const c = grid[ic][jc % cols];
+    // У кромок и полюсов точки сходятся: вырожденный треугольник не рисуется.
+    if (Math.hypot(...cross(sub(b, a), sub(c, a))) < MIN_DOUBLE_AREA_M2) return;
+    target.indices.push(vertex(target, ia, ja), vertex(target, ib, jb), vertex(target, ic, jc));
+  };
+
+  for (let i = 0; i < rows - 1; i++) {
+    for (let j = 0; j < quadCols; j++) {
+      const target = pick(i, j);
+      if (!target) continue;
+      const q = [
+        [i, j],
+        [i, j + 1],
+        [i + 1, j + 1],
+        [i + 1, j],
+      ];
+      const [a, b, c, d] = flip ? [q[0], q[3], q[2], q[1]] : q;
+      triangle(target, a, b, c);
+      triangle(target, a, c, d);
+    }
+  }
+}
+
+/** Плоский многоугольник-веер (торец купола): своя нормаль, свои вершины. */
+function flatPolygon(target, points, outward) {
+  let n = [0, 0, 0];
+  for (let k = 1; k + 1 < points.length; k++) n = add(n, cross(sub(points[k], points[0]), sub(points[k + 1], points[0])));
+  const ordered = dot(n, outward) < 0 ? [...points].reverse() : points;
+  const normal = normalize(dot(n, outward) < 0 ? scale(n, -1) : n);
+  const base = target.positions.length / 3;
+  for (const p of ordered) {
+    target.positions.push(...p);
+    target.normals.push(...normal);
+  }
+  for (let k = 1; k + 1 < ordered.length; k++) {
+    const [a, b, c] = [ordered[0], ordered[k], ordered[k + 1]];
+    if (Math.hypot(...cross(sub(b, a), sub(c, a))) < MIN_DOUBLE_AREA_M2) continue;
+    target.indices.push(base, base + k, base + k + 1);
+  }
+}
+
+/* ── Купол ───────────────────────────────────────────────────────────────── */
 
 /** Профиль NACA 00xx: полутолщина на доле хорды u ∈ [0, 1] (замкнутая задняя кромка). */
 function halfThickness(u) {
@@ -71,129 +248,268 @@ function camber(u) {
   return 4 * CAMBER * u * (1 - u);
 }
 
-/** Сечение купола на угле дуги theta: точки верха и низа по хорде. */
-function section(theta) {
-  const t = theta / (ARC_HALF_ANGLE_DEG * DEG);
+/** Надув по хорде: у кромок ноль, пузырь — ближе к носу, как у настоящих ячеек. */
+function inflationAlongChord(u) {
+  return Math.sin(Math.PI * u) ** 0.6;
+}
+
+/** Точки хорды для доли размаха t ∈ [0, 1]: края шеврона — ровно на рёбрах сетки. */
+function chordSamples(t) {
+  const axis = CHEVRON_ROOT_U + (CHEVRON_TIP_U - CHEVRON_ROOT_U) * t;
+  const [front, back] = [axis - CHEVRON_HALF_WIDTH, axis + CHEVRON_HALF_WIDTH];
+  const u = [];
+  // До полосы — гуще у передней кромки: там профиль гнётся сильнее.
+  for (let k = 0; k <= FRONT_SAMPLES; k++) u.push(front * (1 - Math.cos(((k / FRONT_SAMPLES) * Math.PI) / 2)));
+  for (let k = 1; k <= STRIPE_SAMPLES; k++) u.push(front + ((back - front) * k) / STRIPE_SAMPLES);
+  for (let k = 1; k <= REAR_SAMPLES; k++) u.push(back + ((TRAILING_BAND_U - back) * k) / REAR_SAMPLES);
+  for (let k = 1; k <= TRAILING_SAMPLES; k++) u.push(TRAILING_BAND_U + ((1 - TRAILING_BAND_U) * k) / TRAILING_SAMPLES);
+  return u;
+}
+
+/** Номера граней по хорде, с которых начинаются полоса шеврона, белое поле и задняя полоса. */
+const STRIPE_QUADS = [FRONT_SAMPLES, FRONT_SAMPLES + STRIPE_SAMPLES, FRONT_SAMPLES + STRIPE_SAMPLES + REAR_SAMPLES];
+
+/**
+ * Сечение купола на угле дуги theta: точки верха и низа по хорде. inflate —
+ * доля надува верха (0 на нервюре, 1 в середине ячейки).
+ */
+function section(theta, inflate) {
+  const t = Math.abs(theta) / (ARC_HALF_ANGLE_DEG * DEG);
   const chord = ROOT_CHORD_M * Math.max(TIP_CHORD_FRACTION, Math.sqrt(1 - t * t));
   const normal = [Math.sin(theta), Math.cos(theta), 0];
   const centre = [ARC_RADIUS_M * Math.sin(theta), CANOPY_TOP_M - ARC_RADIUS_M * (1 - Math.cos(theta)), 0];
   const leadingZ = LEADING_EDGE_FRACTION * chord - TIP_SWEEP_M * t * t;
-  const upper = [];
-  const lower = [];
-  for (let k = 0; k <= CHORD_SAMPLES; k++) {
-    // Точки гуще у передней кромки: там профиль гнётся сильнее.
-    const u = (1 - Math.cos((k / CHORD_SAMPLES) * Math.PI)) / 2;
-    const z = leadingZ - u * chord;
-    const up = (camber(u) + halfThickness(u)) * chord;
-    const down = (camber(u) - halfThickness(u)) * chord;
-    upper.push([centre[0] + normal[0] * up, centre[1] + normal[1] * up, z]);
-    lower.push([centre[0] + normal[0] * down, centre[1] + normal[1] * down, z]);
-  }
-  return { upper, lower, chord, u: upper.map((_, k) => (1 - Math.cos((k / CHORD_SAMPLES) * Math.PI)) / 2) };
-}
-
-const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-const normalize = (v) => {
-  const l = Math.hypot(...v) || 1;
-  return [v[0] / l, v[1] / l, v[2] / l];
-};
-
-/** Набор треугольников одного материала: плоские нормали на грань. */
-function mesh() {
-  const positions = [];
-  const normals = [];
+  const at = (u, offset) => [centre[0] + normal[0] * offset, centre[1] + normal[1] * offset, leadingZ - u * chord];
+  const u = chordSamples(t);
   return {
-    positions,
-    normals,
-    triangle(a, b, c) {
-      const normal = cross(sub(b, a), sub(c, a));
-      // У кромок профиль сходится в точку: вырожденный треугольник нормали не имеет.
-      if (Math.hypot(...normal) < MIN_DOUBLE_AREA_M2) return;
-      const n = normalize(normal);
-      positions.push(...a, ...b, ...c);
-      normals.push(...n, ...n, ...n);
-    },
-    quad(a, b, c, d) {
-      this.triangle(a, b, c);
-      this.triangle(a, c, d);
-    },
+    u,
+    upper: u.map((x) => at(x, (camber(x) + halfThickness(x) + INFLATION * inflate * inflationAlongChord(x)) * chord)),
+    lower: u.map((x) => at(x, (camber(x) - halfThickness(x)) * chord)),
   };
 }
 
-const parts = {
-  canopy: mesh(),
-  accent: mesh(),
-  underside: mesh(),
-  harness: mesh(),
-  pilot: mesh(),
-  helmet: mesh(),
-};
+/** Центр дуги купола: «наружу» для верха — от него. */
+const ARC_CENTRE = [0, CANOPY_TOP_M - ARC_RADIUS_M, 0];
+const thetaOf = (index, count) => (-1 + (2 * index) / count) * ARC_HALF_ANGLE_DEG * DEG;
+const isTipCell = (cell) => cell < TIP_CELLS || cell >= CELLS - TIP_CELLS;
 
-// Купол: верх (светлый, передняя полоса — акцент) и низ.
-const sections = [];
-for (let i = 0; i <= CELLS; i++) {
-  sections.push(section((-1 + (2 * i) / CELLS) * ARC_HALF_ANGLE_DEG * DEG));
+// Верх: CELL_SAMPLES точек на ячейку, между нервюрами — надув.
+const upperRows = [];
+for (let i = 0; i <= CELLS * CELL_SAMPLES; i++) {
+  const s = (i % CELL_SAMPLES) / CELL_SAMPLES;
+  upperRows.push(section(thetaOf(i, CELLS * CELL_SAMPLES), Math.sin(Math.PI * s)).upper);
 }
-for (let i = 0; i < CELLS; i++) {
-  const a = sections[i];
-  const b = sections[i + 1];
-  for (let k = 0; k < CHORD_SAMPLES; k++) {
-    const top = a.u[k + 1] <= LEADING_BAND ? parts.accent : parts.canopy;
-    // Обход против часовой, если смотреть снаружи: нормаль верха — вверх.
-    top.quad(a.upper[k], a.upper[k + 1], b.upper[k + 1], b.upper[k]);
-    parts.underside.quad(a.lower[k], b.lower[k], b.lower[k + 1], a.lower[k + 1]);
-  }
-}
-// Торцы купола — замкнуть профиль.
-for (const [s, flip] of [
-  [sections[0], false],
-  [sections[CELLS], true],
+surface(upperRows, {
+  outward: (i, j) => sub(upperRows[i][j], ARC_CENTRE),
+  pick: (i, j) => {
+    if (isTipCell(Math.floor(i / CELL_SAMPLES))) return parts['canopy-trim'];
+    if (j < STRIPE_QUADS[0]) return parts['canopy-primary'];
+    if (j < STRIPE_QUADS[1]) return parts['canopy-trim'];
+    if (j < STRIPE_QUADS[2]) return parts['canopy-secondary'];
+    return parts['canopy-primary'];
+  },
+});
+
+// Низ: по нервюрам, без надува; передняя полоса — входные отверстия.
+const ribs = [];
+for (let i = 0; i <= CELLS; i++) ribs.push(section(thetaOf(i, CELLS), 0));
+const lowerRows = ribs.map((rib) => rib.lower);
+surface(lowerRows, {
+  outward: (i, j) => sub(ARC_CENTRE, lowerRows[i][j]),
+  pick: (i, j) => ((ribs[i].u[j] + ribs[i].u[j + 1]) / 2 < INTAKE_U ? parts['canopy-intake'] : parts['canopy-underside']),
+});
+
+// Торцы купола — замкнуть профиль у законцовок.
+for (const [rib, side] of [
+  [ribs[0], -1],
+  [ribs[CELLS], 1],
 ]) {
-  for (let k = 0; k < CHORD_SAMPLES; k++) {
-    const quad = [s.upper[k], s.lower[k], s.lower[k + 1], s.upper[k + 1]];
-    if (flip) quad.reverse();
-    parts.accent.quad(...quad);
+  const outline = [...rib.upper, ...[...rib.lower].reverse().slice(1, -1)];
+  flatPolygon(parts['canopy-trim'], outline, [side * Math.cos(ARC_HALF_ANGLE_DEG * DEG), -Math.sin(ARC_HALF_ANGLE_DEG * DEG), 0]);
+}
+
+/* ── Пилот ───────────────────────────────────────────────────────────────── */
+
+const X_AXIS = [1, 0, 0];
+
+/**
+ * Лофт вдоль пути в плоскости YZ: в каждой точке — эллипс с полуосями rx (по X)
+ * и ry (поперёк пути). Концы с нулевым радиусом закрывают лофт в точку.
+ */
+function loft(path, segments, pick) {
+  const rings = path.map((p, k) => {
+    const tangent = normalize(sub(path[Math.min(k + 1, path.length - 1)].at, path[Math.max(k - 1, 0)].at));
+    const across = normalize(cross(tangent, X_AXIS));
+    return Array.from({ length: segments }, (_, j) => {
+      const phi = (2 * Math.PI * j) / segments;
+      return add(p.at, add(scale(X_AXIS, p.rx * Math.cos(phi)), scale(across, p.ry * Math.sin(phi))));
+    });
+  });
+  const centres = path.map((p) => p.at);
+  surface(rings, {
+    wrap: true,
+    outward: (i, j) => sub(rings[i][j], lerp(centres[i], centres[i + 1] ?? centres[i], 0.5)),
+    pick: (i, j) => pick(i, j),
+  });
+}
+
+/** Эллипсоид: кольца по широте от южного полюса к северному. */
+function ellipsoid(centre, radii, target, { rings = 10, segments = 16, latRange = [-90, 90], lonRange = null } = {}) {
+  const grid = [];
+  for (let i = 0; i <= rings; i++) {
+    const lat = (latRange[0] + ((latRange[1] - latRange[0]) * i) / rings) * DEG;
+    const row = [];
+    const count = lonRange ? segments + 1 : segments;
+    for (let j = 0; j < count; j++) {
+      const lon = lonRange ? (lonRange[0] + ((lonRange[1] - lonRange[0]) * j) / segments) * DEG : (2 * Math.PI * j) / segments;
+      // Долгота 0 — вперёд (+Z), растёт к +X.
+      row.push(add(centre, [radii[0] * Math.cos(lat) * Math.sin(lon), radii[1] * Math.sin(lat), radii[2] * Math.cos(lat) * Math.cos(lon)]));
+    }
+    grid.push(row);
   }
+  surface(grid, { wrap: !lonRange, outward: (i, j) => sub(grid[i][j], centre), pick: () => target });
 }
 
-/** Прямоугольный блок [min, max] по осям. */
-function box(target, [x0, y0, z0], [x1, y1, z1]) {
-  const p = (x, y, z) => [x, y, z];
-  const c = [p(x0, y0, z0), p(x1, y0, z0), p(x1, y1, z0), p(x0, y1, z0), p(x0, y0, z1), p(x1, y0, z1), p(x1, y1, z1), p(x0, y1, z1)];
-  target.quad(c[0], c[3], c[2], c[1]); // зад (−Z)
-  target.quad(c[4], c[5], c[6], c[7]); // перед (+Z)
-  target.quad(c[0], c[1], c[5], c[4]); // низ
-  target.quad(c[3], c[7], c[6], c[2]); // верх
-  target.quad(c[0], c[4], c[7], c[3]); // сторона x0
-  target.quad(c[1], c[2], c[6], c[5]); // сторона x1
+const HARNESS_SEGMENTS = 16;
+/**
+ * Кокон: от верха спинки (протектор) вниз к сиденью и вперёд к ногам —
+ * пилот полулёжа, ноги по курсу. Полуоси — по габаритам подвесок-коконов.
+ */
+const pod = [
+  { at: [0, 0.3, -0.5], rx: 0, ry: 0 },
+  { at: [0, 0.28, -0.52], rx: 0.19, ry: 0.09 },
+  { at: [0, 0.02, -0.46], rx: 0.25, ry: 0.16 },
+  { at: [0, -0.25, -0.26], rx: 0.27, ry: 0.2 },
+  { at: [0, -0.32, 0.15], rx: 0.24, ry: 0.16 },
+  { at: [0, -0.3, 0.6], rx: 0.19, ry: 0.13 },
+  { at: [0, -0.24, 0.98], rx: 0.12, ry: 0.09 },
+  { at: [0, -0.2, 1.08], rx: 0.04, ry: 0.035 },
+  { at: [0, -0.19, 1.1], rx: 0, ry: 0 },
+];
+/** Полоса-акцент по бокам кокона: от сиденья до ног (грани кольца у ±X). */
+const SIDE_STRIPE = new Set([0, HARNESS_SEGMENTS / 2 - 1, HARNESS_SEGMENTS / 2, HARNESS_SEGMENTS - 1]);
+loft(pod, HARNESS_SEGMENTS, (i, j) => (i >= 3 && i <= 5 && SIDE_STRIPE.has(j) ? parts['harness-accent'] : parts.harness));
+
+// Корпус — над сиденьем перед спинкой, куртка.
+loft(
+  [
+    { at: [0, -0.16, -0.3], rx: 0, ry: 0 },
+    { at: [0, -0.12, -0.3], rx: 0.18, ry: 0.12 },
+    { at: [0, 0.2, -0.36], rx: 0.21, ry: 0.13 },
+    { at: [0, 0.36, -0.39], rx: 0.11, ry: 0.08 },
+    { at: [0, 0.43, -0.4], rx: 0.05, ry: 0.05 },
+    { at: [0, 0.46, -0.4], rx: 0, ry: 0 },
+  ],
+  12,
+  () => parts.pilot,
+);
+
+// Руки — от плеч к тормозным клевантам у свободных концов.
+for (const side of [1, -1]) {
+  const shoulder = [side * 0.2, 0.33, -0.37];
+  const elbow = [side * 0.33, 0.26, -0.2];
+  const hand = [side * 0.3, 0.44, -0.1];
+  const limb = [shoulder, elbow, hand];
+  const rings = limb.map((at, k) => {
+    const tangent = normalize(sub(limb[Math.min(k + 1, 2)], limb[Math.max(k - 1, 0)]));
+    const u = normalize(cross(tangent, [0, 1, 0]));
+    const v = normalize(cross(u, tangent));
+    const r = [0.05, 0.045, 0.04][k];
+    return Array.from({ length: 8 }, (_, j) => {
+      const phi = (2 * Math.PI * j) / 8;
+      return add(at, add(scale(u, r * Math.cos(phi)), scale(v, r * Math.sin(phi))));
+    });
+  });
+  surface(rings, { wrap: true, outward: (i, j) => sub(rings[i][j], limb[i]), pick: () => parts.pilot });
+  ellipsoid(hand, [0.045, 0.045, 0.045], parts.pilot, { rings: 4, segments: 8 });
 }
 
-// Пилот полулёжа в коконе: подвеска на уровне груди, ноги вперёд.
-box(parts.harness, [-0.26, -0.45, -0.35], [0.26, -0.05, 0.95]); // кокон с ногами
-box(parts.harness, [-0.28, -0.5, -0.55], [0.28, 0.25, -0.3]); // спинка с запаской
-box(parts.pilot, [-0.22, -0.1, -0.45], [0.22, 0.45, -0.15]); // корпус
-box(parts.pilot, [-0.3, 0.15, -0.35], [-0.2, 0.55, -0.25]); // левая рука к клевантам
-box(parts.pilot, [0.2, 0.15, -0.35], [0.3, 0.55, -0.25]);
-box(parts.helmet, [-0.13, 0.45, -0.42], [0.13, 0.72, -0.14]); // шлем
+// Шлем и визор спереди.
+const HEAD = [0, 0.56, -0.4];
+ellipsoid(HEAD, [0.125, 0.14, 0.14], parts.helmet);
+ellipsoid(HEAD, [0.128, 0.143, 0.145], parts.visor, { rings: 3, segments: 8, latRange: [-25, 20], lonRange: [-60, 60] });
 
-// Стропы: от свободных концов к низу купола — ряды A (у кромки), C и тормозные.
-const risers = { left: [0.22, 0.45, -0.2], right: [-0.22, 0.45, -0.2] };
+/* ── Свободные концы и стропы ────────────────────────────────────────────── */
+
+/** Карабины — начало координат по бокам; верх свободных концов — над плечами. */
+const CARABINER = (side) => [side * 0.2, 0, -0.22];
+const RISER_TOP = (side) => [side * 0.22, 0.55, -0.2];
+for (const side of [1, -1]) {
+  const [from, to] = [CARABINER(side), RISER_TOP(side)];
+  const u = normalize(cross(sub(to, from), [0, 0, 1]));
+  const v = [0, 0, 1];
+  const rings = [from, to].map((at) =>
+    Array.from({ length: 6 }, (_, j) => add(at, add(scale(u, 0.025 * Math.cos((2 * Math.PI * j) / 6)), scale(v, 0.012 * Math.sin((2 * Math.PI * j) / 6))))),
+  );
+  surface(rings, { wrap: true, outward: (i, j) => sub(rings[i][j], i === 0 ? from : to), pick: () => parts.risers });
+}
+
+/**
+ * Ряды строп: доля хорды точки крепления и смещение верха свободного конца
+ * по Z (ряд A — впереди). Тормозные — к задней кромке и в руку пилота.
+ */
+const ROWS = [
+  { u: 0.12, riserZ: 0.05 },
+  { u: 0.4, riserZ: 0 },
+  { u: 0.68, riserZ: -0.05 },
+  { u: 1, brake: true },
+];
+/** Несущие нервюры — через одну, без законцовочных. */
+const LOAD_RIBS = Array.from({ length: CELLS - 1 }, (_, k) => k + 1).filter((k) => k % 2 === 1);
+/** Каскад: верхние стропы по 3 сходятся в одну, средние по 3 — в нижнюю. */
+const CASCADE = 3;
+/** Доли пути к свободному концу, где сходятся верхние и средние стропы. */
+const UPPER_JOIN = 0.25;
+const MIDDLE_JOIN = 0.5;
+
+/** Точка на низе купола у нервюры rib на доле хорды u. */
+function lowerPoint(rib, u) {
+  const theta = thetaOf(rib, CELLS);
+  const t = Math.abs(theta) / (ARC_HALF_ANGLE_DEG * DEG);
+  const chord = ROOT_CHORD_M * Math.max(TIP_CHORD_FRACTION, Math.sqrt(1 - t * t));
+  const offset = (camber(u) - halfThickness(u)) * chord;
+  const leadingZ = LEADING_EDGE_FRACTION * chord - TIP_SWEEP_M * t * t;
+  return [
+    ARC_RADIUS_M * Math.sin(theta) + Math.sin(theta) * offset,
+    CANOPY_TOP_M - ARC_RADIUS_M * (1 - Math.cos(theta)) + Math.cos(theta) * offset,
+    leadingZ - u * chord,
+  ];
+}
+
+const chunks = (items, size) => Array.from({ length: Math.ceil(items.length / size) }, (_, k) => items.slice(k * size, k * size + size));
+
 const linePositions = [];
-for (let i = 0; i <= CELLS; i += 2) {
-  const s = sections[i];
-  const riser = s.lower[0][0] >= 0 ? risers.left : risers.right;
-  for (const fraction of [0.15, 0.55]) {
-    const k = s.u.findIndex((u) => u >= fraction);
-    linePositions.push(...riser, ...s.lower[k]);
+const line = (a, b) => linePositions.push(...a, ...b);
+for (const side of [1, -1]) {
+  // От центра к законцовке: рядом стоящие нервюры сходятся в одну стропу.
+  const sideRibs = LOAD_RIBS.filter((rib) => Math.sign(thetaOf(rib, CELLS)) === side).sort(
+    (a, b) => Math.abs(thetaOf(a, CELLS)) - Math.abs(thetaOf(b, CELLS)),
+  );
+  for (const row of ROWS) {
+    const bottom = row.brake ? [side * 0.3, 0.44, -0.1] : add(RISER_TOP(side), [0, 0, row.riserZ]);
+    const upperGroups = chunks(
+      sideRibs.map((rib) => lowerPoint(rib, row.u)),
+      CASCADE,
+    );
+    const middles = upperGroups.map((group) => {
+      const join = lerp(centroid(group), bottom, UPPER_JOIN);
+      for (const attach of group) line(attach, join);
+      return join;
+    });
+    for (const group of chunks(middles, CASCADE)) {
+      const join = lerp(centroid(group), bottom, MIDDLE_JOIN);
+      for (const middle of group) line(middle, join);
+      line(join, bottom);
+    }
   }
-  linePositions.push(...riser, ...s.lower[CHORD_SAMPLES]); // тормозные — к задней кромке
 }
 
 /* ── Сборка GLB ──────────────────────────────────────────────────────────── */
 
 const FLOAT = 5126;
+const UNSIGNED_SHORT = 5123;
 const ARRAY_BUFFER = 34962;
+const ELEMENT_ARRAY_BUFFER = 34963;
 const TRIANGLES = 4;
 const LINES = 1;
 
@@ -211,12 +527,19 @@ const gltf = {
   buffers: [],
 };
 
-function addAccessor(values, withBounds) {
+/** Буфер-вид, выровненный на 4 байта (требование glTF к смещениям). */
+function addView(data, target) {
+  const bytes = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  const view = gltf.bufferViews.push({ buffer: 0, byteOffset: byteLength, byteLength: bytes.length, target }) - 1;
+  const padding = Buffer.alloc((4 - (bytes.length % 4)) % 4);
+  binary.push(bytes, padding);
+  byteLength += bytes.length + padding.length;
+  return view;
+}
+
+function addVec3(values, withBounds) {
   const data = Float32Array.from(values);
-  const view = gltf.bufferViews.push({ buffer: 0, byteOffset: byteLength, byteLength: data.byteLength, target: ARRAY_BUFFER }) - 1;
-  binary.push(Buffer.from(data.buffer));
-  byteLength += data.byteLength;
-  const accessor = { bufferView: view, componentType: FLOAT, count: values.length / 3, type: 'VEC3' };
+  const accessor = { bufferView: addView(data, ARRAY_BUFFER), componentType: FLOAT, count: values.length / 3, type: 'VEC3' };
   if (withBounds) {
     accessor.min = [0, 1, 2].map((axis) => Math.min(...data.filter((_, i) => i % 3 === axis)));
     accessor.max = [0, 1, 2].map((axis) => Math.max(...data.filter((_, i) => i % 3 === axis)));
@@ -224,31 +547,28 @@ function addAccessor(values, withBounds) {
   return gltf.accessors.push(accessor) - 1;
 }
 
-function addMaterial(name, rgb, extra = {}) {
-  return (
-    gltf.materials.push({
-      name,
-      pbrMetallicRoughness: { baseColorFactor: [...rgb, 1], metallicFactor: 0, roughnessFactor: 0.85 },
-      ...extra,
-    }) - 1
-  );
+function addIndices(values) {
+  const data = Uint16Array.from(values);
+  return gltf.accessors.push({ bufferView: addView(data, ELEMENT_ARRAY_BUFFER), componentType: UNSIGNED_SHORT, count: values.length, type: 'SCALAR' }) - 1;
 }
 
-for (const [name, part] of Object.entries(parts)) {
-  const colour = name === 'accent' ? COLORS.accent : COLORS[name];
-  // Купол тонкий: изнутри его видно снизу, поэтому без отсечения задних граней.
-  const material = addMaterial(name, colour, { doubleSided: name === 'canopy' || name === 'accent' || name === 'underside' });
+function addMaterial(name) {
+  const { color, alpha = 1, metallicFactor, roughnessFactor } = MATERIALS[name];
+  const material = { name, pbrMetallicRoughness: { baseColorFactor: [...color, alpha], metallicFactor, roughnessFactor } };
+  if (alpha < 1) material.alphaMode = 'BLEND';
+  return gltf.materials.push(material) - 1;
+}
+
+for (const [name, p] of Object.entries(parts)) {
+  if (p.positions.length / 3 > 0xffff) throw new Error(`${name}: больше 65 535 вершин — не влезает в UNSIGNED_SHORT`);
   gltf.meshes[0].primitives.push({
-    attributes: { POSITION: addAccessor(part.positions, true), NORMAL: addAccessor(part.normals, false) },
-    material,
+    attributes: { POSITION: addVec3(p.positions, true), NORMAL: addVec3(p.normals, false) },
+    indices: addIndices(p.indices),
+    material: addMaterial(name),
     mode: TRIANGLES,
   });
 }
-gltf.meshes[0].primitives.push({
-  attributes: { POSITION: addAccessor(linePositions, true) },
-  material: addMaterial('lines', COLORS.lines),
-  mode: LINES,
-});
+gltf.meshes[0].primitives.push({ attributes: { POSITION: addVec3(linePositions, true) }, material: addMaterial('lines'), mode: LINES });
 gltf.buffers.push({ byteLength });
 
 const pad = (buffer, fill) => Buffer.concat([buffer, Buffer.alloc((4 - (buffer.length % 4)) % 4, fill)]);
@@ -268,4 +588,5 @@ const glb = Buffer.concat([header, chunk(0x4e4f534a, json), chunk(0x004e4942, bi
 
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, glb);
-console.log(`${OUT}: ${glb.length} байт, ${Object.values(parts).reduce((n, p) => n + p.positions.length / 9, 0)} треугольников`);
+const triangles = Object.values(parts).reduce((n, p) => n + p.indices.length / 3, 0);
+console.log(`${OUT}: ${glb.length} байт, ${triangles} треугольников, ${linePositions.length / 6} строп`);
