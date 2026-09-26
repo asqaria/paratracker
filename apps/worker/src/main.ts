@@ -10,7 +10,7 @@ import {
   markFlightProcessing,
   markFlightReady,
   notifyFlightStatus,
-  requeueFlightsWithoutSummary,
+  requeueFlightsForBackfill,
 } from '@skyline/db';
 import { pino } from 'pino';
 
@@ -104,9 +104,9 @@ async function sweepExpired(): Promise<void> {
 }
 
 await listener.start();
-// Разово: полёты до задачи 2.11 без сводки и линии для логбука — на повторную обработку.
-const backfill = await requeueFlightsWithoutSummary(database.db);
-if (backfill > 0) logger.info({ count: backfill }, 'requeued flights without logbook summary');
+// Разово: полёты до задач 2.11 и 2.13 (нет сводки, линии, точки взлёта) — на повторную обработку.
+const backfill = await requeueFlightsForBackfill(database.db);
+if (backfill > 0) logger.info({ count: backfill }, 'requeued flights for derived-data backfill');
 await requeueUnfinished();
 const sweep = setInterval(() => {
   void requeueUnfinished().catch((error: unknown) => logger.error({ err: error }, 'requeue sweep failed'));

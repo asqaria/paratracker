@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createDatabase, type DatabaseConnection } from '../client.js';
 import { flights, users } from '../schema.js';
-import { insertFlight, markFlightReady, requeueFlightsWithoutSummary } from './flights.js';
+import { insertFlight, markFlightReady, requeueFlightsForBackfill } from './flights.js';
 import { claimFlights, listLogbook, listLogbookMap } from './logbook.js';
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -54,6 +54,9 @@ describe.runIf(Boolean(databaseUrl))('логбук на живой БД', () => 
         altM: [1500, 2300, Number.NaN],
         timeMs: [startedAt.getTime(), startedAt.getTime() + 60_000, startedAt.getTime() + 120_000],
       },
+      // Южный океан: рядом нет мест из сида.
+      takeoff: { lat: -61, lon: -101, altM: 1500 },
+      landing: { lat: -61.1, lon: -101, altM: 800 },
     });
     return flight.id;
   };
@@ -141,7 +144,7 @@ describe.runIf(Boolean(databaseUrl))('логбук на живой БД', () => 
     createdFlights.push(legacy.id);
     await connection.db.update(flights).set({ status: 'ready' }).where(eq(flights.id, legacy.id));
 
-    expect(await requeueFlightsWithoutSummary(connection.db)).toBeGreaterThanOrEqual(1);
+    expect(await requeueFlightsForBackfill(connection.db)).toBeGreaterThanOrEqual(1);
     const [row] = await connection.db.select({ status: flights.status }).from(flights).where(eq(flights.id, legacy.id));
     expect(row?.status).toBe('pending');
     // Полёты со сводкой не трогает.

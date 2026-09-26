@@ -2,7 +2,8 @@ import type { FlightStatus } from '@skyline/core';
 import { and, desc, eq, gte, isNull, lt, or, sql } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
-import { flights } from '../schema.js';
+import { flights, sites } from '../schema.js';
+import { SITE_COLUMNS, type SiteRecord } from './sites.js';
 
 /**
  * Логбук пилота (задача 2.11): список своих полётов, карта, перенос анонимных
@@ -19,6 +20,7 @@ export interface LogbookEntryRecord {
   distanceTrackM: number | null;
   maxAltM: number | null;
   thermalCount: number | null;
+  takeoffSite: SiteRecord | null;
 }
 
 /** Позиция в списке: ключ сортировки и id для равных ключей. */
@@ -52,12 +54,13 @@ const MAP_MAX_FLIGHTS = 500;
 
 export async function listLogbook(
   db: Database,
-  query: { userId: string; limit: number; from?: string; to?: string; after?: LogbookCursor },
+  query: { userId: string; limit: number; from?: string; to?: string; siteId?: string; after?: LogbookCursor },
 ): Promise<LogbookPage> {
   const conditions = [eq(flights.userId, query.userId)];
   // Дата старта в UTC; локальная дата места — с задачей 2.14.
   if (query.from) conditions.push(gte(flights.startedAt, sql`${query.from}::date`));
   if (query.to) conditions.push(lt(flights.startedAt, sql`${query.to}::date + 1`));
+  if (query.siteId) conditions.push(eq(flights.takeoffSiteId, query.siteId));
   if (query.after) {
     conditions.push(sql`(${sortKey}, ${flights.id}) < (${query.after.sortKey.toISOString()}::timestamptz, ${query.after.id}::uuid)`);
   }
@@ -72,9 +75,11 @@ export async function listLogbook(
       distanceTrackM: flights.distanceTrackM,
       maxAltM: flights.maxAltM,
       thermalCount: flights.thermalCount,
+      takeoffSite: SITE_COLUMNS,
       sortKey,
     })
     .from(flights)
+    .leftJoin(sites, eq(sites.id, flights.takeoffSiteId))
     .where(and(...conditions))
     .orderBy(desc(sortKey), desc(flights.id))
     // На одну строку больше: так видно, есть ли следующая страница.
@@ -92,6 +97,7 @@ export async function listLogbook(
       distanceTrackM: row.distanceTrackM,
       maxAltM: row.maxAltM,
       thermalCount: row.thermalCount,
+      takeoffSite: row.takeoffSite,
     })),
     next: rows.length > query.limit && last ? { sortKey: new Date(last.sortKey), id: last.id } : null,
   };

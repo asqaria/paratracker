@@ -13,6 +13,7 @@
     "typecheck": "turbo typecheck"
   },
   "devDependencies": {
+    "@photostructure/tz-lookup": "^11.7.0",
     "@types/node": "^22.19.0",
     "egm96-universal": "1.1.1",
     "eslint": "^10.10.0",

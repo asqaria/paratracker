@@ -7,6 +7,8 @@ import {
   GLIDE_KINDS,
   LOCALES,
   PRIVACY_LEVELS,
+  SITE_SOURCES,
+  SITE_TYPES,
   SOURCE_FORMATS,
   TURN_DIRECTIONS,
   UNIT_SYSTEMS,
@@ -15,6 +17,7 @@ import {
 import { sql, type SQL } from 'drizzle-orm';
 import {
   boolean,
+  char,
   check,
   date,
   index,
@@ -33,12 +36,12 @@ import { citext, geography } from './columns.js';
 
 /**
  * Схема по ТЗ §9: users и flights (Фаза 0, задача 0.4), thermals и glides (задача 2.5),
- * oauth_accounts и sessions (задача 2.10).
+ * oauth_accounts и sessions (задача 2.10), sites (задача 2.13).
  *
  * Отступления от текста §9, обязательные по CLAUDE.md:
  * - дистанции хранятся в метрах (`*_m integer`), а не в км: внутри системы только СИ;
- * - FK на sites и gliders не объявлены — этих таблиц ещё нет, колонки уже есть,
- *   ограничения добавятся миграцией вместе с таблицами.
+ * - FK на gliders не объявлен — таблицы ещё нет, колонка уже есть,
+ *   ограничение добавится миграцией вместе с таблицей (задача 2.13б).
  */
 
 /** CHECK по списку значений из core: один источник правды для БД и API. */
@@ -114,6 +117,38 @@ export const sessions = pgTable(
   (t) => [index('sessions_user_idx').on(t.userId)],
 );
 
+/**
+ * Места старта и посадки (ТЗ §6.8, §9, задача 2.13). Сид — paragliding.earth
+ * (CC BY-SA 3.0): таблица мест открыта под той же лицензией. Места от пилотов
+ * видны всем сразу (решение владельца 26.09.2026).
+ */
+export const sites = pgTable(
+  'sites',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    slug: text('slug').notNull().unique(),
+    name: text('name').notNull(),
+    /** ISO 3166-1 alpha-2, строчными; null — неизвестна. */
+    countryCode: char('country_code', { length: 2 }),
+    location: geography('location', { kind: 'Point' }).notNull(),
+    elevationM: integer('elevation_m'),
+    /** IANA, напр. 'Asia/Almaty': из него — местное время полёта (задача 2.14). */
+    timezone: text('timezone').notNull(),
+    type: text('type', { enum: SITE_TYPES }).notNull().default('takeoff'),
+    description: text('description'),
+    source: text('source', { enum: SITE_SOURCES }).notNull(),
+    /** id в источнике ('pge:9773'): повторная загрузка сида не плодит дубли. */
+    sourceRef: text('source_ref').unique(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    check('sites_type_check', oneOf(t.type, SITE_TYPES)),
+    check('sites_source_check', oneOf(t.source, SITE_SOURCES)),
+    index('sites_location_gist').using('gist', t.location),
+  ],
+);
+
 export const flights = pgTable(
   'flights',
   {
@@ -138,10 +173,16 @@ export const flights = pgTable(
     pilotNameRaw: text('pilot_name_raw'),
     gliderRaw: text('glider_raw'),
 
-    // привязки; FK — вместе с таблицами gliders и sites
+    // привязки; FK на gliders — вместе с таблицей (задача 2.13б)
     gliderId: uuid('glider_id'),
-    takeoffSiteId: uuid('takeoff_site_id'),
-    landingSiteId: uuid('landing_site_id'),
+    takeoffSiteId: uuid('takeoff_site_id').references(() => sites.id, { onDelete: 'set null' }),
+    landingSiteId: uuid('landing_site_id').references(() => sites.id, { onDelete: 'set null' }),
+    /**
+     * Точки взлёта и посадки (flightRange, ТЗ §6.8): по ним ищется место.
+     * Не первая точка трека — её пишут и до подъёма пешком на старт.
+     */
+    takeoffPoint: geography('takeoff_point', { kind: 'Point' }),
+    landingPoint: geography('landing_point', { kind: 'Point' }),
 
     // время: UTC, local_date — дата в таймзоне места старта
     startedAt: timestamptz('started_at'),

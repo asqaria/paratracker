@@ -68,6 +68,9 @@ const analytics = (overrides: Partial<FlightAnalytics['details']> = {}): FlightA
     avgClimbMs: 1.61,
     avgGlideRatio: 6.69,
     wind: { dirDeg: 44, speedMs: 3.63 },
+    takeoffSite: null,
+    landingSite: null,
+    canEdit: false,
     ...overrides,
   },
   thermals: [thermal(0, 490, 1160, 1.67), thermal(1, 1345, 1627, 3.4)],
@@ -81,6 +84,31 @@ const render = (state: AnalyticsState, timeMs = START_MS, tab: 'thermals' | 'gli
   );
 
 const ready = (details: Partial<FlightAnalytics['details']> = {}): AnalyticsState => ({ status: 'ready', analytics: analytics(details) });
+
+describe('AnalyticsPanel: место старта (задача 2.13)', () => {
+  const site = { id: '33333333-2222-4333-8444-555555555555', name: 'Ush Konyr', countryCode: 'kz', source: 'seed' } as const;
+  const withCreate = (state: AnalyticsState): string =>
+    renderToString(
+      <AnalyticsPanel state={state} timeline={timeline} timeMs={START_MS} defaultOpen onSelect={() => {}} onCreateSite={() => Promise.resolve()} />,
+    );
+
+  it('место из paragliding.earth — название и ссылка на источник (CC BY-SA)', () => {
+    const html = render(ready({ takeoffSite: site }));
+    expect(html).toContain('Ush Konyr');
+    expect(html).toContain('href="https://paraglidingearth.com"');
+  });
+
+  it('место от пилота — с пометкой', () => {
+    expect(render(ready({ takeoffSite: { ...site, source: 'user' } }))).toContain(text['site.byPilot']);
+  });
+
+  it('места нет: владельцу — «добавить», чужому — ничего', () => {
+    expect(withCreate(ready({ canEdit: true }))).toContain(text['site.add']);
+    expect(withCreate(ready({ canEdit: false }))).not.toContain(text['site.unknown']);
+    // Без обработчика (демо) — тоже ничего.
+    expect(render(ready({ canEdit: true }))).not.toContain(text['site.unknown']);
+  });
+});
 
 describe('AnalyticsPanel', () => {
   it('свёрнута по умолчанию: только кнопка — прогрессивное раскрытие (ТЗ §8.1)', () => {

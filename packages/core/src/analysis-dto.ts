@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { GLIDE_KINDS, THERMAL_STRENGTHS, TURN_DIRECTIONS } from './derived.js';
 import { AnalysisLevel, FlightStatus } from './flight.js';
+import { SiteSummary } from './site-dto.js';
 
 /**
  * Контракт аналитики полёта (ТЗ §10): GET /flights/{id}, /thermals, /glides,
@@ -34,6 +35,11 @@ export const FlightDetailsResponse = z.object({
   /** null — не было глайдов с потерей высоты (ТЗ §6.4). */
   avgGlideRatio: z.number().nullable(),
   wind: WindDto.nullable(),
+  /** Место старта и посадки (задача 2.13); null — рядом нет известного места. */
+  takeoffSite: SiteSummary.nullable(),
+  landingSite: SiteSummary.nullable(),
+  /** Спрашивающий — владелец полёта: может добавить место, править полёт. */
+  canEdit: z.boolean(),
 });
 export type FlightDetailsResponse = z.infer<typeof FlightDetailsResponse>;
 

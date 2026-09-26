@@ -6,7 +6,11 @@ import {
   type GlideDto,
   type ThermalDto,
 } from '@skyline/core';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
+
+import { useMe } from '../auth/session';
+import { createSite } from '../sites/create-site';
 
 /**
  * Аналитика полёта из API (ТЗ §10, задача 2.6): детали с агрегатами, термики,
@@ -52,12 +56,32 @@ export async function fetchFlightAnalytics(
   return { details, thermals: thermals.thermals, glides: glides.glides, wind };
 }
 
+const analyticsKey = (flightId: string | null, viewerId: string | null) =>
+  ['flight-analytics', flightId, viewerId] as const;
+
+/** Добавить место старта полёта и обновить панель (задача 2.13). */
+export function useCreateSite(flightId: string | null): ((name: string) => Promise<void>) | undefined {
+  const client = useQueryClient();
+  const create = useCallback(
+    async (name: string) => {
+      if (flightId === null) return;
+      await createSite(flightId, name);
+      await client.invalidateQueries({ queryKey: ['flight-analytics', flightId] });
+    },
+    [client, flightId],
+  );
+  return flightId === null ? undefined : create;
+}
+
 /** null — демо-трек: его нет в API, панели нет. */
 export function useFlightAnalytics(flightId: string | null): AnalyticsState | null {
+  // Вход меняет ответ (canEdit): ждём, пока станет известно, кто смотрит, и
+  // держим его в ключе — после входа или выхода панель перезапросится.
+  const me = useMe();
   const query = useQuery({
-    queryKey: ['flight-analytics', flightId],
+    queryKey: analyticsKey(flightId, me?.id ?? null),
     queryFn: ({ signal }) => fetchFlightAnalytics(flightId ?? '', signal),
-    enabled: flightId !== null,
+    enabled: flightId !== null && me !== undefined,
     // Анализ готового полёта не меняется до повторной обработки.
     staleTime: Number.POSITIVE_INFINITY,
     retry: 1,

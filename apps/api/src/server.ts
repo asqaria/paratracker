@@ -1,6 +1,7 @@
 import {
   claimFlights,
   createChannelListener,
+  createUserSite,
   createDatabase,
   createSession,
   findFlight,
@@ -11,12 +12,15 @@ import {
   listGlides,
   listLogbook,
   listLogbookMap,
+  listLogbookSites,
   listThermals,
   notifyFlightQueued,
   revokeSession,
   rotateSession,
   signInWithOAuth,
 } from '@skyline/db';
+
+import tzlookup from '@photostructure/tz-lookup';
 
 import { buildApp } from './app.js';
 import { createGoogleOAuth } from './auth/google.js';
@@ -67,7 +71,12 @@ const app = buildApp({
         logbook: {
           list: (query) => listLogbook(database.db, query),
           map: (userId) => listLogbookMap(database.db, userId),
+          sites: (userId) => listLogbookSites(database.db, userId),
           claim: (userId, claims) => claimFlights(database.db, userId, claims),
+        },
+        sites: {
+          // Таймзона места — по координатам взлёта (IANA): из неё местное время полёта (2.14).
+          create: (args) => createUserSite(database.db, { ...args, timezoneAt: (lat, lon) => tzlookup(lat, lon) }),
         },
       }
     : {}),

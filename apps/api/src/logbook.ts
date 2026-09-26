@@ -4,9 +4,10 @@ import {
   LogbookMapResponse,
   LogbookQuery,
   LogbookResponse,
+  LogbookSitesResponse,
   type LogbookEntry,
 } from '@skyline/core';
-import type { LogbookCursor, LogbookEntryRecord, LogbookMapFeature, LogbookPage } from '@skyline/db';
+import type { LogbookCursor, LogbookEntryRecord, LogbookMapFeature, LogbookPage, SiteRecord } from '@skyline/db';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
@@ -19,7 +20,16 @@ import { problem, sendProblem } from './problem.js';
  */
 
 export interface LogbookRoutesDeps {
-  list(query: { userId: string; limit: number; from?: string; to?: string; after?: LogbookCursor }): Promise<LogbookPage>;
+  list(query: {
+    userId: string;
+    limit: number;
+    from?: string;
+    to?: string;
+    siteId?: string;
+    after?: LogbookCursor;
+  }): Promise<LogbookPage>;
+  /** Места, откуда летал пилот, с числом полётов (задача 2.13). */
+  sites(userId: string): Promise<(SiteRecord & { flightCount: number })[]>;
   map(userId: string): Promise<LogbookMapFeature[]>;
   claim(userId: string, claims: readonly { flightId: string; tokenHash: string }[]): Promise<string[]>;
 }
@@ -65,7 +75,7 @@ export function registerLogbookRoutes(app: FastifyInstance, deps: LogbookRoutesD
     if (!query.success) {
       return sendProblem(reply, problem(HTTP.badRequest, { detail: z.prettifyError(query.error) }));
     }
-    const { cursor, from, to, limit } = query.data;
+    const { cursor, from, to, siteId, limit } = query.data;
     const after = cursor === undefined ? undefined : decodeCursor(cursor);
     if (after === null) return sendProblem(reply, problem(HTTP.badRequest, { detail: 'Invalid cursor' }));
 
@@ -74,11 +84,18 @@ export function registerLogbookRoutes(app: FastifyInstance, deps: LogbookRoutesD
       limit,
       ...(from === undefined ? {} : { from }),
       ...(to === undefined ? {} : { to }),
+      ...(siteId === undefined ? {} : { siteId }),
       ...(after === undefined ? {} : { after }),
     });
     return reply.send(
       LogbookResponse.parse({ items: page.items.map(toEntry), nextCursor: page.next ? encodeCursor(page.next) : null }),
     );
+  });
+
+  app.get('/logbook/sites', async (request, reply) => {
+    const userId = await requireUser(request, reply);
+    if (!userId) return reply;
+    return reply.send(LogbookSitesResponse.parse({ sites: await deps.sites(userId) }));
   });
 
   app.get('/logbook/map', async (request, reply) => {

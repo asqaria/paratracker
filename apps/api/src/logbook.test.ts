@@ -12,6 +12,7 @@ const USER_ID = '11111111-2222-4333-8444-555555555555';
 const FLIGHT_A = 'aaaaaaaa-2222-4333-8444-555555555555';
 const FLIGHT_B = 'bbbbbbbb-2222-4333-8444-555555555555';
 const NOW = new Date(Date.UTC(2026, 8, 26, 12));
+const SITE_ID = '33333333-2222-4333-8444-555555555555';
 
 const entry = (id: string, startedAt: Date | null): LogbookEntryRecord => ({
   id,
@@ -22,6 +23,7 @@ const entry = (id: string, startedAt: Date | null): LogbookEntryRecord => ({
   distanceTrackM: startedAt ? 42_000 : null,
   maxAltM: startedAt ? 3505 : null,
   thermalCount: startedAt ? 12 : null,
+  takeoffSite: startedAt ? { id: SITE_ID, name: 'Ush Konyr', countryCode: 'kz', source: 'seed' } : null,
 });
 
 function harness(page: LogbookPage = { items: [], next: null }) {
@@ -48,6 +50,8 @@ function harness(page: LogbookPage = { items: [], next: null }) {
       Promise.resolve([
         { id: FLIGHT_A, startedAt: new Date(Date.UTC(2026, 6, 1, 9)), coordinates: [[76.9, 43.2], [76.95, 43.25]] },
       ]),
+    sites: () =>
+      Promise.resolve([{ id: SITE_ID, name: 'Ush Konyr', countryCode: 'kz', source: 'seed', flightCount: 13 }]),
     claim: (userId, list) => {
       claims.push({ userId, claims: [...list] });
       return Promise.resolve(list.filter((c) => c.tokenHash === hashToken('good')).map((c) => c.flightId));
@@ -81,13 +85,18 @@ describe('GET /logbook', () => {
       distanceTrackM: 42_000,
       maxAltM: 3505,
       thermalCount: 12,
+      takeoffSite: { id: SITE_ID, name: 'Ush Konyr', countryCode: 'kz', source: 'seed' },
     });
     expect(body.items[1]?.startedAt).toBeNull();
     expect(h.listed[0]).toEqual({ userId: USER_ID, limit: 2, from: '2026-06-01' });
 
+    // Фильтр по месту старта (задача 2.13).
+    await h.app.inject({ url: `/api/v1/logbook?siteId=${SITE_ID}`, cookies: await signedIn() });
+    expect(h.listed[1]).toEqual({ userId: USER_ID, limit: 30, siteId: SITE_ID });
+
     // Курсор — как есть в следующий запрос.
     await h.app.inject({ url: `/api/v1/logbook?cursor=${body.nextCursor ?? ''}`, cookies: await signedIn() });
-    expect(h.listed[1]).toEqual({ userId: USER_ID, limit: 30, after: next });
+    expect(h.listed[2]).toEqual({ userId: USER_ID, limit: 30, after: next });
   });
 
   it('кривой курсор или лимит — 400', async () => {
@@ -96,6 +105,17 @@ describe('GET /logbook', () => {
       const res = await h.app.inject({ url: `/api/v1/logbook?${query}`, cookies: await signedIn() });
       expect(res.statusCode, query).toBe(400);
     }
+  });
+});
+
+describe('GET /logbook/sites', () => {
+  it('места пилота с числом полётов; без входа — 401', async () => {
+    const h = harness();
+    const res = await h.app.inject({ url: '/api/v1/logbook/sites', cookies: await signedIn() });
+    expect(res.json()).toEqual({
+      sites: [{ id: SITE_ID, name: 'Ush Konyr', countryCode: 'kz', source: 'seed', flightCount: 13 }],
+    });
+    expect((await h.app.inject('/api/v1/logbook/sites')).statusCode).toBe(401);
   });
 });
 

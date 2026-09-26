@@ -19,21 +19,22 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 describe('fetchLogbookPage', () => {
   it('первая страница без курсора, следующая — с курсором как есть', async () => {
     const page = { items: [], nextCursor: null };
-    const { calls, fetchImpl } = scripted([json(page), json(page)]);
-    await fetchLogbookPage(null, fetchImpl);
-    await fetchLogbookPage('abc_-1', fetchImpl);
-    expect(calls.map((c) => c.url)).toEqual([LOGBOOK_URL, `${LOGBOOK_URL}?cursor=abc_-1`]);
+    const { calls, fetchImpl } = scripted([json(page), json(page), json(page)]);
+    await fetchLogbookPage(null, null, fetchImpl);
+    await fetchLogbookPage('abc_-1', null, fetchImpl);
+    await fetchLogbookPage(null, FLIGHT, fetchImpl);
+    expect(calls.map((c) => c.url)).toEqual([LOGBOOK_URL, `${LOGBOOK_URL}?cursor=abc_-1`, `${LOGBOOK_URL}?siteId=${FLIGHT}`]);
   });
 
   it('access истёк — обновляет сессию и повторяет', async () => {
     const { calls, fetchImpl } = scripted([json({}, 401), new Response(null, { status: 204 }), json({ items: [], nextCursor: null })]);
-    await expect(fetchLogbookPage(null, fetchImpl)).resolves.toEqual({ items: [], nextCursor: null });
+    await expect(fetchLogbookPage(null, null, fetchImpl)).resolves.toEqual({ items: [], nextCursor: null });
     expect(calls.map((c) => c.url)).toEqual([LOGBOOK_URL, REFRESH_URL, LOGBOOK_URL]);
   });
 
   it('сессии нет — ошибка', async () => {
     const { fetchImpl } = scripted([json({}, 401), json({}, 401)]);
-    await expect(fetchLogbookPage(null, fetchImpl)).rejects.toThrow(/401/);
+    await expect(fetchLogbookPage(null, null, fetchImpl)).rejects.toThrow(/401/);
   });
 });
 

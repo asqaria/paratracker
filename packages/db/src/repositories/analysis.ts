@@ -1,8 +1,10 @@
 import type { AnalysisLevel, FlightStatus, GlideKind, TurnDirection, WindBand } from '@skyline/core';
 import { asc, eq, sql, type AnyColumn } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 import type { Database } from '../client.js';
-import { flights, glides, thermals } from '../schema.js';
+import { flights, glides, sites, thermals } from '../schema.js';
+import type { SiteRecord } from './sites.js';
 
 /**
  * Чтение анализа полёта (ТЗ §10: GET /flights/{id}, /thermals, /glides, /wind).
@@ -23,6 +25,10 @@ export interface FlightDetailsRecord {
   windDirDeg: number | null;
   windSpeedMs: number | null;
   windProfile: WindBand[] | null;
+  /** Владелец; null — анонимная загрузка. */
+  userId: string | null;
+  takeoffSite: SiteRecord | null;
+  landingSite: SiteRecord | null;
 }
 
 export interface ThermalRecord {
@@ -60,6 +66,10 @@ export interface GlideRecord {
   headingConsistency: number;
 }
 
+/** Место старта и посадки — одна таблица, два соединения. */
+const takeoffSites = alias(sites, 'takeoff_site');
+const landingSites = alias(sites, 'landing_site');
+
 export async function findFlightDetails(db: Database, id: string): Promise<FlightDetailsRecord | null> {
   const [row] = await db
     .select({
@@ -75,8 +85,24 @@ export async function findFlightDetails(db: Database, id: string): Promise<Fligh
       windDirDeg: flights.windDirDeg,
       windSpeedMs: flights.windSpeedMs,
       windProfile: flights.windProfile,
+      userId: flights.userId,
+      // Drizzle отдаёт вложенный объект left join как null, если места нет.
+      takeoffSite: {
+        id: takeoffSites.id,
+        name: takeoffSites.name,
+        countryCode: takeoffSites.countryCode,
+        source: takeoffSites.source,
+      },
+      landingSite: {
+        id: landingSites.id,
+        name: landingSites.name,
+        countryCode: landingSites.countryCode,
+        source: landingSites.source,
+      },
     })
     .from(flights)
+    .leftJoin(takeoffSites, eq(takeoffSites.id, flights.takeoffSiteId))
+    .leftJoin(landingSites, eq(landingSites.id, flights.landingSiteId))
     .where(eq(flights.id, id))
     .limit(1);
   return row ?? null;

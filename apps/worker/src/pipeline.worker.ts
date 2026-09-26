@@ -1,6 +1,6 @@
 import { parentPort } from 'node:worker_threads';
 
-import { analyseFlight, cleanAndDerive, simplifyTrack, summarizeFlight } from '@skyline/analysis';
+import { analyseFlight, cleanAndDerive, flightRange, simplifyTrack, summarizeFlight } from '@skyline/analysis';
 import {
   DEFAULT_AIRCRAFT_TYPE,
   TRACK_FLAGS,
@@ -11,6 +11,7 @@ import {
   type ParseResult,
   type SimplifiedLine,
   type SourceFormat,
+  type FlightPoint,
 } from '@skyline/core';
 import { parseGpx, parseIgc, parseKml } from '@skyline/parsing';
 import { writeTrack } from '@skyline/track-format';
@@ -50,6 +51,9 @@ export interface PipelineSuccess {
   distanceTrackM: number;
   /** Линия для карты логбука; null — меньше двух точек, линии нет. */
   simplified: SimplifiedLine | null;
+  /** Взлёт и посадка по скорости (flightRange): по ним ищется место старта (§6.8). */
+  takeoff: FlightPoint;
+  landing: FlightPoint;
 }
 
 export type PipelineMessage =
@@ -120,6 +124,14 @@ export function runPipeline(message: PipelineTaskMessage, onProgress: (value: nu
       ? { lat: pick(points.lat), lon: pick(points.lon), altM: pick(points.altitude), timeMs: pick(points.t) }
       : null;
 
+  // Место старта ищется по взлёту, а не по первой точке: трек включают и до подъёма пешком.
+  const range = flightRange(points.t, points.groundSpeed);
+  const pointAt = (i: number): FlightPoint => ({
+    lat: points.lat[i] ?? Number.NaN,
+    lon: points.lon[i] ?? Number.NaN,
+    altM: points.altitude[i] ?? Number.NaN,
+  });
+
   const startedAt = points.t[0] ?? Number.NaN;
   const endedAt = points.t[points.t.length - 1] ?? Number.NaN;
   onProgress(PROGRESS.done);
@@ -142,6 +154,8 @@ export function runPipeline(message: PipelineTaskMessage, onProgress: (value: nu
       maxAltM: summary.maxAltM,
       distanceTrackM: summary.distanceTrackM,
       simplified,
+      takeoff: pointAt(range.takeoff),
+      landing: pointAt(range.landing),
     },
   };
 }

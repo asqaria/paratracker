@@ -30,7 +30,8 @@ const iso = (date: Date | null): string | null => (date === null ? null : date.t
 const wind = (dirDeg: number | null, speedMs: number | null): WindDto | null =>
   dirDeg === null || speedMs === null ? null : { dirDeg, speedMs };
 
-function toDetails(flight: FlightDetailsRecord): FlightDetailsResponse {
+/** viewerId — вошедший; владельцу можно добавить место старта и править полёт. */
+function toDetails(flight: FlightDetailsRecord, viewerId: string | null): FlightDetailsResponse {
   return FlightDetailsResponse.parse({
     flightId: flight.id,
     status: flight.status,
@@ -42,6 +43,9 @@ function toDetails(flight: FlightDetailsRecord): FlightDetailsResponse {
     avgClimbMs: flight.avgClimbMs,
     avgGlideRatio: flight.avgGlideRatio,
     wind: wind(flight.windDirDeg, flight.windSpeedMs),
+    takeoffSite: flight.takeoffSite,
+    landingSite: flight.landingSite,
+    canEdit: viewerId !== null && viewerId === flight.userId,
   });
 }
 
@@ -118,7 +122,7 @@ export function registerAnalysisRoutes(app: FastifyInstance, deps: AnalysisRoute
 
   app.get('/flights/:id', async (request, reply) => {
     const flight = await flightOf(request.params, reply);
-    return flight ? reply.send(toDetails(flight)) : reply;
+    return flight ? reply.send(toDetails(flight, request.userId)) : reply;
   });
 
   app.get('/flights/:id/thermals', async (request, reply) => {
