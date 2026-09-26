@@ -6,9 +6,11 @@ import {
   IMAGERY_FALLBACK_AFTER_ERRORS,
   imagerySourceById,
   imagerySources,
+  preferredImagery,
   readViewerConfig,
   terrainSource,
   tileFailureTracker,
+  type ImagerySource,
 } from './providers';
 
 const ENV = {
@@ -144,5 +146,15 @@ describe('collapsedAttribution — одна строка атрибуции на
       expect(short.length).toBeLessThan(entries.length);
       expect(entries.filter((entry) => short.includes(entry))).toEqual(short);
     }
+  });
+});
+
+describe('preferredImagery', () => {
+  const sentinel = { id: 'sentinel2' } as ImagerySource;
+  const esri = { id: 'esri' } as ImagerySource;
+
+  it('Esri подтверждена сервером — она по умолчанию; нет — Sentinel-2', () => {
+    expect(preferredImagery([sentinel, esri])).toBe('esri');
+    expect(preferredImagery([sentinel])).toBe('sentinel2');
   });
 });

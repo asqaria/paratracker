@@ -81,6 +81,7 @@ import {
   collapsedAttribution,
   imagerySourceById,
   imagerySources,
+  preferredImagery,
   readViewerConfig,
   terrainSource,
   tileFailureTracker,
@@ -336,6 +337,8 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
   // её держать нельзя: смена подложки пересоздала бы Viewer вместе с часами,
   // и время проигрывания сбрасывалось бы в начало.
   const imageryRef = useRef<ImageryId>(imagery);
+  /** Пользователь сам выбрал подложку — умолчание её больше не меняет. */
+  const imageryChosenRef = useRef(false);
   const [error, setError] = useState<string | null>('config' in configured ? null : configured.message);
   const [timeMs, setTimeMs] = useState<number>(timeline.startMs);
   const [playing, setPlaying] = useState(false);
@@ -835,6 +838,20 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
     setImageryNotice(notice);
   };
 
+  // Подложка по умолчанию — Esri, как только сервер её подтвердил: до ответа
+  // сцена стартует на Sentinel-2 (он без ключа и лимитов) и переключается.
+  const preferred = preferredImagery(shownSources);
+  useEffect(() => {
+    if (imageryChosenRef.current || preferred === imageryRef.current) return;
+    if (viewerRef.current) {
+      switchImagery(preferred);
+    } else {
+      imageryRef.current = preferred;
+      setImagery(preferred);
+    }
+    // Зависимость — только preferred: switchImagery пересоздаётся каждый рендер.
+  }, [preferred]);
+
   const active = (config ? imagerySourceById(config, imagery) : null) ?? sources[0] ?? null;
   const attribution = config ? [...terrainSource(config).attribution, ...(active?.attribution ?? [])] : [];
 
@@ -847,7 +864,10 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
             key={source.id}
             type="button"
             aria-pressed={source.id === imagery}
-            onClick={() => switchImagery(source.id)}
+            onClick={() => {
+              imageryChosenRef.current = true;
+              switchImagery(source.id);
+            }}
             className="rounded px-2 py-1 text-secondary aria-pressed:bg-subtle aria-pressed:text-primary compact:min-h-11"
           >
             {source.id === 'esri' ? t('viewer.imagery.esri') : t('viewer.imagery.sentinel2')}
