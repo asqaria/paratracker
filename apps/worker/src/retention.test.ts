@@ -11,6 +11,8 @@ const flight = (id: string, track = true): ExpiredFlight => ({
   id,
   rawObjectKey: `raw/anonymous/${id}.igc.gz`,
   trackObjectKey: track ? `tracks/${id}.track` : null,
+  publicTrackObjectKey: track ? `tracks/${id}.public.track` : null,
+  previewObjectKey: track ? `previews/${id}.jpg` : null,
 });
 
 /** Журнал действий: по нему проверяется порядок «сначала S3, потом строка». */
@@ -60,10 +62,16 @@ describe('createRetentionSweep', () => {
     expect(log).toEqual([]);
   });
 
-  it('сначала объекты в S3, потом строка', async () => {
+  it('сначала объекты в S3 (сырой файл, оба трека, превью), потом строка', async () => {
     const { sweep, log } = world([flight('a')]);
     expect(await sweep.run()).toEqual({ deleted: 1, failed: 0 });
-    expect(log).toEqual(['s3:raw/anonymous/a.igc.gz', 's3:tracks/a.track', 'rows:a']);
+    expect(log).toEqual([
+      's3:raw/anonymous/a.igc.gz',
+      's3:tracks/a.track',
+      's3:tracks/a.public.track',
+      's3:previews/a.jpg',
+      'rows:a',
+    ]);
   });
 
   it('полёт без .track (упал при разборе) тоже удаляется', async () => {

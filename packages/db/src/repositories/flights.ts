@@ -43,6 +43,8 @@ export interface FlightRecord {
   privacy: Privacy;
   shareToken: string | null;
   publicTrackObjectKey: string | null;
+  /** Картинка для мессенджеров (задача 3.8); null — ещё нет. */
+  previewObjectKey: string | null;
 }
 
 /** Результат конвейера: то, что известно после parse → clean → derive → pack. */
@@ -50,6 +52,8 @@ export interface ProcessedFlight {
   trackObjectKey: string;
   /** .track для посторонних; null — полёта в записи нет. */
   publicTrackObjectKey: string | null;
+  /** JPEG-превью (задача 3.8); null — не получилось, догрузится при следующем старте. */
+  previewObjectKey: string | null;
   altitudeSource: AltitudeSource;
   analysisLevel: AnalysisLevel;
   startedAt: Date;
@@ -87,6 +91,7 @@ const RECORD_COLUMNS = {
   privacy: flights.privacy,
   shareToken: flights.shareToken,
   publicTrackObjectKey: flights.publicTrackObjectKey,
+  previewObjectKey: flights.previewObjectKey,
 } as const;
 
 export async function insertFlight(db: Database, flight: NewFlight): Promise<FlightRecord> {
@@ -188,6 +193,7 @@ export async function markFlightReady(db: Database, id: string, result: Processe
         errorCode: null,
         trackObjectKey: result.trackObjectKey,
         publicTrackObjectKey: result.publicTrackObjectKey,
+        previewObjectKey: result.previewObjectKey,
         altitudeSource: result.altitudeSource,
         analysisLevel: result.analysisLevel,
         startedAt: result.startedAt,
@@ -296,6 +302,8 @@ export interface ExpiredFlight {
   rawObjectKey: string;
   /** null — полёт не дошёл до упаковки .track. */
   trackObjectKey: string | null;
+  publicTrackObjectKey: string | null;
+  previewObjectKey: string | null;
 }
 
 /**
@@ -309,7 +317,13 @@ export async function listExpiredAnonymousFlights(
   limit: number,
 ): Promise<ExpiredFlight[]> {
   return db
-    .select({ id: flights.id, rawObjectKey: flights.rawObjectKey, trackObjectKey: flights.trackObjectKey })
+    .select({
+      id: flights.id,
+      rawObjectKey: flights.rawObjectKey,
+      trackObjectKey: flights.trackObjectKey,
+      publicTrackObjectKey: flights.publicTrackObjectKey,
+      previewObjectKey: flights.previewObjectKey,
+    })
     .from(flights)
     .where(and(isNull(flights.userId), lt(flights.createdAt, before)))
     .orderBy(asc(flights.createdAt))
@@ -329,7 +343,8 @@ export async function listUnfinishedFlights(db: Database): Promise<FlightRecord[
  * Разовая догрузка производных данных: полёты, обработанные до задачи 2.11
  * (нет сводки и линии для карты), 2.13 (нет точки взлёта для места старта)
  * 2.14 (нет таймзоны), 2.12 (нет времени в воздухе и суммарного набора)
- * 3.1 (нет XC-очков у полноценного трека) или 3.7 (нет трека для посторонних),
+ * 3.1 (нет XC-очков у полноценного трека), 3.7 (нет трека для посторонних)
+ * или 3.8 (нет превью),
  * возвращаются в очередь — их подберёт обычное восстановление при старте
  * воркера. После обработки обе колонки заполнены, повторно полёт не попадёт.
  */
@@ -347,6 +362,8 @@ export async function requeueFlightsForBackfill(db: Database): Promise<number> {
           isNull(flights.airtimeS),
           // Полёт в записи есть (время в воздухе > 0), а трека для посторонних нет — до задачи 3.7.
           and(sql`${flights.airtimeS} > 0`, isNull(flights.publicTrackObjectKey)),
+          // Есть что показать, а превью нет — до задачи 3.8 или рендер упал. Только при старте воркера — не цикл.
+          and(sql`${flights.airtimeS} > 0`, isNull(flights.previewObjectKey)),
           // Полноценный трек без XC — обработан до задачи 3.1.
           and(eq(flights.analysisLevel, 'full'), isNull(flights.xcRules)),
         ),

@@ -12,7 +12,9 @@ import {
 import type { FlightRecord, ProcessedFlight } from '@skyline/db';
 
 import { trackObjectKey as defaultTrackObjectKey } from './constants.js';
+import type { PipelineSuccess } from './pipeline.worker.js';
 import type { PipelinePool } from './pool.js';
+import { renderPreview, type TileSource } from './preview.js';
 
 /** Обработка одного полёта: сеть и база здесь, счёт — в пуле потоков. */
 
@@ -40,6 +42,8 @@ export interface FlightProcessorDeps {
   now?: () => number;
   trackObjectKey?: (flightId: string) => string;
   onError?: (error: unknown, flightId: string) => void;
+  /** Подложка превью (задача 3.8); нет ключа — превью на тёмном фоне. */
+  tiles?: TileSource | null;
   /** Полёт обработан — для структурного лога с flightId (датум высоты, источник, точки). */
   onReady?: (flightId: string, summary: ReadySummary) => void;
 }
@@ -80,6 +84,26 @@ export function createFlightProcessor(deps: FlightProcessorDeps): FlightProcesso
     await announce(flightId, 'failed', { errorCode });
   };
 
+  const renderAndStorePreview = async (
+    flightId: string,
+    trackKey: string,
+    result: PipelineSuccess,
+  ): Promise<string | null> => {
+    if (!result.publicLine) return null;
+    const jpeg = await renderPreview(
+      {
+        ...result.publicLine,
+        xc: result.xc?.route ?? null,
+        xcClosed: result.xc !== null && result.xc.type !== 'free_distance',
+      },
+      deps.tiles ?? null,
+    );
+    if (!jpeg) return null;
+    const previewKey = trackKey.replace(/^tracks\//, 'previews/').replace(/\.track$/, '.jpg');
+    await deps.storage.put(previewKey, jpeg, 'image/jpeg');
+    return previewKey;
+  };
+
   return {
     process: async (flightId) => {
       const flight = await deps.repository.find(flightId);
@@ -110,9 +134,15 @@ export function createFlightProcessor(deps: FlightProcessorDeps): FlightProcesso
         if (publicKey && result.publicTrack) {
           await deps.storage.put(publicKey, new Uint8Array(result.publicTrack), 'application/octet-stream');
         }
+        // Превью для мессенджеров (задача 3.8): не вышло — полёт всё равно готов, превью догрузится.
+        const previewKey = await renderAndStorePreview(flightId, key, result).catch((error: unknown) => {
+          deps.onError?.(error, flightId);
+          return null;
+        });
         await deps.repository.markReady(flightId, {
           trackObjectKey: key,
           publicTrackObjectKey: publicKey,
+          previewObjectKey: previewKey,
           altitudeSource: result.altitudeSource,
           analysisLevel: result.analysisLevel,
           startedAt: new Date(result.startedAt),
