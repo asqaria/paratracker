@@ -43,6 +43,20 @@
       "when": 1790442713277,
       "tag": "0005_logbook_claim",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790444823292,
+      "tag": "0006_sites",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790444832927,
+      "tag": "0007_seed_sites",
+      "breakpoints": true
     }
   ]
 }

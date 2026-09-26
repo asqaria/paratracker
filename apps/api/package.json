@@ -21,6 +21,7 @@
     "@aws-sdk/client-s3": "^3.1133.0",
     "@fastify/cookie": "^11.1.2",
     "@fastify/multipart": "^10.1.1",
+    "@photostructure/tz-lookup": "^11.7.0",
     "@skyline/core": "workspace:*",
     "@skyline/db": "workspace:*",
     "fastify": "^5.12.4",

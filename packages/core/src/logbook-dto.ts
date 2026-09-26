@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { FlightStatus } from './flight.js';
+import { SiteSummary } from './site-dto.js';
 
 /**
  * Контракт логбука (задача 2.11, ТЗ §10): список своих полётов, карта всех
@@ -19,6 +20,8 @@ export const LogbookQuery = z.object({
   from: z.iso.date().optional(),
   to: z.iso.date().optional(),
   cursor: z.string().min(1).optional(),
+  /** Только полёты с этого места старта (задача 2.13). */
+  siteId: z.uuid().optional(),
   limit: z.coerce.number().int().min(1).max(LOGBOOK_PAGE.maxLimit).default(LOGBOOK_PAGE.defaultLimit),
 });
 export type LogbookQuery = z.infer<typeof LogbookQuery>;
@@ -35,6 +38,8 @@ export const LogbookEntry = z.object({
   distanceTrackM: z.number().int().nonnegative().nullable(),
   maxAltM: z.number().int().nullable(),
   thermalCount: z.number().int().nonnegative().nullable(),
+  /** null — место не определено (нет рядом известного или полёт не обработан). */
+  takeoffSite: SiteSummary.nullable(),
 });
 export type LogbookEntry = z.infer<typeof LogbookEntry>;
 

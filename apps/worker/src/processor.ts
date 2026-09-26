@@ -115,6 +115,8 @@ export function createFlightProcessor(deps: FlightProcessorDeps): FlightProcesso
           maxAltM: result.maxAltM,
           distanceTrackM: result.distanceTrackM,
           simplified: result.simplified,
+          takeoff: result.takeoff,
+          landing: result.landing,
         });
         await announce(flightId, 'ready', { progress: 1, trackReady: true });
         deps.onReady?.(flightId, {

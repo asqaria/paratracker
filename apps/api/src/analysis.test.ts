@@ -14,6 +14,7 @@ import { buildApp } from './app.js';
 /** Настоящий UUID v4: z.uuid() в Zod 4 проверяет и версию, и вариант. */
 const FLIGHT_ID = '11111111-2222-4333-8444-555555555555';
 const T0 = Date.UTC(2026, 6, 15, 10);
+const SITE_ID = '33333333-2222-4333-8444-555555555555';
 
 const details = (overrides: Partial<FlightDetailsRecord> = {}): FlightDetailsRecord => ({
   id: FLIGHT_ID,
@@ -28,6 +29,9 @@ const details = (overrides: Partial<FlightDetailsRecord> = {}): FlightDetailsRec
   windDirDeg: 44,
   windSpeedMs: 3.63,
   windProfile: [{ altitudeBand: [1500, 1750], windSpeedMs: 5.1, windDirDeg: 55, confidence: 0.4, circleCount: 12 }],
+  userId: null,
+  takeoffSite: { id: SITE_ID, name: 'Ush Konyr', countryCode: 'kz', source: 'seed' },
+  landingSite: null,
   ...overrides,
 });
 
@@ -101,6 +105,10 @@ describe('GET /api/v1/flights/:id', () => {
       avgClimbMs: 1.61,
       avgGlideRatio: 6.69,
       wind: { speedMs: 3.63, dirDeg: 44 },
+      takeoffSite: { id: SITE_ID, name: 'Ush Konyr', countryCode: 'kz', source: 'seed' },
+      landingSite: null,
+      // Аноним смотрит анонимный полёт — править нечего.
+      canEdit: false,
     });
   });
 

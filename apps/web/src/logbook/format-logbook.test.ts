@@ -13,6 +13,7 @@ const ENTRY: LogbookEntry = {
   distanceTrackM: 176_800,
   maxAltM: 3505,
   thermalCount: 28,
+  takeoffSite: null,
 };
 
 describe('formatEntry', () => {

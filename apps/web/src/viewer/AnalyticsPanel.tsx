@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { fill, useLocaleStore, useT } from '../i18n/locale';
+import { SiteLine } from '../sites/SiteLine';
 import type { MessageKey } from '../i18n/messages';
 import type { AnalyticsState, FlightAnalytics } from './flight-analytics';
 import { glideRatioText, segmentDuration, windText } from './format-analytics';
@@ -35,6 +36,8 @@ export interface AnalyticsPanelProps {
   onColumnsShown?: (shown: boolean) => void;
   /** Внутри шторки на телефоне: без своей рамки и кнопки сворачивания — сворачивает шторка. */
   embedded?: boolean;
+  /** Добавить место старта своего полёта (задача 2.13); без обработчика формы нет. */
+  onCreateSite?: (name: string) => Promise<void>;
 }
 
 const TABS: ReadonlyArray<{ id: AnalyticsTab; label: MessageKey }> = [
@@ -61,6 +64,7 @@ export function AnalyticsPanel({
   columnsShown = true,
   onColumnsShown,
   embedded = false,
+  onCreateSite,
 }: AnalyticsPanelProps) {
   const t = useT();
   const [collapsedOpen, setOpen] = useState(defaultOpen);
@@ -98,6 +102,15 @@ export function AnalyticsPanel({
             <p role="alert" className="text-danger">
               {t('viewer.analytics.error')}
             </p>
+          )}
+          {state.status === 'ready' && (
+            <div className="mb-2">
+              <SiteLine
+                site={state.analytics.details.takeoffSite}
+                canEdit={state.analytics.details.canEdit && onCreateSite !== undefined}
+                onCreate={onCreateSite ?? (() => Promise.resolve())}
+              />
+            </div>
           )}
           {state.status === 'ready' && (
             <Content analytics={state.analytics} timeline={timeline} timeMs={timeMs} tab={tab} onTab={setTab} onSelect={onSelect} embedded={embedded} />

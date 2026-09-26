@@ -1,10 +1,11 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useState } from 'react';
 
 import { useMe } from '../auth/session';
 import { UserMenu } from '../auth/UserMenu';
 import { LocaleSwitch } from '../i18n/LocaleSwitch';
 import { useLocaleStore, useT } from '../i18n/locale';
+import { fetchLogbookSites, PGE_URL } from '../sites/create-site';
 import { fetchImageryCapabilities } from '../viewer/imagery-capabilities';
 import { fetchLogbookMap, fetchLogbookPage } from './fetch-logbook';
 import { LOGBOOK_QUERY_KEY } from './logbook-keys';
@@ -49,9 +50,12 @@ export function LogbookPage() {
 
 function LogbookContent() {
   const t = useT();
+  /** Фильтр по месту старта (задача 2.13); null — все места. */
+  const [siteId, setSiteId] = useState<string | null>(null);
+  const sites = useQuery({ queryKey: [...LOGBOOK_QUERY_KEY, 'sites'], queryFn: () => fetchLogbookSites() });
   const list = useInfiniteQuery({
-    queryKey: [...LOGBOOK_QUERY_KEY, 'list'],
-    queryFn: ({ pageParam }) => fetchLogbookPage(pageParam),
+    queryKey: [...LOGBOOK_QUERY_KEY, 'list', siteId],
+    queryFn: ({ pageParam }) => fetchLogbookPage(pageParam, siteId),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.nextCursor,
     refetchInterval: (query) =>
@@ -70,7 +74,7 @@ function LogbookContent() {
   if (list.status === 'error') return <p role="alert" className="text-danger">{t('logbook.error')}</p>;
 
   const items = list.data.pages.flatMap((page) => page.items);
-  if (items.length === 0) {
+  if (items.length === 0 && siteId === null) {
     return (
       <div className="rounded-xl glass p-8 text-center">
         <p className="text-secondary">{t('logbook.empty')}</p>
@@ -90,6 +94,21 @@ function LogbookContent() {
         </Suspense>
       )}
       <section className="rounded-xl glass p-4 compact:p-2">
+        {(sites.data?.sites.length ?? 0) > 0 && (
+          <select
+            aria-label={t('logbook.siteFilter')}
+            value={siteId ?? ''}
+            onChange={(event) => setSiteId(event.target.value === '' ? null : event.target.value)}
+            className="mb-2 rounded bg-subtle px-2 py-1 text-sm text-primary"
+          >
+            <option value="">{t('logbook.allSites')}</option>
+            {sites.data?.sites.map((site) => (
+              <option key={site.id} value={site.id}>
+                {`${site.name} (${site.flightCount})`}
+              </option>
+            ))}
+          </select>
+        )}
         <LogbookList
           items={items}
           hasMore={list.hasNextPage}
@@ -97,6 +116,14 @@ function LogbookContent() {
           onMore={() => void list.fetchNextPage()}
         />
       </section>
+      {/* Места из paragliding.earth — CC BY-SA 3.0: ссылка на источник обязательна. */}
+      <p className="text-xs text-secondary">
+        {t('site.attributionPrefix')}{' '}
+        <a href={PGE_URL} target="_blank" rel="noreferrer" className="hover:text-accent">
+          paragliding.earth
+        </a>{' '}
+        (CC BY-SA 3.0)
+      </p>
     </div>
   );
 }

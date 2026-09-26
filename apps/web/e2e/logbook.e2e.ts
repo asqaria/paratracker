@@ -18,6 +18,7 @@ const ENTRY = {
   distanceTrackM: 162_100,
   maxAltM: 3293,
   thermalCount: 28,
+  takeoffSite: { id: '33333333-2222-4333-8444-555555555555', name: 'Ush Konyr', countryCode: 'kz', source: 'seed' },
 };
 const MAP = {
   type: 'FeatureCollection',
@@ -38,6 +39,9 @@ async function signedIn(page: Page): Promise<string[]> {
   await page.route('**/api/v1/auth/providers', (route) => route.fulfill({ json: { google: true } }));
   await page.route('**/api/v1/imagery', (route) => route.fulfill({ json: { esri: true } }));
   await page.route('**/api/v1/logbook/map', (route) => route.fulfill({ json: MAP }));
+  await page.route('**/api/v1/logbook/sites', (route) =>
+    route.fulfill({ json: { sites: [{ ...ENTRY.takeoffSite, flightCount: 1 }] } }),
+  );
   await page.route('**/api/v1/logbook', (route) => route.fulfill({ json: { items: [ENTRY], nextCursor: null } }));
   await page.route('**/api/v1/flights/claim', async (route) => {
     const body = route.request().postDataJSON() as { claims: { flightId: string }[] };
@@ -57,6 +61,9 @@ for (const viewport of [
     await page.goto('/#/logbook');
 
     await expect(page.locator('[data-panel="logbook-list"] tbody tr')).toHaveCount(1);
+    // Место старта — под датой; фильтр по местам — над списком (задача 2.13).
+    await expect(page.locator('[data-panel="logbook-list"] tbody tr')).toContainText('Ush Konyr');
+    await expect(page.locator('select option')).toHaveCount(2);
     await expect(page.locator('.maplibregl-canvas')).toBeVisible({ timeout: 30_000 });
     // Атрибуция Esri обязательна по лицензии (ТЗ §11.3).
     await expect(page.locator('.maplibregl-ctrl-attrib')).toContainText('Powered by Esri');

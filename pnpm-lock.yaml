@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@photostructure/tz-lookup':
+        specifier: ^11.7.0
+        version: 11.7.0
       '@types/node':
         specifier: ^22.19.0
         version: 22.20.2
@@ -50,6 +53,9 @@ importers:
       '@fastify/multipart':
         specifier: ^10.1.1
         version: 10.1.1
+      '@photostructure/tz-lookup':
+        specifier: ^11.7.0
+        version: 11.7.0
       '@skyline/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -929,6 +935,9 @@ packages:
 
   '@oxc-project/types@0.149.0':
     resolution: {integrity: sha512-Efcc+iF0j3Bf67YjEqIqWXbX5XddXoK/Mw4K1/JuXwRCZ8N16VR7iT23nlCc9XrveFVh/E5Rqs2StT0V8v9LdA==}
+
+  '@photostructure/tz-lookup@11.7.0':
+    resolution: {integrity: sha512-QbKHXvleluMIlAHf2JiQTJNU5rLQBeQhLobyRqgXZ6NNGKqNikaRkjYviJ4nMU7Y75QE7bBYM8xjiFGjAukyhw==}
 
   '@pinojs/redact@0.4.0':
     resolution: {integrity: sha512-k2ENnmBugE/rzQfEcdWHcCY+/FM3VLzH9cYEsbdsoqrvzAKRhUZeRNhAZvB8OitQJ1TBed3yqWtdjzS6wJKBwg==}
@@ -3215,6 +3224,8 @@ snapshots:
     optional: true
 
   '@oxc-project/types@0.149.0': {}
+
+  '@photostructure/tz-lookup@11.7.0': {}
 
   '@pinojs/redact@0.4.0': {}
 

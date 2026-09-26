@@ -13,8 +13,16 @@ async function ok(response: Response, what: string): Promise<unknown> {
   return response.json();
 }
 
-export async function fetchLogbookPage(cursor: string | null, fetchImpl: typeof fetch = fetch): Promise<LogbookResponse> {
-  const url = cursor === null ? LOGBOOK_URL : `${LOGBOOK_URL}?${new URLSearchParams({ cursor }).toString()}`;
+export async function fetchLogbookPage(
+  cursor: string | null,
+  siteId: string | null = null,
+  fetchImpl: typeof fetch = fetch,
+): Promise<LogbookResponse> {
+  const params = new URLSearchParams({
+    ...(cursor === null ? {} : { cursor }),
+    ...(siteId === null ? {} : { siteId }),
+  }).toString();
+  const url = params === '' ? LOGBOOK_URL : `${LOGBOOK_URL}?${params}`;
   return LogbookResponse.parse(await ok(await fetchWithSession(url, { method: 'GET' }, fetchImpl), 'Logbook'));
 }
 

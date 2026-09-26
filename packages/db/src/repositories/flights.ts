@@ -6,11 +6,13 @@ import {
   type FlightStatus,
   type SimplifiedLine,
   type SourceFormat,
+  type FlightPoint,
 } from '@skyline/core';
-import { and, asc, eq, inArray, isNull, lt } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, lt, or } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import { flights, glides, thermals } from '../schema.js';
+import { nearestSiteId } from './sites.js';
 
 /** Репозиторий полётов: наружу отдаются типизированные записи, не строки БД. */
 
@@ -49,6 +51,9 @@ export interface ProcessedFlight {
   distanceTrackM: number;
   /** Линия для карты логбука (задача 2.11); null — точек меньше двух. */
   simplified: SimplifiedLine | null;
+  /** Взлёт и посадка (задача 2.13): по ним — место старта и посадки. */
+  takeoff: FlightPoint;
+  landing: FlightPoint;
 }
 
 const RECORD_COLUMNS = {
@@ -106,6 +111,9 @@ const bearing = (value: number | null | undefined): number | null => {
 const point = (lat: number, lon: number): string => `SRID=4326;POINT(${lon} ${lat})`;
 
 const MS_PER_SECOND = 1000;
+
+const pointOrNull = (p: FlightPoint): string | null =>
+  Number.isFinite(p.lat) && Number.isFinite(p.lon) ? point(p.lat, p.lon) : null;
 
 /**
  * Упрощённая линия в EWKT: X — долгота, Y — широта, Z — высота (нет — 0:
@@ -168,6 +176,13 @@ export async function markFlightReady(db: Database, id: string, result: Processe
         distanceTrackM: whole(result.distanceTrackM),
         trackSimplified: result.simplified ? lineZM(result.simplified) : null,
         bbox: result.simplified ? bboxPolygon(result.simplified) : null,
+        takeoffPoint: pointOrNull(result.takeoff),
+        landingPoint: pointOrNull(result.landing),
+        takeoffAltM: whole(result.takeoff.altM),
+        landingAltM: whole(result.landing.altM),
+        // Место — ближайшее известное в SITE.matchRadiusM; нет — null, пилот добавит сам.
+        takeoffSiteId: nearestSiteId(result.takeoff),
+        landingSiteId: nearestSiteId(result.landing),
         updatedAt: new Date(),
       })
       .where(eq(flights.id, id));
@@ -269,16 +284,16 @@ export async function listUnfinishedFlights(db: Database): Promise<FlightRecord[
 }
 
 /**
- * Разовая догрузка данных логбука (задача 2.11): у полётов, обработанных до
- * неё, нет сводки и линии для карты. Такие полёты возвращаются в очередь —
- * их подберёт обычное восстановление при старте воркера. После обработки
- * distance_track_m заполнена (хотя бы 0), поэтому повторно они не попадут.
+ * Разовая догрузка производных данных: полёты, обработанные до задачи 2.11
+ * (нет сводки и линии для карты) или 2.13 (нет точки взлёта для места старта),
+ * возвращаются в очередь — их подберёт обычное восстановление при старте
+ * воркера. После обработки обе колонки заполнены, повторно полёт не попадёт.
  */
-export async function requeueFlightsWithoutSummary(db: Database): Promise<number> {
+export async function requeueFlightsForBackfill(db: Database): Promise<number> {
   const rows = await db
     .update(flights)
     .set({ status: 'pending', updatedAt: new Date() })
-    .where(and(eq(flights.status, 'ready'), isNull(flights.distanceTrackM)))
+    .where(and(eq(flights.status, 'ready'), or(isNull(flights.distanceTrackM), isNull(flights.takeoffPoint))))
     .returning({ id: flights.id });
   return rows.length;
 }

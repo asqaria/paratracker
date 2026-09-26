@@ -49,6 +49,7 @@ export function LogbookList({ items, hasMore, loadingMore, onMore }: LogbookList
                     {row.date}
                   </a>
                   {status && <span className="ml-2 text-xs text-secondary">{t(status)}</span>}
+                  {entry.takeoffSite && <span className="block text-xs text-secondary">{entry.takeoffSite.name}</span>}
                 </td>
                 <td className="numeric py-2 text-right">{row.duration}</td>
                 <td className="numeric py-2 text-right">{row.distance}</td>

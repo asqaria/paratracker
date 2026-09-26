@@ -135,6 +135,17 @@ const ru = {
   'logbook.column.maxAlt': 'Макс. высота',
   'logbook.column.thermals': 'Термики',
   'logbook.saveBanner': 'Сохраните полёт в логбук: войдите через Google',
+  'logbook.siteFilter': 'Место старта',
+  'logbook.allSites': 'Все места',
+  'site.takeoff': 'Старт',
+  'site.unknown': 'Место старта не найдено.',
+  'site.add': 'Добавить',
+  'site.namePlaceholder': 'Название места старта',
+  'site.save': 'Сохранить',
+  'site.cancel': 'Отмена',
+  'site.error': 'Не удалось сохранить место',
+  'site.byPilot': 'добавлено пилотом',
+  'site.attributionPrefix': 'Места старта:',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -275,6 +286,17 @@ const en: Messages = {
   'logbook.column.maxAlt': 'Max altitude',
   'logbook.column.thermals': 'Thermals',
   'logbook.saveBanner': 'Save this flight to your logbook: sign in with Google',
+  'logbook.siteFilter': 'Takeoff site',
+  'logbook.allSites': 'All sites',
+  'site.takeoff': 'Takeoff',
+  'site.unknown': 'Takeoff site not found.',
+  'site.add': 'Add',
+  'site.namePlaceholder': 'Takeoff site name',
+  'site.save': 'Save',
+  'site.cancel': 'Cancel',
+  'site.error': 'Could not save the site',
+  'site.byPilot': 'added by a pilot',
+  'site.attributionPrefix': 'Takeoff sites:',
 };
 
 export const messages: Record<Locale, Messages> = { ru, en };
