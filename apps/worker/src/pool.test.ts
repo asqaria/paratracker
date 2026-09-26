@@ -20,13 +20,16 @@ const MAX_MAIN_THREAD_LAG_MS = 200;
  */
 const TIMEOUT_TEST_S = 1;
 /**
- * Лимит vitest для этого теста. По умолчанию 5 с, а тест гоняет настоящие потоки
- * и 18.5 МБ входа: локально ≈0.85 с (генерация 0.13 с, снятие по таймауту 0.52 с,
- * восстановление 0.19 с), на медленном раннере CI — 5.03 с, и он падал по
- * общему лимиту, хотя таймаут пула и восстановление отработали. Проверяется
- * поведение, а не скорость: запас в ~6 раз от худшего замера в CI.
+ * Лимит vitest для тестов пула. По умолчанию 5 с, а тесты гоняют настоящие
+ * потоки: под vitest поток при старте компилирует TypeScript всех пакетов, на
+ * медленном раннере CI это секунды. Так падали по общему лимиту, хотя
+ * проверяемое поведение было в порядке:
+ * - снятие по таймауту: локально ≈0.85 с, в CI — 5.03 с;
+ * - 4-часовой трек: сама обработка ≈70 мс, в CI тест — от 2.3 до 5.06 с
+ *   (главное требование — лаг основного потока < 200 мс — выполнялось).
+ * Проверяется поведение, а не скорость: запас в ~6 раз от худшего замера в CI.
  */
-const TIMEOUT_TEST_LIMIT_MS = 30_000;
+const POOL_TEST_LIMIT_MS = 30_000;
 
 let pool: PipelinePool | undefined;
 afterEach(async () => {
@@ -34,7 +37,7 @@ afterEach(async () => {
   pool = undefined;
 });
 
-describe('пул worker_threads', () => {
+describe('пул worker_threads', { timeout: POOL_TEST_LIMIT_MS }, () => {
   it('прогоняет parse → clean → derive → pack и отдаёт готовый .track', async () => {
     pool = createPipelinePool(OPTIONS);
     const progress: number[] = [];
@@ -140,5 +143,5 @@ describe('пул worker_threads', () => {
 
     const next = await pool.run({ sourceFormat: 'igc', bytes: readFixture('baseline.igc'), now: NOW });
     expect(next.ok, `code: ${next.ok ? '' : next.errorCode}`).toBe(true);
-  }, TIMEOUT_TEST_LIMIT_MS);
+  });
 });
