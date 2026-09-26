@@ -126,6 +126,15 @@ export interface SceneProps {
   showGlow?: boolean;
 }
 
+/**
+ * Предел плотности пикселей рендера. По умолчанию Cesium рисует в CSS-пикселях
+ * (useBrowserRecommendedResolution) — на экранах с масштабом 125–200 % сцена
+ * растягивалась, и края линии, тени и занавеса шли грубой лесенкой. Рендер —
+ * в пикселях экрана, но не плотнее 2: выше разница глазу почти не видна, а
+ * число пикселей и нагрузка на видеокарту растут квадратично (ТЗ §7.7).
+ */
+const MAX_PIXEL_RATIO = 2;
+
 /** Перелёт свободной камеры к сегменту из аналитики: длительность, наклон, дальность в радиусах сегмента. */
 const SEGMENT_FLIGHT_S = 1.2;
 const SEGMENT_PITCH_DEG = -35;
@@ -331,6 +340,7 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
           // ТЗ §7.7: рендер только при изменениях; на время проигрывания включается непрерывный.
           requestRenderMode: true,
           maximumRenderTimeChange: Number.POSITIVE_INFINITY,
+          useBrowserRecommendedResolution: false,
           baseLayerPicker: false,
           geocoder: false,
           homeButton: false,
@@ -343,6 +353,8 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
           selectionIndicator: false,
         });
         viewerRef.current = viewer;
+        // Толщина линий в пикселях Cesium умножает на ту же плотность — на экране она не меняется.
+        viewer.resolutionScale = Math.min(1, MAX_PIXEL_RATIO / window.devicePixelRatio);
 
         const scene = viewer.scene;
         const controller = scene.screenSpaceCameraController;
