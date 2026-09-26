@@ -15,6 +15,7 @@ import {
   Material,
   Math as CesiumMath,
   Matrix4,
+  PerspectiveFrustum,
   NeverTileDiscardPolicy,
   PolylineGeometry,
   PolylineMaterialAppearance,
@@ -105,6 +106,8 @@ import { CURTAIN, curtainInMode, curtainOnByDefault, curtainPieces, curtainSampl
 import { CurtainLayer } from './curtain-layer';
 import { columnStates, thermalColumns, type ThermalColumn } from './thermal-columns';
 import { ThermalLayer } from './thermal-layer';
+import { XcLayer } from './xc-layer';
+import { xcRoute } from './xc-route';
 import { TrackLayer } from './track-layer';
 import {
   COMPACT_MEDIA_QUERY,
@@ -152,6 +155,12 @@ const CAMERA_CLEARANCE_PASSES = 2;
 /** Перелёт свободной камеры к сегменту из аналитики: длительность, наклон, дальность в радиусах сегмента. */
 const SEGMENT_FLIGHT_S = 1.2;
 const SEGMENT_PITCH_DEG = -35;
+/**
+ * Весь XC-маршрут (задача 3.3): сверху под 60° и с севера — треугольник
+ * читается формой, как на карте; дальность — два с небольшим радиуса сферы.
+ */
+const XC_VIEW_PITCH_DEG = -60;
+const XC_VIEW_RANGE_FACTOR = 2.4;
 const SEGMENT_RANGE_FACTOR = 3;
 
 /** ТЗ §7.2: основная линия 3–5 px, свечение — шире и приглушённее. */
@@ -361,6 +370,9 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
   /** Высота над рельефом для графика (задача 2.15); null — рельеф под полётом ещё не пришёл. */
   const [agl, setAgl] = useState<Float64Array | null>(null);
   const [columnsShown, setColumnsShown] = useState(true);
+  /** XC-маршрут на сцене (задача 3.3): виден сразу — это итог полёта. */
+  const [xcRouteShown, setXcRouteShown] = useState(true);
+  const xcLayerRef = useRef<XcLayer | null>(null);
   const thermalLayerRef = useRef<ThermalLayer | null>(null);
   const columnsRef = useRef<ThermalColumn[]>([]);
 
@@ -757,11 +769,6 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
   const createSite = useCreateSite(flightId);
   const setGlider = useSetFlightGlider(flightId);
   const ownGliders = useOwnGliders();
-  const editing = {
-    ...(createSite ? { onCreateSite: createSite } : {}),
-    ...(setGlider ? { onSetGlider: setGlider } : {}),
-    gliders: ownGliders,
-  };
   // Данные запроса стабильны между рендерами, в отличие от объекта состояния вокруг них.
   const analyticsData = analytics?.status === 'ready' ? analytics.analytics : null;
 
@@ -788,6 +795,31 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
       columnsRef.current = [];
     };
   }, [sceneTrack, analyticsData]);
+
+  // XC-маршрут (задача 3.3): по данным анализа, ППМ — на высоте трека сцены в момент прохождения.
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    const xc = analyticsData?.details.xc;
+    const route = xc ? xcRoute(xc) : null;
+    if (!viewer || !sceneTrack || !route) return undefined;
+    const layer = new XcLayer(
+      viewer.scene,
+      route,
+      Color.fromCssColorString(documentColorTokens().accent),
+      (timeMs) => sceneTrack.alt[indexAt(sceneTrack.t, timeMs)] ?? 0,
+    );
+    xcLayerRef.current = layer;
+    viewer.scene.requestRender();
+    return () => {
+      layer.destroy();
+      xcLayerRef.current = null;
+    };
+  }, [sceneTrack, analyticsData]);
+
+  useEffect(() => {
+    xcLayerRef.current?.setVisible(xcRouteShown);
+    viewerRef.current?.scene.requestRender();
+  }, [xcRouteShown, sceneTrack, analyticsData]);
 
   useEffect(() => {
     thermalLayerRef.current?.setVisible(columnsShown);
@@ -827,6 +859,55 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
     },
     [seekTo, track],
   );
+
+  /** Облёт всего XC-маршрута: свободная камера, затем перелёт (следящая перебила бы его). */
+  const pendingXcViewRef = useRef<BoundingSphere | null>(null);
+  const showXcRoute = useCallback(() => {
+    const xc = analyticsData?.details.xc;
+    if (!xc || !sceneTrack) return;
+    const points = xc.route.map((p) =>
+      Cartesian3.fromDegrees(p.lon, p.lat, sceneTrack.alt[indexAt(sceneTrack.t, p.timeMs)] ?? 0),
+    );
+    if (points.length === 0) return;
+    pendingXcViewRef.current = BoundingSphere.fromPoints(points);
+    setXcRouteShown(true);
+    setCameraMode('free');
+  }, [analyticsData, sceneTrack]);
+
+  useEffect(() => {
+    const sphere = pendingXcViewRef.current;
+    const viewer = viewerRef.current;
+    if (!sphere || !viewer || cameraMode !== 'free') return;
+    pendingXcViewRef.current = null;
+    // Справа сцену закрывает панель «Аналитика»: прицел сдвигается на восток
+    // (камера смотрит на север — восток справа) на половину закрытой ширины,
+    // и маршрут встаёт в середину открытой части, а не под панель.
+    const canvasPx = viewer.scene.canvas.clientWidth;
+    const panelPx = document.querySelector('[data-panel="analytics"]')?.getBoundingClientRect().width ?? 0;
+    const rangeM = sphere.radius * XC_VIEW_RANGE_FACTOR;
+    const fov = viewer.camera.frustum instanceof PerspectiveFrustum ? (viewer.camera.frustum.fov ?? 1) : 1;
+    const visibleWidthM = 2 * rangeM * Math.tan(fov / 2);
+    const shiftM = canvasPx > 0 ? (visibleWidthM * panelPx) / canvasPx / 2 : 0;
+    const east = Matrix4.multiplyByPointAsVector(
+      Transforms.eastNorthUpToFixedFrame(sphere.center),
+      new Cartesian3(shiftM, 0, 0),
+      new Cartesian3(),
+    );
+    sphere.center = Cartesian3.add(sphere.center, east, new Cartesian3());
+    viewer.camera.flyToBoundingSphere(sphere, {
+      duration: SEGMENT_FLIGHT_S,
+      offset: new HeadingPitchRange(0, CesiumMath.toRadians(XC_VIEW_PITCH_DEG), rangeM),
+    });
+  }, [cameraMode, showXcRoute]);
+
+  const editing = {
+    ...(createSite ? { onCreateSite: createSite } : {}),
+    ...(setGlider ? { onSetGlider: setGlider } : {}),
+    gliders: ownGliders,
+    xcRouteShown,
+    onXcRouteShown: setXcRouteShown,
+    onShowXcRoute: showXcRoute,
+  };
 
   const togglePlay = useCallback(() => {
     // Доиграли до посадки — следующий запуск с начала.

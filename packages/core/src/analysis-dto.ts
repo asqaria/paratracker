@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { GLIDE_KINDS, THERMAL_STRENGTHS, TURN_DIRECTIONS } from './derived.js';
+import { GLIDE_KINDS, THERMAL_STRENGTHS, TURN_DIRECTIONS, XC_TYPES } from './derived.js';
 import { AnalysisLevel, FlightStatus } from './flight.js';
 import { GliderSummary } from './glider.js';
 import { SiteSummary } from './site-dto.js';
@@ -22,6 +22,21 @@ export const WindDto = z.object({ speedMs: z.number().min(0), dirDeg: Degrees })
 export type WindDto = z.infer<typeof WindDto>;
 
 /** Ответ GET /api/v1/flights/{id}: метаданные и агрегаты полёта. */
+const XcPointDto = z.object({ lat: z.number(), lon: z.number(), timeMs: z.number().int() });
+
+export const XcScoreDto = z.object({
+  rules: z.string(),
+  type: z.enum(XC_TYPES),
+  name: z.string(),
+  distanceM: z.number().int().nonnegative(),
+  score: z.number().nonnegative(),
+  multiplier: z.number().positive(),
+  optimal: z.boolean(),
+  route: z.array(XcPointDto),
+  closing: z.object({ in: XcPointDto, out: XcPointDto, distanceM: z.number().int().nonnegative() }).nullable(),
+});
+export type XcScoreDto = z.infer<typeof XcScoreDto>;
+
 export const FlightDetailsResponse = z.object({
   flightId: z.uuid(),
   status: FlightStatus,
@@ -44,6 +59,8 @@ export const FlightDetailsResponse = z.object({
   /** Место старта и посадки (задача 2.13); null — рядом нет известного места. */
   takeoffSite: SiteSummary.nullable(),
   landingSite: SiteSummary.nullable(),
+  /** XC-очки (задача 3.1); null — не посчитаны (полёт до скоринга или basic). */
+  xc: XcScoreDto.nullable(),
   /** Крыло полёта (задача 2.13б); null — не указано. */
   glider: GliderSummary.nullable(),
   /** Модель крыла, записанная прибором (IGC HFGTY) — подсказка, когда крыло не выбрано. */

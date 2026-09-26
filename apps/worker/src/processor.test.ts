@@ -121,6 +121,9 @@ describe('обработка одного полёта', () => {
     // Набор и время в воздухе (задача 2.12): генератор летает всю запись, две спирали по 420 м.
     expect(ready[0]?.airtimeS).toBeGreaterThan(900);
     expect(ready[0]?.totalGainM).toBeGreaterThan(840);
+    // XC-очки (задача 3.1) — из того же прохода конвейера.
+    expect(ready[0]?.xc).toMatchObject({ rules: 'XContest' });
+    expect(ready[0]?.xc?.distanceM).toBeGreaterThan(0);
     // Анализ из потока доходит до репозитория: две спирали генератора — два термика.
     expect(ready[0]?.analysis?.thermals).toHaveLength(2);
     expect(ready[0]?.analysis?.glides.length).toBeGreaterThan(0);

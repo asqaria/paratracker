@@ -1,4 +1,4 @@
-import type { AnalysisLevel, FlightStatus, GlideKind, TurnDirection, WindBand } from '@skyline/core';
+import type { AnalysisLevel, FlightStatus, GlideKind, TurnDirection, WindBand, XcScore } from '@skyline/core';
 import { asc, eq, sql, type AnyColumn } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
@@ -33,6 +33,8 @@ export interface FlightDetailsRecord {
   landingSite: SiteRecord | null;
   glider: GliderRef | null;
   gliderRaw: string | null;
+  /** XC-очки (задача 3.1); null — не посчитаны. */
+  xc: XcScore | null;
 }
 
 export interface ThermalRecord {
@@ -106,6 +108,7 @@ export async function findFlightDetails(db: Database, id: string): Promise<Fligh
       },
       glider: GLIDER_COLUMNS,
       gliderRaw: flights.gliderRaw,
+      xc: flights.xcTurnpoints,
     })
     .from(flights)
     .leftJoin(takeoffSites, eq(takeoffSites.id, flights.takeoffSiteId))

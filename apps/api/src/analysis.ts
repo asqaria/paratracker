@@ -49,6 +49,7 @@ function toDetails(flight: FlightDetailsRecord, viewerId: string | null): Flight
     landingSite: flight.landingSite,
     glider: flight.glider ? { id: flight.glider.id, label: gliderLabel(flight.glider) } : null,
     gliderRaw: flight.gliderRaw,
+    xc: flight.xc,
     canEdit: viewerId !== null && viewerId === flight.userId,
   });
 }

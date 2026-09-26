@@ -79,6 +79,7 @@ const processed = (result: FlightAnalysis | null): ProcessedFlight => ({
   timezone: 'Asia/Almaty',
   airtimeS: 3000,
   totalGainM: 1234.4,
+  xc: null,
 });
 
 // Интеграционный: нужен поднятый docker compose и применённые миграции.

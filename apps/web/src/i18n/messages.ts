@@ -198,6 +198,13 @@ const ru = {
   'review.missedStart': 'Начало пропущенного здесь',
   'review.missedEnd': 'Конец здесь (с {start})',
   'review.download': 'Скачать разметку (labels.json)',
+  'xc.type.free_distance': 'Свободная дистанция',
+  'xc.type.free_triangle': 'Треугольник',
+  'xc.type.fai_triangle': 'FAI-треугольник',
+  'xc.points': 'очков',
+  'xc.estimate': 'оценка',
+  'xc.route': 'Маршрут XC',
+  'xc.showRoute': 'Показать весь',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -401,6 +408,13 @@ const en: Messages = {
   'review.missedStart': 'Missed thermal starts here',
   'review.missedEnd': 'Ends here (from {start})',
   'review.download': 'Download labels (labels.json)',
+  'xc.type.free_distance': 'Free distance',
+  'xc.type.free_triangle': 'Triangle',
+  'xc.type.fai_triangle': 'FAI triangle',
+  'xc.points': 'points',
+  'xc.estimate': 'estimate',
+  'xc.route': 'XC route',
+  'xc.showRoute': 'Show all',
 };
 
 export const messages: Record<Locale, Messages> = { ru, en };
