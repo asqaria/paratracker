@@ -107,7 +107,17 @@ const MATERIALS = {
   risers: { color: rgb(0x22252b), ...NYLON },
   harness: { color: rgb(0x2a2d33), ...NYLON },
   'harness-accent': { color: rgb(0x4da3ff), ...NYLON },
-  pilot: { color: rgb(0x39475a), ...FABRIC },
+  /**
+   * Куртка — светлая сине-серая: тёмная (#34506f) сливалась со штанами и
+   * подвеской — силуэт не читался.
+   */
+  jacket: { color: rgb(0x5b7fa6), ...FABRIC },
+  /** Манжеты и полосы на рукавах — акцент дизайн-системы. */
+  'jacket-accent': { color: rgb(0x4da3ff), ...FABRIC },
+  pants: { color: rgb(0x22252b), ...FABRIC },
+  /** Горные ботинки — коричневая кожа. */
+  boots: { color: rgb(0x5a3e2b), metallicFactor: 0, roughnessFactor: 0.7 },
+  gloves: { color: rgb(0x1b1d21), ...FABRIC },
   helmet: { color: rgb(0xf2f4f7), metallicFactor: 0, roughnessFactor: 0.35 },
   visor: { color: rgb(0x0e1116), metallicFactor: 0.2, roughnessFactor: 0.15 },
 };
@@ -370,45 +380,17 @@ function ellipsoid(centre, radii, target, { rings = 10, segments = 16, latRange 
   surface(grid, { wrap: !lonRange, outward: (i, j) => sub(grid[i][j], centre), pick: () => target });
 }
 
-const HARNESS_SEGMENTS = 16;
-/**
- * Кокон: от верха спинки (протектор) вниз к сиденью и вперёд к ногам —
- * пилот полулёжа, ноги по курсу. Полуоси — по габаритам подвесок-коконов.
- */
-const pod = [
-  { at: [0, 0.3, -0.5], rx: 0, ry: 0 },
-  { at: [0, 0.28, -0.52], rx: 0.19, ry: 0.09 },
-  { at: [0, 0.02, -0.46], rx: 0.25, ry: 0.16 },
-  { at: [0, -0.25, -0.26], rx: 0.27, ry: 0.2 },
-  { at: [0, -0.32, 0.15], rx: 0.24, ry: 0.16 },
-  { at: [0, -0.3, 0.6], rx: 0.19, ry: 0.13 },
-  { at: [0, -0.24, 0.98], rx: 0.12, ry: 0.09 },
-  { at: [0, -0.2, 1.08], rx: 0.04, ry: 0.035 },
-  { at: [0, -0.19, 1.1], rx: 0, ry: 0 },
-];
-/** Полоса-акцент по бокам кокона: от сиденья до ног (грани кольца у ±X). */
-const SIDE_STRIPE = new Set([0, HARNESS_SEGMENTS / 2 - 1, HARNESS_SEGMENTS / 2, HARNESS_SEGMENTS - 1]);
-loft(pod, HARNESS_SEGMENTS, (i, j) => (i >= 3 && i <= 5 && SIDE_STRIPE.has(j) ? parts['harness-accent'] : parts.harness));
-
-// Корпус — над сиденьем перед спинкой, куртка.
-loft(
-  [
-    { at: [0, -0.16, -0.3], rx: 0, ry: 0 },
-    { at: [0, -0.12, -0.3], rx: 0.18, ry: 0.12 },
-    { at: [0, 0.2, -0.36], rx: 0.21, ry: 0.13 },
-    { at: [0, 0.36, -0.39], rx: 0.11, ry: 0.08 },
-    { at: [0, 0.43, -0.4], rx: 0.05, ry: 0.05 },
-    { at: [0, 0.46, -0.4], rx: 0, ry: 0 },
-  ],
-  12,
-  () => parts.pilot,
-);
+const HARNESS_SEGMENTS = 20;
+/** Сечений у торса и конечностей: мельче — видны грани, как у прежней модели. */
+const BODY_SEGMENTS = 16;
+const LIMB_SEGMENTS = 12;
 
 /**
- * Трубка по точкам limb с радиусами radii: руки и ноги. Сечение — круг в
- * плоскости, перпендикулярной оси; опорный вектор — не параллельный оси.
+ * Трубка по точкам limb с радиусами radii: руки, ноги, лямки. Сечение — круг
+ * в плоскости, перпендикулярной оси; опорный вектор — не параллельный оси.
+ * pick(i) — материал отрезка i (между точками i и i + 1).
  */
-function tube(limb, radii, target, segments = 8) {
+function tube(limb, radii, pick, segments = LIMB_SEGMENTS) {
   const rings = limb.map((at, k) => {
     const tangent = normalize(sub(limb[Math.min(k + 1, limb.length - 1)], limb[Math.max(k - 1, 0)]));
     const reference = Math.abs(tangent[1]) > 0.9 ? [0, 0, 1] : [0, 1, 0];
@@ -420,20 +402,87 @@ function tube(limb, radii, target, segments = 8) {
       return add(at, add(scale(u, r * Math.cos(phi)), scale(v, r * Math.sin(phi))));
     });
   });
-  surface(rings, { wrap: true, outward: (i, j) => sub(rings[i][j], limb[i]), pick: () => target });
+  const target = typeof pick === 'function' ? pick : () => pick;
+  surface(rings, { wrap: true, outward: (i, j) => sub(rings[i][j], limb[i]), pick: (i) => target(i) });
 }
+
+/** Сустав — шарик на стыке трубок: без него на изгибе локтя и колена щель. */
+const joint = (at, r, target) => ellipsoid(at, [r, r, r], target, { rings: 6, segments: LIMB_SEGMENTS });
+
+/**
+ * Рука: плечо → локоть → запястье, перчатка, манжета-акцент у запястья.
+ * Радиусы — взрослый в куртке: плечо 5 см, локоть 4.4, запястье 3.4.
+ */
+function arm(target, shoulder, elbow, wrist, hand) {
+  const cuff = lerp(elbow, wrist, 0.82);
+  tube([shoulder, lerp(shoulder, elbow, 0.5), elbow], [0.052, 0.048, 0.044], target.jacket);
+  joint(elbow, 0.044, target.jacket);
+  tube([elbow, cuff, wrist], [0.044, 0.037, 0.034], (i) => (i === 1 ? target['jacket-accent'] : target.jacket));
+  ellipsoid(hand, [0.042, 0.05, 0.036], target.gloves, { rings: 6, segments: 10 });
+}
+
+/** Шлем: вытянутый вперёд, полоса-акцент по верху от лба к затылку, визор. */
+function helmet(target, centre) {
+  ellipsoid(centre, [0.128, 0.14, 0.155], target.helmet, { rings: 12, segments: 18 });
+  const shell = [0.131, 0.143, 0.158];
+  for (const lon of [[-9, 9], [171, 189]]) {
+    ellipsoid(centre, shell, target['jacket-accent'], { rings: 6, segments: 2, latRange: [5, 88], lonRange: lon });
+  }
+  ellipsoid(centre, [0.132, 0.144, 0.16], target.visor, { rings: 4, segments: 12, latRange: [-32, 14], lonRange: [-68, 68] });
+}
+
+/**
+ * Торс по сечениям снизу вверх: таз (штаны), куртка, плечи, шея в воротнике.
+ * at — середины сечений; наклон задаёт сама линия точек.
+ */
+function torso(target, rings) {
+  loft(rings, BODY_SEGMENTS, (i) => (i < 2 ? target.pants : target.jacket));
+}
+
+/**
+ * Кокон: от верха спинки (протектор) вниз к сиденью и вперёд к ногам —
+ * пилот полулёжа, ноги по курсу. Полуоси — по габаритам подвесок-коконов.
+ */
+const pod = [
+  { at: [0, 0.3, -0.5], rx: 0, ry: 0 },
+  { at: [0, 0.29, -0.515], rx: 0.15, ry: 0.07 },
+  { at: [0, 0.2, -0.52], rx: 0.21, ry: 0.12 },
+  { at: [0, 0.02, -0.47], rx: 0.25, ry: 0.16 },
+  { at: [0, -0.2, -0.32], rx: 0.27, ry: 0.19 },
+  { at: [0, -0.3, -0.05], rx: 0.26, ry: 0.18 },
+  { at: [0, -0.32, 0.25], rx: 0.23, ry: 0.155 },
+  { at: [0, -0.3, 0.6], rx: 0.19, ry: 0.13 },
+  { at: [0, -0.26, 0.9], rx: 0.14, ry: 0.1 },
+  { at: [0, -0.22, 1.04], rx: 0.08, ry: 0.06 },
+  { at: [0, -0.2, 1.09], rx: 0.03, ry: 0.025 },
+  { at: [0, -0.195, 1.1], rx: 0, ry: 0 },
+];
+/** Полоса-акцент по бокам кокона: от сиденья до ног (грани кольца у ±X). */
+const SIDE_STRIPE = new Set([0, 1, HARNESS_SEGMENTS / 2 - 1, HARNESS_SEGMENTS / 2, HARNESS_SEGMENTS / 2 + 1, HARNESS_SEGMENTS - 1]);
+loft(pod, HARNESS_SEGMENTS, (i, j) => (i >= 4 && i <= 7 && SIDE_STRIPE.has(j) ? parts['harness-accent'] : parts.harness));
+
+// Торс полулёжа — из кокона, спиной к протектору; шея в воротнике куртки.
+torso(parts, [
+  { at: [0, -0.2, -0.3], rx: 0, ry: 0 },
+  { at: [0, -0.16, -0.3], rx: 0.16, ry: 0.11 },
+  { at: [0, 0.05, -0.33], rx: 0.155, ry: 0.105 },
+  { at: [0, 0.22, -0.36], rx: 0.19, ry: 0.125 },
+  { at: [0, 0.34, -0.385], rx: 0.2, ry: 0.11 },
+  { at: [0, 0.41, -0.4], rx: 0.15, ry: 0.08 },
+  { at: [0, 0.45, -0.405], rx: 0.07, ry: 0.065 },
+  { at: [0, 0.5, -0.41], rx: 0.058, ry: 0.058 },
+  { at: [0, 0.52, -0.41], rx: 0, ry: 0 },
+]);
 
 // Руки — от плеч к тормозным клевантам у свободных концов.
 for (const side of [1, -1]) {
-  const hand = [side * 0.3, 0.44, -0.1];
-  tube([[side * 0.2, 0.33, -0.37], [side * 0.33, 0.26, -0.2], hand], [0.05, 0.045, 0.04], parts.pilot);
-  ellipsoid(hand, [0.045, 0.045, 0.045], parts.pilot, { rings: 4, segments: 8 });
+  arm(parts, [side * 0.19, 0.37, -0.39], [side * 0.32, 0.24, -0.23], [side * 0.3, 0.41, -0.12], [side * 0.3, 0.45, -0.1]);
+  joint([side * 0.19, 0.37, -0.39], 0.055, parts.jacket);
 }
 
-// Шлем и визор спереди.
-const HEAD = [0, 0.56, -0.4];
-ellipsoid(HEAD, [0.125, 0.14, 0.14], parts.helmet);
-ellipsoid(HEAD, [0.128, 0.143, 0.145], parts.visor, { rings: 3, segments: 8, latRange: [-25, 20], lonRange: [-60, 60] });
+// Шлем — над воротником.
+const HEAD = [0, 0.61, -0.41];
+helmet(parts, HEAD);
 
 /* ── Свободные концы и стропы ────────────────────────────────────────────── */
 
@@ -519,65 +568,88 @@ for (const side of [1, -1]) {
  * и, когда крыло сложено, с рюкзаком.
  */
 const GROUND_BELOW_M = 1;
-const MATERIALS_OF_PILOT = ['harness', 'harness-accent', 'pilot', 'helmet', 'visor'];
+const MATERIALS_OF_PILOT = ['harness', 'harness-accent', 'jacket', 'jacket-accent', 'pants', 'boots', 'gloves', 'helmet', 'visor'];
 const partsOf = (names) => Object.fromEntries(names.map((name) => [name, part()]));
 const standing = partsOf(MATERIALS_OF_PILOT);
-const legs = { left: partsOf(['harness']), right: partsOf(['harness']) };
+const legs = { left: partsOf(['pants', 'boots']), right: partsOf(['pants', 'boots']) };
 const backpack = partsOf(['harness', 'harness-accent']);
 
-// Корпус — вертикально над подвеской, чуть впереди спинки.
+/**
+ * Стоя — человек ростом ~1.78 м: земля на GROUND_BELOW_M ниже подвески.
+ * Высоты над землёй: тазобедренный сустав 0.92 м, талия 1.07, грудь 1.3,
+ * плечи 1.45, основание шеи 1.5, центр головы 1.66.
+ */
+const standingY = (aboveGroundM) => aboveGroundM - GROUND_BELOW_M;
+torso(standing, [
+  { at: [0, standingY(0.86), -0.05], rx: 0, ry: 0 },
+  { at: [0, standingY(0.88), -0.05], rx: 0.15, ry: 0.1 },
+  { at: [0, standingY(0.96), -0.05], rx: 0.175, ry: 0.115 },
+  { at: [0, standingY(1.07), -0.05], rx: 0.155, ry: 0.105 },
+  { at: [0, standingY(1.28), -0.04], rx: 0.19, ry: 0.125 },
+  { at: [0, standingY(1.4), -0.05], rx: 0.205, ry: 0.115 },
+  { at: [0, standingY(1.47), -0.06], rx: 0.165, ry: 0.085 },
+  { at: [0, standingY(1.51), -0.06], rx: 0.07, ry: 0.065 },
+  { at: [0, standingY(1.56), -0.06], rx: 0.058, ry: 0.058 },
+  { at: [0, standingY(1.58), -0.06], rx: 0, ry: 0 },
+]);
+// Подвеска стоя: протектор на спине, лямки через плечи, грудная перемычка.
 loft(
   [
-    { at: [0, -0.14, -0.08], rx: 0, ry: 0 },
-    { at: [0, -0.1, -0.08], rx: 0.17, ry: 0.11 },
-    { at: [0, 0.25, -0.08], rx: 0.2, ry: 0.12 },
-    { at: [0, 0.42, -0.08], rx: 0.1, ry: 0.07 },
-    { at: [0, 0.49, -0.08], rx: 0.05, ry: 0.05 },
-    { at: [0, 0.51, -0.08], rx: 0, ry: 0 },
-  ],
-  12,
-  () => standing.pilot,
-);
-// Подвесная система стоя: спинка-протектор за корпусом, полоса-акцент по бокам.
-loft(
-  [
-    { at: [0, 0.34, -0.26], rx: 0, ry: 0 },
-    { at: [0, 0.3, -0.26], rx: 0.18, ry: 0.07 },
-    { at: [0, -0.1, -0.27], rx: 0.22, ry: 0.1 },
-    { at: [0, -0.34, -0.22], rx: 0.18, ry: 0.08 },
-    { at: [0, -0.38, -0.21], rx: 0, ry: 0 },
+    { at: [0, standingY(1.36), -0.2], rx: 0, ry: 0 },
+    { at: [0, standingY(1.33), -0.2], rx: 0.15, ry: 0.05 },
+    { at: [0, standingY(1.05), -0.21], rx: 0.19, ry: 0.07 },
+    { at: [0, standingY(0.84), -0.19], rx: 0.17, ry: 0.07 },
+    { at: [0, standingY(0.8), -0.18], rx: 0, ry: 0 },
   ],
   HARNESS_SEGMENTS,
   (i, j) => (i === 2 && SIDE_STRIPE.has(j) ? standing['harness-accent'] : standing.harness),
 );
-// Руки — к свободным концам над плечами.
 for (const side of [1, -1]) {
-  const hand = [side * 0.24, 0.52, -0.08];
-  tube([[side * 0.2, 0.38, -0.08], [side * 0.31, 0.18, -0.02], hand], [0.05, 0.045, 0.04], standing.pilot);
-  ellipsoid(hand, [0.045, 0.045, 0.045], standing.pilot, { rings: 4, segments: 8 });
+  const x = side * 0.11;
+  tube(
+    [
+      [x, standingY(1.3), -0.19],
+      [x, standingY(1.46), -0.12],
+      [x, standingY(1.44), 0.03],
+      [x, standingY(1.25), 0.085],
+      [x, standingY(0.98), 0.07],
+    ],
+    [0.018, 0.02, 0.02, 0.02, 0.018],
+    standing.harness,
+    8,
+  );
 }
-const HEAD_STANDING = [0, 0.66, -0.08];
-ellipsoid(HEAD_STANDING, [0.125, 0.14, 0.14], standing.helmet, { rings: 8, segments: 12 });
-ellipsoid(HEAD_STANDING, [0.128, 0.143, 0.145], standing.visor, { rings: 3, segments: 8, latRange: [-25, 20], lonRange: [-60, 60] });
+tube([[-0.13, standingY(1.24), 0.09], [0.13, standingY(1.24), 0.09]], [0.016, 0.016], standing['harness-accent'], 8);
+
+// Руки вдоль тела, кисти перед бёдрами — держит свободные концы. Руки к голове
+// (как в полёте на тормозах) стоя читались позой «сдаюсь».
+for (const side of [1, -1]) {
+  const shoulder = [side * 0.2, standingY(1.44), -0.06];
+  arm(standing, shoulder, [side * 0.25, standingY(1.17), -0.02], [side * 0.22, standingY(0.98), 0.1], [side * 0.21, standingY(0.94), 0.12]);
+  joint(shoulder, 0.055, standing.jacket);
+}
+helmet(standing, [0, standingY(1.66), -0.07]);
 
 /**
  * Ноги — отдельные узлы с началом в бедре: сцена качает их вокруг оси X
- * (шаг). Стопа — на земле, GROUND_BELOW_M ниже подвески.
+ * (шаг). Бедро → колено → лодыжка, ботинок; подошва — на земле.
  */
-const HIP = (side) => [side * 0.1, -0.1, -0.08];
-for (const [side, target] of [
-  [1, legs.left],
-  [-1, legs.right],
-]) {
-  const hipY = HIP(side)[1];
-  const ankle = -GROUND_BELOW_M - hipY + 0.06;
-  tube([[0, 0, 0], [0, (ankle * 0.5), 0.03], [0, ankle, 0]], [0.08, 0.065, 0.05], target.harness);
-  ellipsoid([0, ankle - 0.02, 0.06], [0.05, 0.04, 0.11], target.harness, { rings: 4, segments: 8 });
+const HIP_ABOVE_GROUND_M = 0.92;
+const HIP = (side) => [side * 0.095, standingY(HIP_ABOVE_GROUND_M), -0.05];
+for (const target of [legs.left, legs.right]) {
+  const knee = [0, -0.42, 0.03];
+  const ankle = [0, -(HIP_ABOVE_GROUND_M - 0.08), 0];
+  tube([[0, 0, 0], lerp([0, 0, 0], knee, 0.5), knee], [0.08, 0.07, 0.056], target.pants);
+  joint(knee, 0.056, target.pants);
+  tube([knee, lerp(knee, ankle, 0.5), ankle], [0.056, 0.05, 0.043], target.pants);
+  // Ботинок: голенище и носок; низ подошвы — ровно на земле.
+  tube([[0, ankle[1] + 0.06, -0.005], [0, ankle[1] - 0.02, 0.0]], [0.05, 0.052], target.boots);
+  ellipsoid([0, -HIP_ABOVE_GROUND_M + 0.045, 0.05], [0.055, 0.045, 0.125], target.boots, { rings: 6, segments: 12 });
 }
 
 // Рюкзак со сложенным крылом — за спиной, с полосой-акцентом.
-ellipsoid([0, 0.1, -0.38], [0.19, 0.28, 0.13], backpack.harness, { rings: 6, segments: 10 });
-ellipsoid([0, 0.1, -0.38], [0.195, 0.05, 0.135], backpack['harness-accent'], { rings: 2, segments: 10, latRange: [-40, 40] });
+ellipsoid([0, standingY(1.1), -0.38], [0.19, 0.28, 0.13], backpack.harness, { rings: 8, segments: 14 });
+ellipsoid([0, standingY(1.1), -0.38], [0.195, 0.05, 0.135], backpack['harness-accent'], { rings: 2, segments: 14, latRange: [-40, 40] });
 
 /* ── Сборка GLB ──────────────────────────────────────────────────────────── */
 

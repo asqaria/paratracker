@@ -68,8 +68,8 @@ describe('модель параплана', () => {
     expect(glb.readUInt32LE(4)).toBe(2);
     expect(glb.readUInt32LE(8)).toBe(glb.length);
     expect(parse().asset.version).toBe('2.0');
-    // Две позы пилота (кокон и стоя), ноги и рюкзак — больше одной позы, но десятки КБ.
-    expect(glb.length).toBeLessThan(170_000);
+    // Две позы пилота в одежде (кокон и стоя), ноги и рюкзак — сотни КБ, не мегабайты.
+    expect(glb.length).toBeLessThan(260_000);
   });
 
   it('файл в репозитории — ровно то, что выдаёт генератор (детерминирован)', () => {
@@ -83,7 +83,7 @@ describe('модель параплана', () => {
     }
   });
 
-  it('треугольники — индексированные, с нормалями; не больше 7000 на всю модель', () => {
+  it('треугольники — индексированные, с нормалями; не больше 10 000 на всю модель', () => {
     const gltf = parse();
     let triangles = 0;
     for (const primitive of primitives(gltf)) {
@@ -93,7 +93,7 @@ describe('модель параплана', () => {
       triangles += (gltf.accessors[primitive.indices ?? -1]?.count ?? 0) / 3;
     }
     expect(triangles).toBeGreaterThan(2000);
-    expect(triangles).toBeLessThanOrEqual(7000);
+    expect(triangles).toBeLessThanOrEqual(10_000);
   });
 
   it('размеры настоящего крыла: размах 9–12 м, купол в 6–8 м над пилотом', () => {
@@ -105,7 +105,7 @@ describe('модель параплана', () => {
   });
 
   it('пилот — в начале координат (точка трека), купол симметричен', () => {
-    const pilot = bounds(parse(), (name) => name === 'pilot' || name.startsWith('harness'));
+    const pilot = bounds(parse(), (name) => name.startsWith('jacket') || name.startsWith('harness'));
     expect(pilot.min[1]).toBeLessThan(0.5);
     expect(pilot.max[1]).toBeGreaterThan(0);
     const wing = bounds(parse(), canopy);
@@ -144,6 +144,13 @@ describe('модель параплана', () => {
       const minY = Math.min(...(mesh?.primitives ?? []).map((p) => gltf.accessors[p.attributes.POSITION]?.min?.[1] ?? Infinity));
       const hipY = node?.translation?.[1] ?? Number.NaN;
       expect(Math.abs(hipY + minY + 1)).toBeLessThan(0.03);
+    }
+  });
+
+  it('пилот одет: куртка, штаны, ботинки, перчатки — отдельными материалами', () => {
+    const names = parse().materials.map((m) => m.name);
+    for (const clothing of ['jacket', 'jacket-accent', 'pants', 'boots', 'gloves', 'helmet', 'visor']) {
+      expect(names).toContain(clothing);
     }
   });
 
