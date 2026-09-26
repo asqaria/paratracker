@@ -15,7 +15,6 @@ import {
   Math as CesiumMath,
   Matrix4,
   NeverTileDiscardPolicy,
-  PolylineColorAppearance,
   PolylineGeometry,
   PolylineMaterialAppearance,
   Primitive,
@@ -88,6 +87,14 @@ import { SummaryPanel } from './SummaryPanel';
 import { TimelinePanel } from './TimelinePanel';
 import { VarioLegend } from './VarioLegend';
 import { buildTrackGeometry } from './track-geometry';
+import { TrackLayer } from './track-layer';
+import {
+  COMPACT_MEDIA_QUERY,
+  DEFAULT_TRACK_SHOWN,
+  flownVertexCount,
+  trackWidths,
+  type TrackShown,
+} from './track-progress';
 import { useHotkeys } from './use-hotkeys';
 
 /**
@@ -109,11 +116,9 @@ export interface SceneProps {
 }
 
 /** ТЗ §7.2: основная линия 3–5 px, свечение — шире и приглушённее. */
-const TRACK_WIDTH_PX = 4;
 const GLOW_WIDTH_PX = 12;
 const GLOW_INTENSITY = 0.25;
 const SHADOW_ALPHA = 0.42;
-const SHADOW_WIDTH_PX = 2;
 /** Основная кнопка мыши (PointerEvent.button): ею облетают пилота. */
 const PRIMARY_BUTTON = 0;
 
@@ -239,6 +244,9 @@ export function Scene({ track, showGlow = false }: SceneProps) {
   const clockRef = useRef<FlightClock | null>(null);
   const cameraModeRef = useRef<CameraMode>(DEFAULT_CAMERA_MODE);
   const smoothHeadingRef = useRef<HeadingState | null>(null);
+  const glowRef = useRef<Primitive | null>(null);
+  const [trackShown, setTrackShown] = useState<TrackShown>(DEFAULT_TRACK_SHOWN);
+  const trackShownRef = useRef<TrackShown>(DEFAULT_TRACK_SHOWN);
   const adjustRef = useRef<CameraAdjust | null>(adjustFor(DEFAULT_CAMERA_MODE));
 
   // Конфиг читается один раз и не роняет рендер: без переменных окружения
@@ -348,22 +356,10 @@ export function Scene({ track, showGlow = false }: SceneProps) {
           groundRgba: [r, g, b, a],
         });
         const positions = Cartesian3.fromDegreesArrayHeights(Array.from(geometry.positions));
-        const colors: Color[] = [];
-        for (let i = 0; i < geometry.pointCount; i++) {
-          const at = i * 4;
-          colors.push(
-            Color.fromBytes(
-              geometry.colors[at],
-              geometry.colors[at + 1],
-              geometry.colors[at + 2],
-              geometry.colors[at + 3],
-            ),
-          );
-        }
 
+        // Свечение — целиком (по умолчанию выключено); в режиме «Пройденный» скрыто.
         if (showGlow) {
-          scene.primitives.add(
-            new Primitive({
+          const glow = new Primitive({
               geometryInstances: new GeometryInstance({
                 geometry: new PolylineGeometry({
                   positions,
@@ -379,37 +375,19 @@ export function Scene({ track, showGlow = false }: SceneProps) {
                 }),
               }),
               asynchronous: false,
-            }),
-          );
+          });
+          scene.primitives.add(glow);
+          glowRef.current = glow;
         }
 
-        scene.primitives.add(
-          new Primitive({
-            geometryInstances: new GeometryInstance({
-              geometry: new PolylineGeometry({
-                positions,
-                width: TRACK_WIDTH_PX,
-                colors,
-                colorsPerVertex: true,
-                arcType: ArcType.NONE,
-                vertexFormat: PolylineColorAppearance.VERTEX_FORMAT,
-              }),
-            }),
-            appearance: new PolylineColorAppearance({ translucent: false }),
-            asynchronous: false,
-          }),
-        );
-
-        // Тень трека на рельефе — одна линия на весь трек, не Entity на точку.
-        viewer.entities.add({
-          polyline: {
-            positions: Cartesian3.fromDegreesArray(Array.from(geometry.groundPositions)),
-            width: SHADOW_WIDTH_PX,
-            clampToGround: true,
-            material: new Color(0, 0, 0, SHADOW_ALPHA),
-          },
+        // Линия и тень — кусками, чтобы показывать только пройденный путь (track-layer.ts).
+        // Толщина — по экрану: на телефоне 4 px — полоса поперёк долины.
+        const widths = trackWidths(window.matchMedia(COMPACT_MEDIA_QUERY).matches);
+        const layer = new TrackLayer(scene, geometry, positions, {
+          linePx: widths.linePx,
+          shadowPx: widths.shadowPx,
+          shadowColor: new Color(0, 0, 0, SHADOW_ALPHA),
         });
-
         const flightClock = setupFlightClock(viewer, shown);
         clockRef.current = flightClock;
 
@@ -428,6 +406,9 @@ export function Scene({ track, showGlow = false }: SceneProps) {
             lastIndex = index;
             setTimeMs(current);
           }
+          layer.update(trackShownRef.current, flownVertexCount(geometry.sourceIndex, index));
+          // Тень строится асинхронно: пока её куски не готовы, кадры нужны и в покое.
+          if (layer.pending) scene.requestRender();
 
           const mode = cameraModeRef.current;
           const modePose = CAMERA_POSES[mode];
@@ -494,6 +475,13 @@ export function Scene({ track, showGlow = false }: SceneProps) {
     const viewer = viewerRef.current;
     if (viewer) viewer.clock.multiplier = speed;
   }, [speed]);
+
+  /** «Весь / Пройденный»: применяется в кадре (onPreRender), здесь — только перерисовка. */
+  useEffect(() => {
+    trackShownRef.current = trackShown;
+    if (glowRef.current) glowRef.current.show = trackShown === 'all';
+    viewerRef.current?.scene.requestRender();
+  }, [trackShown]);
 
   useEffect(() => {
     cameraModeRef.current = cameraMode;
@@ -757,6 +745,8 @@ export function Scene({ track, showGlow = false }: SceneProps) {
           playing={playing}
           speed={speed}
           cameraMode={cameraMode}
+          trackShown={trackShown}
+          onTrackShown={setTrackShown}
           onTogglePlay={togglePlay}
           onSeekTo={seekTo}
           onSpeed={setSpeed}
