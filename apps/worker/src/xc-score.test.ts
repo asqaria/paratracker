@@ -12,6 +12,12 @@ import { scoreXc, type XcColumns } from './xc-score.js';
  */
 
 const KM = 1000;
+/**
+ * Лимит vitest для тестов скоринга. Решатель — CPU-перебор: реальный трек
+ * локально 0.47 с, на раннере CI, где параллельно идут тесты всех пакетов, —
+ * 8.5 с, и падал по лимиту 5 с по умолчанию. Проверяется результат, не скорость.
+ */
+const XC_TEST_LIMIT_MS = 30_000;
 /** Дистанция библиотеки — по приближению FCC на сфере: 1 % от гаверсинуса с запасом. */
 const DISTANCE_TOLERANCE = 0.01;
 const LAT0 = 43.2;
@@ -40,7 +46,7 @@ function track(legs: readonly [headingDeg: number, seconds: number][]): XcColumn
 }
 const whole = (c: XcColumns) => ({ takeoff: 0, landing: c.t.length - 1 });
 
-describe('scoreXc — геометрия на синтетике', () => {
+describe('scoreXc — геометрия на синтетике', { timeout: XC_TEST_LIMIT_MS }, () => {
   it('прямо на север 20 км — свободная дистанция 20 км, очки = км', () => {
     const c = track([[0, 2000]]);
     const xc = scoreXc(c, whole(c));
@@ -79,7 +85,7 @@ describe('scoreXc — геометрия на синтетике', () => {
   });
 });
 
-describe('scoreXc на реальном треке real-wind-thermals.igc', () => {
+describe('scoreXc на реальном треке real-wind-thermals.igc', { timeout: XC_TEST_LIMIT_MS }, () => {
   it('закрытый свободный треугольник ~70 км — результат igc-xc-score 1.8.0', () => {
     const parsed = parseIgc(readFixture('real-wind-thermals.igc'), { now: NOW });
     if (!parsed.ok) throw new Error(`parse failed: ${parsed.code}`);

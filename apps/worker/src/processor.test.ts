@@ -11,6 +11,12 @@ import { NOW, readFixture } from './testing/tracks.js';
 
 /** Настоящий UUID v4: z.uuid() в Zod 4 проверяет и версию, и вариант. */
 const FLIGHT_ID = '11111111-2222-4333-8444-555555555555';
+/**
+ * Лимит vitest: тесты гоняют настоящие потоки конвейера, а в нём с задачи 3.1
+ * XC-скоринг — CPU-перебор. Локально ≈0.4 с, на раннере CI — больше 5 с по
+ * умолчанию. Проверяется поведение, а не скорость.
+ */
+const PROCESSOR_TEST_LIMIT_MS = 30_000;
 
 function fakeStorage(objects: Map<string, Uint8Array>): ObjectStorage {
   return {
@@ -79,7 +85,7 @@ afterEach(async () => {
   pool = undefined;
 });
 
-describe('обработка одного полёта', () => {
+describe('обработка одного полёта', { timeout: PROCESSOR_TEST_LIMIT_MS }, () => {
   it('parsing → ready: .track загружен в S3, события отправлены', async () => {
     pool = createPipelinePool({ size: 1, timeoutS: 30, memoryLimitMb: 512 });
     const objects = new Map<string, Uint8Array>([
