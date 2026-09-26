@@ -431,7 +431,7 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
         });
         // Занавес: низ — рельеф под прореженными точками, грубый уровень тайлов
         // (CURTAIN.terrainLevel). Опрос идёт параллельно, трек его не ждёт.
-        const samples = curtainSamples(track.t, range);
+        const samples = curtainSamples(range);
         const curtainColor = Color.fromCssColorString(documentColorTokens().primary);
         void sampleTerrainAtLevel(
           terrain,

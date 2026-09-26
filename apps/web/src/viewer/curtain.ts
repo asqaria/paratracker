@@ -2,7 +2,6 @@ import { TRACK_FLAGS, type FlightRange } from '@skyline/core';
 
 import type { CameraMode } from './camera-modes';
 
-import { MS_PER_SECOND } from './playback';
 
 /**
  * «Занавес» под треком (ТЗ §7.2, задача 2.8) — расчёт без Cesium. Стена от
@@ -12,12 +11,6 @@ import { MS_PER_SECOND } from './playback';
  */
 
 export const CURTAIN = {
-  /**
-   * Точка стены — раз в столько секунд: стена широкая и прозрачная, мелкий
-   * изгиб трека на ней не виден, а рельеф под каждой точкой спрашивается
-   * отдельно. В «Пройденном» край стены идёт за пилотом плавно (pieceProgress).
-   */
-  sampleStepS: 5,
   /**
    * Непрозрачность у трека и у земли. Раньше к земле стена растворялась до
    * нуля — нижний край пропадал, и высоту было не с чем сравнить: стена
@@ -31,29 +24,22 @@ export const CURTAIN = {
    */
   groundEdge: { fraction: 0.03, alpha: 0.4 },
   /**
-   * Уровень тайлов рельефа для низа стены: ~40 м на пиксель тайла. Низ под
-   * рельефом скрыт проверкой глубины, для градиента такой точности хватает,
-   * а опрос на максимальной детализации тянул бы сотни тайлов вдоль маршрута.
+   * Уровень тайлов рельефа для низа стены: ~40 м на пиксель тайла. Опрашивается
+   * каждая точка полёта — на максимальной детализации это сотни тайлов вдоль
+   * маршрута, а кромке у земли такой точности хватает.
    */
   terrainLevel: 11,
 } as const;
 
-/** Индексы точек стены: от взлёта до посадки раз в CURTAIN.sampleStepS, посадка — последней. */
-export function curtainSamples(t: Float64Array, range: FlightRange): number[] {
+/**
+ * Индексы точек стены: каждая точка от взлёта до посадки — те же вершины,
+ * что у линии и тени. Прореженная стена (раз в 5 с) шла хордами: на вираже
+ * её верх срезал дугу линии, а низ расходился с тенью.
+ */
+export function curtainSamples(range: FlightRange): number[] {
   const { takeoff, landing } = range;
   if (takeoff < 0 || landing <= takeoff) return [];
-  const stepMs = CURTAIN.sampleStepS * MS_PER_SECOND;
-  const samples = [takeoff];
-  let next = (t[takeoff] ?? 0) + stepMs;
-  for (let i = takeoff + 1; i < landing; i++) {
-    // По времени, а не по номеру: через разрыв записи сетка точек не равномерна.
-    if ((t[i] ?? 0) >= next) {
-      samples.push(i);
-      next = (t[i] ?? 0) + stepMs;
-    }
-  }
-  samples.push(landing);
-  return samples;
+  return Array.from({ length: landing - takeoff + 1 }, (_, k) => takeoff + k);
 }
 
 /**
