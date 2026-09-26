@@ -27,11 +27,20 @@ async function refresh(fetchImpl: typeof fetch): Promise<boolean> {
   return response.ok || response.status === HTTP.conflict;
 }
 
+/**
+ * Запрос от имени вошедшего: access живёт 15 минут, на 401 сессия один раз
+ * обновляется и запрос повторяется. 401 после этого — сессии правда нет.
+ */
+export async function fetchWithSession(url: string, init: RequestInit = {}, fetchImpl: typeof fetch = fetch): Promise<Response> {
+  const ask = () => fetchImpl(url, { ...init, headers: { ...ACCEPT_JSON, ...init.headers } });
+  const response = await ask();
+  if (response.status === HTTP.unauthorized && (await refresh(fetchImpl))) return ask();
+  return response;
+}
+
 /** Профиль вошедшего; null — не вошёл (или вход на сервере выключен). */
 export async function fetchMe(fetchImpl: typeof fetch = fetch): Promise<MeResponse | null> {
-  const ask = () => fetchImpl(ME_URL, { method: 'GET', headers: ACCEPT_JSON });
-  let response = await ask();
-  if (response.status === HTTP.unauthorized && (await refresh(fetchImpl))) response = await ask();
+  const response = await fetchWithSession(ME_URL, { method: 'GET' }, fetchImpl);
 
   if (response.ok) return MeResponse.parse(await response.json());
   if (response.status === HTTP.unauthorized || response.status === HTTP.notFound) return null;

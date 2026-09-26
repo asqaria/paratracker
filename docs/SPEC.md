@@ -772,6 +772,11 @@ driftVector делится не на duration, а на время между с�
   → баннер «Сохраните полёт в логбук → войти»
 ```
 
+**Перенос в логбук (задача 2.11).** Анонимная загрузка возвращает `claimToken` (256 бит),
+в БД — только его SHA-256. Браузер помнит токены в localStorage (до 50 штук, не дольше
+срока хранения анонимного полёта). После входа фронт шлёт их в `POST /flights/claim`:
+полёт получает владельца, если он ещё ничей и хэш совпал; хэш стирается.
+
 Это даёт «вау» до любых форм регистрации и резко поднимает конверсию.
 
 ### 7.2. Слои 3D-сцены
@@ -1059,6 +1064,8 @@ flights (
   -- сырые метаданные из файла
   source_format text,             -- igc | gpx | kml | fit | csv
   raw_object_key text,            -- ключ в S3
+  claim_token_hash text null,     -- анонимная загрузка: SHA-256 токена, которым браузер
+                                  -- после входа забирает полёт в логбук (задача 2.11)
   track_object_key text,          -- ключ .track в S3
   preview_object_key text,        -- ключ превью WebP
   device text, pilot_name_raw text, glider_raw text,
@@ -1096,7 +1103,8 @@ flights (
   xc_turnpoints jsonb null,
 
   -- геометрия
-  track_simplified geography(LineStringZM,4326),
+  track_simplified geography(LineStringZM,4326),  -- Дуглас–Пекер 15 м, ≤ 1000 точек
+                                                  -- (SIMPLIFY в core); M — секунды от старта
   bbox geography(Polygon,4326),
 
   -- социальное
@@ -1222,8 +1230,13 @@ PATCH  /api/v1/flights/{id}               title, description, privacy, gliderId
 DELETE /api/v1/flights/{id}
 GET    /api/v1/flights/{id}/export?format=igc|gpx|kml
 
-# Логбук
-GET    /api/v1/logbook?from&to&siteId&gliderId&cursor&limit&sort
+# Логбук (только вошедший; без входа — 401)
+GET    /api/v1/logbook?from&to&cursor&limit   свои полёты, новые сверху; курсор непрозрачный.
+                                           from/to — дата старта UTC (локальная — с 2.14);
+                                           siteId, gliderId — с 2.13
+GET    /api/v1/logbook/map                GeoJSON упрощённых треков своих полётов (до 500)
+POST   /api/v1/flights/claim              { claims: [{ flightId, token }] } → { claimed } —
+                                           забрать анонимные загрузки этого браузера (§7.1)
 GET    /api/v1/logbook/stats?year         агрегаты за период
 GET    /api/v1/logbook/heatmap            GeoJSON термиков пилота
 
@@ -1511,7 +1524,7 @@ Chrome/Edge 120+, Safari 17+, Firefox 120+. WebGL2 обязателен для 3
 2.8  Фронт: curtain wall под треком
 2.9  Фронт: glTF-модель параплана с ориентацией и креном
 2.10 Аутентификация: вход через Google (без паролей), JWT + refresh, /me
-2.11 Логбук: список полётов, фильтры, карта всех полётов (MapLibre)
+2.11 Логбук: список полётов, фильтр по дате, карта всех полётов (MapLibre), перенос анонимных загрузок
 2.12 Статистика сезона: часы, км, набор, число полётов, топ-мест, график по месяцам
 2.13 Привязка крыльев, автоопределение места старта (таблица sites + сидинг)
 2.14 Определение таймзоны по месту старта → локальное время полёта

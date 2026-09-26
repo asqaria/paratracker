@@ -109,6 +109,13 @@ describe('обработка одного полёта', () => {
     expect(trackKey).toMatch(/^tracks\/.*\.track$/);
     expect(readTrack(objects.get(trackKey) ?? new Uint8Array()).pointCount).toBe(960);
     expect(ready[0]).toMatchObject({ analysisLevel: 'full', altitudeSource: 'baro', durationS: 959 });
+    // Сводка и линия для логбука (задача 2.11) — из того же прохода конвейера.
+    expect(ready[0]?.distanceTrackM).toBeGreaterThan(0);
+    expect(ready[0]?.maxAltM).toBeGreaterThan(0);
+    const line = ready[0]?.simplified;
+    expect(line?.lat.length).toBeGreaterThan(2);
+    expect(line?.lat.length).toBeLessThan(960);
+    expect(line?.timeMs[0]).toBe(ready[0]?.startedAt.getTime());
     // Анализ из потока доходит до репозитория: две спирали генератора — два термика.
     expect(ready[0]?.analysis?.thermals).toHaveLength(2);
     expect(ready[0]?.analysis?.glides.length).toBeGreaterThan(0);

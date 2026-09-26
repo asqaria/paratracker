@@ -1,6 +1,7 @@
 import type { AuthProvidersResponse, MeResponse } from '@skyline/core';
 
 import { useT } from '../i18n/locale';
+import { LOGBOOK_HASH } from '../routing';
 import { signInUrl, useLogout, useMe, useProviders } from './session';
 
 /** Размер аватара в шапке, px. */
@@ -32,7 +33,9 @@ export function UserMenuView({ me, providers, onSignOut, currentHash }: UserMenu
             className="rounded-full"
           />
         )}
-        <span className="max-w-40 truncate">{me.displayName ?? me.username}</span>
+        <a href={LOGBOOK_HASH} className="max-w-40 truncate hover:text-accent">
+          {me.displayName ?? me.username}
+        </a>
         <button type="button" onClick={onSignOut} className="rounded px-2 py-1 text-secondary hover:bg-subtle">
           {t('auth.signOut')}
         </button>

@@ -5,6 +5,7 @@ import { registerAuthHook, registerAuthRoutes, type AuthDeps } from './auth/rout
 import { API_V1_PREFIX } from './constants.js';
 import { registerFlightRoutes, type FlightRoutesDeps } from './flights.js';
 import { registerHealthRoutes, type HealthRouteOptions } from './health.js';
+import { registerLogbookRoutes, type LogbookRoutesDeps } from './logbook.js';
 import { registerProblemHandlers } from './problem.js';
 import { registerTileRoutes, type TileRoutesDeps } from './tiles.js';
 
@@ -20,6 +21,8 @@ export interface AppOptions {
   tiles?: TileRoutesDeps;
   /** Вход и сессии; без них все запросы анонимные. */
   auth?: AuthDeps;
+  /** Логбук; без входа (auth) не регистрируется — у анонима логбука нет. */
+  logbook?: LogbookRoutesDeps;
 }
 
 export function buildApp(options: AppOptions): FastifyInstance {
@@ -31,6 +34,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
     (v1, _opts, done) => {
       if (options.health) registerHealthRoutes(v1, options.health);
       if (options.auth) registerAuthRoutes(v1, options.auth);
+      if (options.auth && options.logbook) registerLogbookRoutes(v1, options.logbook);
       if (options.flights) registerFlightRoutes(v1, options.flights);
       if (options.analysis) registerAnalysisRoutes(v1, options.analysis);
       if (options.tiles) registerTileRoutes(v1, options.tiles);

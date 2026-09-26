@@ -18,6 +18,7 @@ import type { FlightRecord } from '@skyline/db';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
+import { hashToken, newRandomToken } from './auth/tokens.js';
 import type { FlightEventListener } from './events.js';
 import { problem, sendProblem } from './problem.js';
 
@@ -30,6 +31,8 @@ export interface NewFlightInput {
   userId: string | null;
   sourceFormat: SourceFormat;
   rawObjectKey: string;
+  /** Анонимная загрузка: хэш токена, по которому полёт потом забирают в логбук. */
+  claimTokenHash?: string;
 }
 
 export interface FlightRoutesDeps {
@@ -133,12 +136,20 @@ export function registerFlightRoutes(app: FastifyInstance, deps: FlightRoutesDep
     const rawObjectKey = `raw/${userId ?? 'anonymous'}/${flightId}.${fileExtension(file.filename)}.gz`;
     await deps.storage.put(rawObjectKey, await gzipAsync(bytes), 'application/gzip');
 
-    const flight = await deps.repository.insert({ id: flightId, userId, sourceFormat: format, rawObjectKey });
+    // Аноним получает токен: после входа им забирают полёт в логбук (задача 2.11).
+    const claimToken = userId === null ? newRandomToken() : undefined;
+    const flight = await deps.repository.insert({
+      id: flightId,
+      userId,
+      sourceFormat: format,
+      rawObjectKey,
+      ...(claimToken === undefined ? {} : { claimTokenHash: hashToken(claimToken) }),
+    });
     await deps.onQueued(flight.id);
 
     return reply
       .code(ACCEPTED)
-      .send(UploadResponse.parse({ flightId: flight.id, status: flight.status }));
+      .send(UploadResponse.parse({ flightId: flight.id, status: flight.status, claimToken }));
   });
 
   app.get('/flights/:id/status', async (request, reply) => {

@@ -126,6 +126,12 @@ export const flights = pgTable(
     // сырые метаданные из файла
     sourceFormat: text('source_format', { enum: SOURCE_FORMATS }).notNull(),
     rawObjectKey: text('raw_object_key').notNull(),
+    /**
+     * Анонимная загрузка: SHA-256 токена, который получил загрузивший браузер.
+     * Предъявив токен после входа, пилот забирает полёт в логбук (задача 2.11).
+     * У полёта с владельцем — null.
+     */
+    claimTokenHash: text('claim_token_hash'),
     trackObjectKey: text('track_object_key'),
     previewObjectKey: text('preview_object_key'),
     device: text('device'),

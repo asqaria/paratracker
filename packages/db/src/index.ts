@@ -19,6 +19,7 @@ export {
   markFlightFailed,
   markFlightProcessing,
   markFlightReady,
+  requeueFlightsWithoutSummary,
   type ExpiredFlight,
   type FlightRecord,
   type NewFlight,
@@ -33,6 +34,15 @@ export {
   type ThermalRecord,
 } from './repositories/analysis.js';
 export { readPostgisVersion } from './repositories/health.js';
+export {
+  claimFlights,
+  listLogbook,
+  listLogbookMap,
+  type LogbookCursor,
+  type LogbookEntryRecord,
+  type LogbookMapFeature,
+  type LogbookPage,
+} from './repositories/logbook.js';
 export {
   createSession,
   findUserProfile,

@@ -112,6 +112,9 @@ export function createFlightProcessor(deps: FlightProcessorDeps): FlightProcesso
           endedAt: new Date(result.endedAt),
           durationS: Math.round((result.endedAt - result.startedAt) / MS_PER_SECOND),
           analysis: result.analysis,
+          maxAltM: result.maxAltM,
+          distanceTrackM: result.distanceTrackM,
+          simplified: result.simplified,
         });
         await announce(flightId, 'ready', { progress: 1, trackReady: true });
         deps.onReady?.(flightId, {

@@ -121,6 +121,20 @@ const ru = {
   'auth.account': 'Аккаунт',
   'auth.failed': 'Не удалось войти через Google. Попробуйте ещё раз.',
   'auth.savedToLogbook': 'Полёт сохранится в вашем аккаунте',
+  'logbook.title': 'Логбук',
+  'logbook.signInPrompt': 'Войдите, чтобы видеть свои полёты',
+  'logbook.empty': 'Здесь появятся ваши полёты — бросьте трек на главной',
+  'logbook.upload': 'Загрузить трек',
+  'logbook.loading': 'Загружаем логбук…',
+  'logbook.error': 'Не удалось загрузить логбук',
+  'logbook.more': 'Показать ещё',
+  'logbook.map': 'Карта полётов',
+  'logbook.column.date': 'Дата',
+  'logbook.column.duration': 'Время',
+  'logbook.column.distance': 'Дистанция',
+  'logbook.column.maxAlt': 'Макс. высота',
+  'logbook.column.thermals': 'Термики',
+  'logbook.saveBanner': 'Сохраните полёт в логбук: войдите через Google',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -247,6 +261,20 @@ const en: Messages = {
   'auth.account': 'Account',
   'auth.failed': 'Could not sign in with Google. Please try again.',
   'auth.savedToLogbook': 'The flight will be saved to your account',
+  'logbook.title': 'Logbook',
+  'logbook.signInPrompt': 'Sign in to see your flights',
+  'logbook.empty': 'Your flights will appear here — drop a track on the home page',
+  'logbook.upload': 'Upload a track',
+  'logbook.loading': 'Loading logbook…',
+  'logbook.error': 'Could not load the logbook',
+  'logbook.more': 'Show more',
+  'logbook.map': 'Flights map',
+  'logbook.column.date': 'Date',
+  'logbook.column.duration': 'Time',
+  'logbook.column.distance': 'Distance',
+  'logbook.column.maxAlt': 'Max altitude',
+  'logbook.column.thermals': 'Thermals',
+  'logbook.saveBanner': 'Save this flight to your logbook: sign in with Google',
 };
 
 export const messages: Record<Locale, Messages> = { ru, en };

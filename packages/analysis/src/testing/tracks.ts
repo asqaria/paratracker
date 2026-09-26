@@ -35,6 +35,8 @@ interface Expectation {
   trajectory: Trajectory;
   /** Сводка по записанным в файл точкам; null — у генератора формата её нет. */
   summary: FlightSummary | null;
+  /** Упрощение для карты логбука (Дуглас–Пекер генератора); null — нет у формата. */
+  simplified: { toleranceM: number; indices: number[] } | null;
 }
 
 const expectations = JSON.parse(readFileSync(new URL('expected.json', FIXTURES), 'utf8')) as Record<string, Expectation>;

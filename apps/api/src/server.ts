@@ -1,4 +1,5 @@
 import {
+  claimFlights,
   createChannelListener,
   createDatabase,
   createSession,
@@ -8,6 +9,8 @@ import {
   FLIGHT_STATUS_CHANNEL,
   insertFlight,
   listGlides,
+  listLogbook,
+  listLogbookMap,
   listThermals,
   notifyFlightQueued,
   revokeSession,
@@ -58,7 +61,16 @@ const app = buildApp({
     level: config.LOG_LEVEL,
     redact: ['req.headers.authorization', 'req.headers.cookie'],
   },
-  ...(auth ? { auth } : {}),
+  ...(auth
+    ? {
+        auth,
+        logbook: {
+          list: (query) => listLogbook(database.db, query),
+          map: (userId) => listLogbookMap(database.db, userId),
+          claim: (userId, claims) => claimFlights(database.db, userId, claims),
+        },
+      }
+    : {}),
   health: {
     probe: createHealthProbe({ db: database.db, storage: s3, bucket: config.S3_BUCKET }),
     timeoutS: HEALTH_CHECK_TIMEOUT_S,

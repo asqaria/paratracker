@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ensureFreshSession, useMe } from '../auth/session';
 import { UserMenu } from '../auth/UserMenu';
 import { LocaleSwitch } from '../i18n/LocaleSwitch';
+import { rememberClaim } from '../logbook/claims';
 import { useLocaleStore, useT } from '../i18n/locale';
 import { flightHash, HEALTH_HASH } from '../routing';
 import { subscribeFlightStatus } from './flight-events';
@@ -56,6 +57,8 @@ export function UploadPage({ authFailed = false }: UploadPageProps) {
         .then(() => uploadTrack(file))
         .then(
         (accepted) => {
+          // Аноним: токен, чтобы после входа забрать полёт в логбук (задача 2.11).
+          if (accepted.claimToken) rememberClaim(accepted.flightId, accepted.claimToken);
           setFlightId(accepted.flightId);
           setPhase({ kind: 'processing', fileName: file.name, status: accepted.status });
         },
@@ -106,7 +109,7 @@ export function UploadPage({ authFailed = false }: UploadPageProps) {
   return (
     <main lang={locale} className="grid min-h-dvh place-items-center p-6">
       <section className="w-full max-w-xl rounded-2xl glass p-6">
-        <header className="mb-6 flex items-center justify-between">
+        <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-lg font-semibold">{t('app.name')}</h1>
           <div className="flex items-center gap-3">
             <UserMenu />
