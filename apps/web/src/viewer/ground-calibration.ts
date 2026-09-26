@@ -11,16 +11,13 @@
  * на настоящих данных.
  */
 
+import type { FlightRange } from '@skyline/core';
+
+/** Взлёт и посадка — в analysis (FLIGHT в core): по ним же режутся глайды, ТЗ §6.4. */
+export { flightRange } from '@skyline/analysis';
+export type { FlightRange } from '@skyline/core';
+
 export const GROUND_CALIBRATION = {
-  /**
-   * Полёт — путевая скорость выше 4 м/с, державшаяся 30 с (по медиане). Ходьба
-   * в гору — 1–2.5 м/с (замер: подъём пешком 1.3 м/с больше полутора часов),
-   * разбег на старте — 3–5 м/с, но несколько секунд; параплан в воздухе —
-   * 8–12 м/с. Проверено на 51 реальном треке: подъём пешком больше не
-   * засчитывается полётом, обычные старты сдвигаются не больше чем на полминуты.
-   */
-  flyingSpeedMs: 4,
-  flyingWindowS: 30,
   /** Поправки считаются по минуте перед взлётом и минуте после посадки: пилот стоит на старте. */
   groundWindowS: 60,
   /** Меньше 5 точек на земле — запись началась (кончилась) в воздухе, калибровать не по чему. */
@@ -57,50 +54,10 @@ export const GROUND_CALIBRATION = {
 
 const MS_PER_SECOND = 1000;
 
-/** Полёт — от взлёта до посадки, индексы точек трека; вне него — ходьба по земле. */
-export interface FlightRange {
-  takeoff: number;
-  landing: number;
-}
-
 /** Поправка на одном конце полёта: когда и на сколько сдвинуть. */
 export interface GroundAnchor {
   tMs: number;
   offsetM: number;
-}
-
-const medianOf = (values: number[]): number => {
-  const sorted = values.map((v) => (Number.isFinite(v) ? v : 0)).sort((a, b) => a - b);
-  return sorted[sorted.length >> 1] ?? 0;
-};
-
-/**
- * Взлёт — первый момент, с которого скорость держится выше flyingSpeedMs
- * flyingWindowS секунд; уточняется до первой точки быстрее порога, иначе
- * медиана окна ставила бы взлёт на полокна раньше. Посадка — то же с конца.
- * Полёта нет вовсе — вся запись земля (takeoff = landing = последняя точка).
- */
-export function flightRange(t: Float64Array, speed: Float64Array): FlightRange {
-  const n = t.length;
-  const windowMs = GROUND_CALIBRATION.flyingWindowS * MS_PER_SECOND;
-  const flying = (i: number): boolean => (speed[i] ?? 0) > GROUND_CALIBRATION.flyingSpeedMs;
-  const windowFrom = (i: number, step: 1 | -1): number[] => {
-    const values: number[] = [];
-    for (let j = i; j >= 0 && j < n && Math.abs((t[j] ?? 0) - (t[i] ?? 0)) <= windowMs; j += step) {
-      values.push(speed[j] ?? 0);
-    }
-    return values;
-  };
-
-  let takeoff = 0;
-  while (takeoff < n && !(medianOf(windowFrom(takeoff, 1)) > GROUND_CALIBRATION.flyingSpeedMs)) takeoff++;
-  if (takeoff >= n) return { takeoff: n - 1, landing: n - 1 };
-  while (takeoff < n - 1 && !flying(takeoff)) takeoff++;
-
-  let landing = n - 1;
-  while (landing > takeoff && !(medianOf(windowFrom(landing, -1)) > GROUND_CALIBRATION.flyingSpeedMs)) landing--;
-  while (landing > takeoff && !flying(landing)) landing--;
-  return { takeoff, landing };
 }
 
 /** Точки, где пилот стоит: минута перед взлётом ('start') или после посадки ('end'). */
