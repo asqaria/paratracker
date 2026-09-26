@@ -217,6 +217,8 @@ export const flights = pgTable(
     startedAt: timestamptz('started_at'),
     endedAt: timestamptz('ended_at'),
     durationS: integer('duration_s'),
+    /** От взлёта до посадки, с (задача 2.12); duration_s — вся запись, с подъёмом пешком. */
+    airtimeS: integer('airtime_s'),
     localDate: date('local_date', { mode: 'string' }),
     /** IANA-таймзона точки взлёта (задача 2.14): местное время — только для показа. */
     timezone: text('timezone'),

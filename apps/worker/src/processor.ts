@@ -119,6 +119,8 @@ export function createFlightProcessor(deps: FlightProcessorDeps): FlightProcesso
           takeoff: result.takeoff,
           landing: result.landing,
           gliderRaw: result.gliderRaw,
+          airtimeS: result.airtimeS,
+          totalGainM: result.totalGainM,
           // Таймзона — по точке взлёта (IANA): из неё местная дата и время полёта (задача 2.14).
           timezone: Number.isFinite(result.takeoff.lat) && Number.isFinite(result.takeoff.lon)
             ? tzlookup(result.takeoff.lat, result.takeoff.lon)

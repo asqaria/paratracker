@@ -809,6 +809,28 @@ function summaryOf(points) {
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
+   Эталон суммарного набора (задача 2.12) — независимая реализация гистерезиса
+   по записанным в файл точкам: подъём считается ступенями ≥ порога от
+   последней опорной точки, спуск на порог переносит опору вниз.
+   ─────────────────────────────────────────────────────────────────────────── */
+/** = GAIN.hysteresisM из packages/core. */
+const GAIN_HYSTERESIS_M = 5;
+
+function totalGainOf(points) {
+  let gain = 0;
+  let ref = points[0].alt;
+  for (const p of points) {
+    if (p.alt - ref >= GAIN_HYSTERESIS_M) {
+      gain += p.alt - ref;
+      ref = p.alt;
+    } else if (ref - p.alt >= GAIN_HYSTERESIS_M) {
+      ref = p.alt;
+    }
+  }
+  return gain;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
    Эталон упрощения трека для карты логбука (задача 2.11) — независимая
    реализация Дугласа–Пекера по записанным в файл точкам. Тест прогоняет
    simplifyTrack из packages/analysis и сверяет список оставленных точек.
@@ -952,7 +974,8 @@ for (const [name, spec] of Object.entries(CASES)) {
     },
     trajectory: TRAJECTORY,
     summary: r.exact ? summaryOf(r.exact) : null,
-    simplified: r.exact ? simplifiedOf(r.exact) : null
+    simplified: r.exact ? simplifiedOf(r.exact) : null,
+    totalGainM: r.exact ? totalGainOf(r.exact) : null
   };
 
   readme.push(`| \`${name}\` | ${spec.what} | ${spec.checks} |`);

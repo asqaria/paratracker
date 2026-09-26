@@ -37,6 +37,8 @@ interface Expectation {
   summary: FlightSummary | null;
   /** Упрощение для карты логбука (Дуглас–Пекер генератора); null — нет у формата. */
   simplified: { toleranceM: number; indices: number[] } | null;
+  /** Суммарный набор с гистерезисом генератора; null — нет у формата. */
+  totalGainM: number | null;
 }
 
 const expectations = JSON.parse(readFileSync(new URL('expected.json', FIXTURES), 'utf8')) as Record<string, Expectation>;

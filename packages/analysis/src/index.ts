@@ -8,6 +8,7 @@ export { analysisLevelFor, medianFixIntervalS } from './sampling.js';
 export { savitzkyGolay, savitzkyGolayCoefficients, type SmoothingOptions } from './savitzky-golay.js';
 export { simplifyTrack, type SimplifiedTrack } from './simplify.js';
 export { summarizeFlight, type SummaryColumns } from './summary.js';
+export { totalGain } from './total-gain.js';
 export { verticalSpeed, type VerticalSpeedOptions } from './vertical-speed.js';
 export { detectCircles, headingTurns, minTurningRate, type CircleColumns, type HeadingTurns } from './circles.js';
 export { detectThermals, type ThermalColumns } from './thermals.js';

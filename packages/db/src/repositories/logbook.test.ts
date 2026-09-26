@@ -59,6 +59,8 @@ describe.runIf(Boolean(databaseUrl))('логбук на живой БД', () => 
       landing: { lat: -61.1, lon: -101, altM: 800 },
       gliderRaw: null,
       timezone: 'Asia/Almaty',
+      airtimeS: 3000,
+      totalGainM: 1234.4,
     });
     return flight.id;
   };

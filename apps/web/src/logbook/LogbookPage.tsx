@@ -10,9 +10,10 @@ import { fetchGliders, GLIDERS_QUERY_KEY } from '../gliders/gliders-api';
 import { SETTINGS_HASH } from '../routing';
 import { fetchLogbookSites, PGE_URL } from '../sites/create-site';
 import { fetchImageryCapabilities } from '../viewer/imagery-capabilities';
-import { fetchLogbookMap, fetchLogbookPage, NO_FILTERS, type LogbookFilters } from './fetch-logbook';
+import { fetchLogbookMap, fetchLogbookPage, fetchSeasonStats, NO_FILTERS, type LogbookFilters } from './fetch-logbook';
 import { LOGBOOK_QUERY_KEY } from './logbook-keys';
 import { LogbookList } from './LogbookList';
+import { SeasonStatsView } from './SeasonStats';
 
 /** MapLibre — ленивый чанк: в начальный бандл не попадает (ТЗ §7.7). */
 const LogbookMap = lazy(() => import('./LogbookMap'));
@@ -55,6 +56,9 @@ function LogbookContent() {
   const t = useT();
   /** Фильтры по месту старта (2.13а) и крылу (2.13б); null — все. */
   const [filters, setFilters] = useState<LogbookFilters>(NO_FILTERS);
+  /** Год статистики; null — последний, в котором пилот летал. */
+  const [year, setYear] = useState<number | null>(null);
+  const stats = useQuery({ queryKey: [...LOGBOOK_QUERY_KEY, 'stats', year], queryFn: () => fetchSeasonStats(year) });
   const sites = useQuery({ queryKey: [...LOGBOOK_QUERY_KEY, 'sites'], queryFn: () => fetchLogbookSites() });
   const gliders = useQuery({ queryKey: GLIDERS_QUERY_KEY, queryFn: () => fetchGliders() });
   const list = useInfiniteQuery({
@@ -92,6 +96,7 @@ function LogbookContent() {
   const features = map.data?.features ?? [];
   return (
     <div className="flex flex-col gap-4">
+      {stats.data && <SeasonStatsView stats={stats.data} onYear={setYear} />}
       {features.length > 0 && map.data && (
         <Suspense fallback={<div className="h-72 rounded-xl bg-subtle compact:h-56" />}>
           <LogbookMap data={map.data} esriTileUrl={imagery.data?.esri === true ? esriTileUrl() : null} />

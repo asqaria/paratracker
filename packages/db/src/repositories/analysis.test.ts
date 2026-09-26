@@ -77,6 +77,8 @@ const processed = (result: FlightAnalysis | null): ProcessedFlight => ({
   landing: { lat: 43.25, lon: 76.95, altM: 800 },
   gliderRaw: 'Ozone Rush 6',
   timezone: 'Asia/Almaty',
+  airtimeS: 3000,
+  totalGainM: 1234.4,
 });
 
 // Интеграционный: нужен поднятый docker compose и применённые миграции.

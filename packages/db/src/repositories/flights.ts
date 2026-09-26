@@ -59,6 +59,9 @@ export interface ProcessedFlight {
   gliderRaw: string | null;
   /** IANA-таймзона точки взлёта (задача 2.14); null — точки нет. */
   timezone: string | null;
+  /** Время в воздухе, с, и сумма подъёмов, м (задача 2.12). */
+  airtimeS: number;
+  totalGainM: number;
 }
 
 const RECORD_COLUMNS = {
@@ -191,6 +194,8 @@ export async function markFlightReady(db: Database, id: string, result: Processe
         takeoffSiteId: nearestSiteId(result.takeoff),
         gliderRaw: result.gliderRaw,
         timezone: result.timezone,
+        airtimeS: whole(result.airtimeS),
+        totalGainM: whole(result.totalGainM),
         // Дата полёта для пилота — по часам места старта: вечерний полёт в Алматы
         // по UTC был бы «вчера». Без таймзоны — дата UTC.
         localDate: sql`(${result.startedAt.toISOString()}::timestamptz AT TIME ZONE ${result.timezone ?? 'UTC'})::date`,
@@ -298,7 +303,7 @@ export async function listUnfinishedFlights(db: Database): Promise<FlightRecord[
 /**
  * Разовая догрузка производных данных: полёты, обработанные до задачи 2.11
  * (нет сводки и линии для карты), 2.13 (нет точки взлёта для места старта)
- * или 2.14 (нет таймзоны),
+ * 2.14 (нет таймзоны) или 2.12 (нет времени в воздухе и суммарного набора),
  * возвращаются в очередь — их подберёт обычное восстановление при старте
  * воркера. После обработки обе колонки заполнены, повторно полёт не попадёт.
  */
@@ -309,7 +314,12 @@ export async function requeueFlightsForBackfill(db: Database): Promise<number> {
     .where(
       and(
         eq(flights.status, 'ready'),
-        or(isNull(flights.distanceTrackM), isNull(flights.takeoffPoint), isNull(flights.timezone)),
+        or(
+          isNull(flights.distanceTrackM),
+          isNull(flights.takeoffPoint),
+          isNull(flights.timezone),
+          isNull(flights.airtimeS),
+        ),
       ),
     )
     .returning({ id: flights.id });

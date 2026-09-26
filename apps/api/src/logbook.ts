@@ -5,10 +5,19 @@ import {
   LogbookQuery,
   LogbookResponse,
   LogbookSitesResponse,
+  SeasonStatsQuery,
+  SeasonStatsResponse,
   gliderLabel,
   type LogbookEntry,
 } from '@skyline/core';
-import type { LogbookCursor, LogbookEntryRecord, LogbookMapFeature, LogbookPage, SiteRecord } from '@skyline/db';
+import type {
+  LogbookCursor,
+  LogbookEntryRecord,
+  LogbookMapFeature,
+  LogbookPage,
+  SeasonStats,
+  SiteRecord,
+} from '@skyline/db';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
@@ -32,6 +41,8 @@ export interface LogbookRoutesDeps {
   }): Promise<LogbookPage>;
   /** Места, откуда летал пилот, с числом полётов (задача 2.13). */
   sites(userId: string): Promise<(SiteRecord & { flightCount: number })[]>;
+  /** Статистика сезона (задача 2.12); year нет — последний год с полётами. */
+  stats(userId: string, year?: number): Promise<SeasonStats>;
   map(userId: string): Promise<LogbookMapFeature[]>;
   claim(userId: string, claims: readonly { flightId: string; tokenHash: string }[]): Promise<string[]>;
 }
@@ -94,6 +105,17 @@ export function registerLogbookRoutes(app: FastifyInstance, deps: LogbookRoutesD
     return reply.send(
       LogbookResponse.parse({ items: page.items.map(toEntry), nextCursor: page.next ? encodeCursor(page.next) : null }),
     );
+  });
+
+  app.get('/logbook/stats', async (request, reply) => {
+    const userId = await requireUser(request, reply);
+    if (!userId) return reply;
+    const query = SeasonStatsQuery.safeParse(request.query);
+    if (!query.success) {
+      return sendProblem(reply, problem(HTTP.badRequest, { detail: z.prettifyError(query.error) }));
+    }
+    const stats = await deps.stats(userId, ...(query.data.year === undefined ? [] : [query.data.year]));
+    return reply.send(SeasonStatsResponse.parse(stats));
   });
 
   app.get('/logbook/sites', async (request, reply) => {

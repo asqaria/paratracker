@@ -1092,7 +1092,8 @@ flights (
   altitude_source text,           -- baro | gnss
   max_alt_m int, min_alt_m int, takeoff_alt_m int, landing_alt_m int,
   max_agl_m int,
-  total_gain_m int,               -- сумма всех наборов
+  total_gain_m int,               -- сумма всех наборов в воздухе, гистерезис GAIN.hysteresisM (2.12)
+  airtime_s int,                  -- от взлёта до посадки (2.12); duration_s — вся запись
   distance_track_km numeric(7,2), -- длина трека
   distance_straight_km numeric(7,2),
   max_climb_ms numeric(4,2), max_sink_ms numeric(4,2),
@@ -1255,7 +1256,8 @@ POST   /api/v1/sites                      { flightId, name } — пилот до
                                            своего полёта; 201 | 404 | 409 (место уже есть)
 POST   /api/v1/flights/claim              { claims: [{ flightId, token }] } → { claimed } —
                                            забрать анонимные загрузки этого браузера (§7.1)
-GET    /api/v1/logbook/stats?year         агрегаты за период
+GET    /api/v1/logbook/stats?year         статистика сезона (2.12): итоги, рекорды, 12 месяцев,
+                                           топ-5 мест; год — по местной дате, нет — последний с полётами
 GET    /api/v1/logbook/heatmap            GeoJSON термиков пилота
 
 # Лента и социальное
@@ -1543,7 +1545,7 @@ Chrome/Edge 120+, Safari 17+, Firefox 120+. WebGL2 обязателен для 3
 2.9  Фронт: glTF-модель параплана с ориентацией и креном
 2.10 Аутентификация: вход через Google (без паролей), JWT + refresh, /me
 2.11 Логбук: список полётов, фильтр по дате, карта всех полётов (MapLibre), перенос анонимных загрузок
-2.12 Статистика сезона: часы, км, набор, число полётов, топ-мест, график по месяцам
+2.12 Статистика сезона: часы в воздухе (airtime_s), км, суммарный набор (гистерезис 5 м), число полётов, топ-мест, график по месяцам
 2.13 а) Места старта: таблица sites, сид paragliding.earth, автоопределение, добавление пилотом
      б) Крылья: «Мои крылья», крыло по умолчанию, выбор в полёте, подсказка из IGC HFGTY, фильтр
 2.14 Таймзона по точке взлёта (tz-lookup, IANA) → local_date и местное время в логбуке и просмотрщике

@@ -1,0 +1,1 @@
+ALTER TABLE "flights" ADD COLUMN "airtime_s" integer;

@@ -46,6 +46,17 @@ async function signedIn(page: Page): Promise<string[]> {
   );
   await page.route('**/api/v1/logbook', (route) => route.fulfill({ json: { items: [ENTRY], nextCursor: null } }));
   await page.route('**/api/v1/gliders', (route) => route.fulfill({ json: { gliders: [] } }));
+  await page.route('**/api/v1/logbook/stats', (route) =>
+    route.fulfill({
+      json: {
+        year: 2023,
+        years: [2023],
+        totals: { flights: 1, airtimeS: 17_000, distanceM: 162_100, gainM: 4200, maxAltM: 3293, longestAirtimeS: 17_000, longestDistanceM: 162_100 },
+        byMonth: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, flights: i === 6 ? 1 : 0, airtimeS: i === 6 ? 17_000 : 0, distanceM: i === 6 ? 162_100 : 0 })),
+        topSites: [{ ...ENTRY.takeoffSite, flights: 1, airtimeS: 17_000 }],
+      },
+    }),
+  );
   await page.route('**/api/v1/flights/claim', async (route) => {
     const body = route.request().postDataJSON() as { claims: { flightId: string }[] };
     claimed.push(...body.claims.map((c) => c.flightId));
@@ -66,7 +77,9 @@ for (const viewport of [
     await expect(page.locator('[data-panel="logbook-list"] tbody tr')).toHaveCount(1);
     // Место старта — под датой; фильтр по местам — над списком (задача 2.13).
     await expect(page.locator('[data-panel="logbook-list"] tbody tr')).toContainText('Ush Konyr · Ozone Rush 6');
-    await expect(page.locator('select option')).toHaveCount(2);
+    // Фильтр по местам (2 варианта) и год статистики (1).
+    await expect(page.locator('[data-panel="logbook-list"]').locator('xpath=..').locator('select option')).toHaveCount(2);
+    await expect(page.locator('[data-panel="season-stats"] rect')).toHaveCount(12);
     await expect(page.locator('.maplibregl-canvas')).toBeVisible({ timeout: 30_000 });
     // Атрибуция Esri обязательна по лицензии (ТЗ §11.3).
     await expect(page.locator('.maplibregl-ctrl-attrib')).toContainText('Powered by Esri');
