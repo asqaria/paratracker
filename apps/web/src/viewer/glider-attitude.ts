@@ -14,8 +14,13 @@ import { shortestTurn } from './camera-modes';
  * по таким данным не восстановить — крен там будет занижен.
  */
 
-/** Модель параплана в public/, путь от BASE_URL (генерирует tools/make-paraglider.mjs). */
-export const PARAGLIDER_MODEL_PATH = 'models/paraglider.glb';
+/**
+ * Модель параплана (генерирует tools/make-paraglider.mjs) — рядом с кодом, а не
+ * в public/: Vite кладёт её в /assets/ с хешем содержимого в имени. Из public/
+ * она отдавалась по одному и тому же адресу без Cache-Control, и после
+ * выкладки новой модели браузеры показывали старую из кэша.
+ */
+export const PARAGLIDER_MODEL_FILE = 'models/paraglider.glb';
 
 export interface AttitudeTrack extends TargetTrack {
   /** Путевая скорость, м/с (колонка .track). */

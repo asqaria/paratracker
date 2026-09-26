@@ -8,7 +8,7 @@
  * (paraglider-model.test.ts сверяет файл с выводом генератора).
  *
  * Запуск:   node tools/make-paraglider.mjs [выходной_файл]
- * По умолчанию пишет apps/web/public/models/paraglider.glb
+ * По умолчанию пишет apps/web/src/viewer/models/paraglider.glb (Vite — в /assets/ с хешем)
  *
  * Оси glTF: +Y вверх, +Z — нос (передняя кромка), +X — левое крыло.
  * Единицы — метры. Начало координат — точка подвеса пилота (карабины): модель
@@ -29,7 +29,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-const OUT = process.argv[2] || 'apps/web/public/models/paraglider.glb';
+const OUT = process.argv[2] || 'apps/web/src/viewer/models/paraglider.glb';
 
 /* ── Размеры (типичное крыло EN-B, ~23 м² плоской площади) ─────────────── */
 

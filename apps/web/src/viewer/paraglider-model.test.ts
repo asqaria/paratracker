@@ -6,10 +6,10 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { PARAGLIDER_MODEL_PATH } from './glider-attitude';
+import { PARAGLIDER_MODEL_FILE } from './glider-attitude';
 
 /**
- * Модель параплана — сгенерированный файл в public/ (tools/make-paraglider.mjs).
+ * Модель параплана — сгенерированный файл рядом с кодом (tools/make-paraglider.mjs).
  * Проверяется то, на что опирается сцена: формат GLB, реальные размеры в
  * метрах, нос по +Z, пилот под куполом в начале координат, области раскраски
  * купола — отдельные материалы (под выбор расцветки, задача 2.13).
@@ -29,7 +29,7 @@ interface Gltf {
   accessors: Array<{ count: number; min?: number[]; max?: number[] }>;
 }
 
-const MODEL_URL = new URL(`../../public/${PARAGLIDER_MODEL_PATH}`, import.meta.url);
+const MODEL_URL = new URL(PARAGLIDER_MODEL_FILE, import.meta.url);
 const GENERATOR = new URL('../../../../tools/make-paraglider.mjs', import.meta.url);
 const glb = readFileSync(MODEL_URL);
 const TRIANGLES = 4;
