@@ -12,6 +12,7 @@ import { and, asc, eq, inArray, isNull, lt, or } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
 import { flights, glides, thermals } from '../schema.js';
+import { defaultGliderId } from './gliders.js';
 import { nearestSiteId } from './sites.js';
 
 /** Репозиторий полётов: наружу отдаются типизированные записи, не строки БД. */
@@ -54,6 +55,8 @@ export interface ProcessedFlight {
   /** Взлёт и посадка (задача 2.13): по ним — место старта и посадки. */
   takeoff: FlightPoint;
   landing: FlightPoint;
+  /** Модель крыла из файла (IGC HFGTY); null — прибор не записал. */
+  gliderRaw: string | null;
 }
 
 const RECORD_COLUMNS = {
@@ -74,6 +77,8 @@ export async function insertFlight(db: Database, flight: NewFlight): Promise<Fli
       sourceFormat: flight.sourceFormat,
       rawObjectKey: flight.rawObjectKey,
       claimTokenHash: flight.claimTokenHash ?? null,
+      // Вошедший пилот — крыло по умолчанию сразу (задача 2.13б); сменит, если летал на другом.
+      gliderId: flight.userId === null ? null : defaultGliderId(flight.userId),
     })
     .returning(RECORD_COLUMNS);
   if (!row) throw new Error('insertFlight returned no row');
@@ -182,6 +187,7 @@ export async function markFlightReady(db: Database, id: string, result: Processe
         landingAltM: whole(result.landing.altM),
         // Место — ближайшее известное в SITE.matchRadiusM; нет — null, пилот добавит сам.
         takeoffSiteId: nearestSiteId(result.takeoff),
+        gliderRaw: result.gliderRaw,
         landingSiteId: nearestSiteId(result.landing),
         updatedAt: new Date(),
       })

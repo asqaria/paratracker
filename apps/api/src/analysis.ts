@@ -1,5 +1,6 @@
 import {
   FlightDetailsResponse,
+  gliderLabel,
   GlidesResponse,
   thermalStrength,
   ThermalsResponse,
@@ -45,6 +46,8 @@ function toDetails(flight: FlightDetailsRecord, viewerId: string | null): Flight
     wind: wind(flight.windDirDeg, flight.windSpeedMs),
     takeoffSite: flight.takeoffSite,
     landingSite: flight.landingSite,
+    glider: flight.glider ? { id: flight.glider.id, label: gliderLabel(flight.glider) } : null,
+    gliderRaw: flight.gliderRaw,
     canEdit: viewerId !== null && viewerId === flight.userId,
   });
 }

@@ -13,14 +13,23 @@ async function ok(response: Response, what: string): Promise<unknown> {
   return response.json();
 }
 
+/** Фильтры логбука; null — без фильтра. */
+export interface LogbookFilters {
+  siteId: string | null;
+  gliderId: string | null;
+}
+
+export const NO_FILTERS: LogbookFilters = { siteId: null, gliderId: null };
+
 export async function fetchLogbookPage(
   cursor: string | null,
-  siteId: string | null = null,
+  filters: LogbookFilters = NO_FILTERS,
   fetchImpl: typeof fetch = fetch,
 ): Promise<LogbookResponse> {
   const params = new URLSearchParams({
     ...(cursor === null ? {} : { cursor }),
-    ...(siteId === null ? {} : { siteId }),
+    ...(filters.siteId === null ? {} : { siteId: filters.siteId }),
+    ...(filters.gliderId === null ? {} : { gliderId: filters.gliderId }),
   }).toString();
   const url = params === '' ? LOGBOOK_URL : `${LOGBOOK_URL}?${params}`;
   return LogbookResponse.parse(await ok(await fetchWithSession(url, { method: 'GET' }, fetchImpl), 'Logbook'));

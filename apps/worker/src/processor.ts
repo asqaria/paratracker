@@ -117,6 +117,7 @@ export function createFlightProcessor(deps: FlightProcessorDeps): FlightProcesso
           simplified: result.simplified,
           takeoff: result.takeoff,
           landing: result.landing,
+          gliderRaw: result.gliderRaw,
         });
         await announce(flightId, 'ready', { progress: 1, trackReady: true });
         deps.onReady?.(flightId, {

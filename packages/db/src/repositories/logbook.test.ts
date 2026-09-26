@@ -57,6 +57,7 @@ describe.runIf(Boolean(databaseUrl))('логбук на живой БД', () => 
       // Южный океан: рядом нет мест из сида.
       takeoff: { lat: -61, lon: -101, altM: 1500 },
       landing: { lat: -61.1, lon: -101, altM: 800 },
+      gliderRaw: null,
     });
     return flight.id;
   };

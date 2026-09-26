@@ -54,6 +54,7 @@ describe.runIf(Boolean(databaseUrl))('места старта на живой Б
       simplified: null,
       takeoff: { ...at, altM: 1948.4 },
       landing: { lat: at.lat + 0.1, lon: at.lon, altM: 800 },
+      gliderRaw: null,
     });
     return flight.id;
   };

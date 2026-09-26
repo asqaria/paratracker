@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { FlightViewerPage } from './flight/FlightViewerPage';
+import { GlidersPage } from './gliders/GlidersPage';
 import { HealthPage } from './health/HealthPage';
 import { ClaimOnSignIn } from './logbook/ClaimOnSignIn';
 import { LogbookPage } from './logbook/LogbookPage';
@@ -37,6 +38,7 @@ function Screen() {
 
   if (route.kind === 'health') return <HealthPage />;
   if (route.kind === 'logbook') return <LogbookPage />;
+  if (route.kind === 'settings') return <GlidersPage />;
   if (route.kind === 'flight') return <FlightViewerPage flightId={route.flightId} trackUrl={route.trackUrl} />;
   return <UploadPage authFailed={route.kind === 'landing' && route.authFailed === true} />;
 }

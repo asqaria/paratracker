@@ -4,6 +4,7 @@ export * from './constants.js';
 export * from './derived.js';
 export * from './flight.js';
 export * from './flight-dto.js';
+export * from './glider.js';
 export * from './health.js';
 export * from './imagery.js';
 export * from './logbook-dto.js';

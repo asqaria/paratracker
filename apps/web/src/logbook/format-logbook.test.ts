@@ -14,6 +14,7 @@ const ENTRY: LogbookEntry = {
   maxAltM: 3505,
   thermalCount: 28,
   takeoffSite: null,
+  glider: null,
 };
 
 describe('formatEntry', () => {

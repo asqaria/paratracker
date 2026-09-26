@@ -1,7 +1,9 @@
 import {
   claimFlights,
   createChannelListener,
+  createGlider,
   createUserSite,
+  deleteGlider,
   createDatabase,
   createSession,
   findFlight,
@@ -12,12 +14,15 @@ import {
   listGlides,
   listLogbook,
   listLogbookMap,
+  listGliders,
   listLogbookSites,
   listThermals,
   notifyFlightQueued,
   revokeSession,
   rotateSession,
+  setFlightGlider,
   signInWithOAuth,
+  updateGlider,
 } from '@skyline/db';
 
 import tzlookup from '@photostructure/tz-lookup';
@@ -77,6 +82,13 @@ const app = buildApp({
         sites: {
           // Таймзона места — по координатам взлёта (IANA): из неё местное время полёта (2.14).
           create: (args) => createUserSite(database.db, { ...args, timezoneAt: (lat, lon) => tzlookup(lat, lon) }),
+        },
+        gliders: {
+          list: (userId) => listGliders(database.db, userId),
+          create: (userId, input) => createGlider(database.db, userId, input),
+          update: (userId, id, input) => updateGlider(database.db, userId, id, input),
+          remove: (userId, id) => deleteGlider(database.db, userId, id),
+          setFlightGlider: (args) => setFlightGlider(database.db, args),
         },
       }
     : {}),

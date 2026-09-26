@@ -5,6 +5,7 @@ import {
   LogbookQuery,
   LogbookResponse,
   LogbookSitesResponse,
+  gliderLabel,
   type LogbookEntry,
 } from '@skyline/core';
 import type { LogbookCursor, LogbookEntryRecord, LogbookMapFeature, LogbookPage, SiteRecord } from '@skyline/db';
@@ -26,6 +27,7 @@ export interface LogbookRoutesDeps {
     from?: string;
     to?: string;
     siteId?: string;
+    gliderId?: string;
     after?: LogbookCursor;
   }): Promise<LogbookPage>;
   /** Места, откуда летал пилот, с числом полётов (задача 2.13). */
@@ -57,6 +59,7 @@ const toEntry = (record: LogbookEntryRecord): LogbookEntry => ({
   ...record,
   startedAt: iso(record.startedAt),
   uploadedAt: record.uploadedAt.toISOString(),
+  glider: record.glider ? { id: record.glider.id, label: gliderLabel(record.glider) } : null,
 });
 
 export function registerLogbookRoutes(app: FastifyInstance, deps: LogbookRoutesDeps): void {
@@ -75,7 +78,7 @@ export function registerLogbookRoutes(app: FastifyInstance, deps: LogbookRoutesD
     if (!query.success) {
       return sendProblem(reply, problem(HTTP.badRequest, { detail: z.prettifyError(query.error) }));
     }
-    const { cursor, from, to, siteId, limit } = query.data;
+    const { cursor, from, to, siteId, gliderId, limit } = query.data;
     const after = cursor === undefined ? undefined : decodeCursor(cursor);
     if (after === null) return sendProblem(reply, problem(HTTP.badRequest, { detail: 'Invalid cursor' }));
 
@@ -85,6 +88,7 @@ export function registerLogbookRoutes(app: FastifyInstance, deps: LogbookRoutesD
       ...(from === undefined ? {} : { from }),
       ...(to === undefined ? {} : { to }),
       ...(siteId === undefined ? {} : { siteId }),
+      ...(gliderId === undefined ? {} : { gliderId }),
       ...(after === undefined ? {} : { after }),
     });
     return reply.send(

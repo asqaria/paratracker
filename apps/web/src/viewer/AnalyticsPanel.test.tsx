@@ -70,6 +70,8 @@ const analytics = (overrides: Partial<FlightAnalytics['details']> = {}): FlightA
     wind: { dirDeg: 44, speedMs: 3.63 },
     takeoffSite: null,
     landingSite: null,
+    glider: null,
+    gliderRaw: null,
     canEdit: false,
     ...overrides,
   },

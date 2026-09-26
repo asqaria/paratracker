@@ -1,6 +1,9 @@
 import { useState } from 'react';
 
 import { fill, useLocaleStore, useT } from '../i18n/locale';
+import type { GliderDto } from '@skyline/core';
+
+import { GliderLine } from '../gliders/GliderLine';
 import { SiteLine } from '../sites/SiteLine';
 import type { MessageKey } from '../i18n/messages';
 import type { AnalyticsState, FlightAnalytics } from './flight-analytics';
@@ -38,6 +41,9 @@ export interface AnalyticsPanelProps {
   embedded?: boolean;
   /** Добавить место старта своего полёта (задача 2.13); без обработчика формы нет. */
   onCreateSite?: (name: string) => Promise<void>;
+  /** Крылья владельца и смена крыла полёта (задача 2.13б); без них — только подпись. */
+  gliders?: GliderDto[] | undefined;
+  onSetGlider?: (gliderId: string | null) => Promise<void>;
 }
 
 const TABS: ReadonlyArray<{ id: AnalyticsTab; label: MessageKey }> = [
@@ -65,6 +71,8 @@ export function AnalyticsPanel({
   onColumnsShown,
   embedded = false,
   onCreateSite,
+  gliders,
+  onSetGlider,
 }: AnalyticsPanelProps) {
   const t = useT();
   const [collapsedOpen, setOpen] = useState(defaultOpen);
@@ -109,6 +117,12 @@ export function AnalyticsPanel({
                 site={state.analytics.details.takeoffSite}
                 canEdit={state.analytics.details.canEdit && onCreateSite !== undefined}
                 onCreate={onCreateSite ?? (() => Promise.resolve())}
+              />
+              <GliderLine
+                glider={state.analytics.details.glider}
+                gliderRaw={state.analytics.details.gliderRaw}
+                gliders={state.analytics.details.canEdit && onSetGlider ? gliders : undefined}
+                onSelect={onSetGlider ?? (() => Promise.resolve())}
               />
             </div>
           )}

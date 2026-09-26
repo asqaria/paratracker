@@ -19,6 +19,7 @@ const ENTRY = {
   maxAltM: 3293,
   thermalCount: 28,
   takeoffSite: { id: '33333333-2222-4333-8444-555555555555', name: 'Ush Konyr', countryCode: 'kz', source: 'seed' },
+  glider: { id: '44444444-2222-4333-8444-555555555555', label: 'Ozone Rush 6' },
 };
 const MAP = {
   type: 'FeatureCollection',
@@ -43,6 +44,7 @@ async function signedIn(page: Page): Promise<string[]> {
     route.fulfill({ json: { sites: [{ ...ENTRY.takeoffSite, flightCount: 1 }] } }),
   );
   await page.route('**/api/v1/logbook', (route) => route.fulfill({ json: { items: [ENTRY], nextCursor: null } }));
+  await page.route('**/api/v1/gliders', (route) => route.fulfill({ json: { gliders: [] } }));
   await page.route('**/api/v1/flights/claim', async (route) => {
     const body = route.request().postDataJSON() as { claims: { flightId: string }[] };
     claimed.push(...body.claims.map((c) => c.flightId));
@@ -62,7 +64,7 @@ for (const viewport of [
 
     await expect(page.locator('[data-panel="logbook-list"] tbody tr')).toHaveCount(1);
     // Место старта — под датой; фильтр по местам — над списком (задача 2.13).
-    await expect(page.locator('[data-panel="logbook-list"] tbody tr')).toContainText('Ush Konyr');
+    await expect(page.locator('[data-panel="logbook-list"] tbody tr')).toContainText('Ush Konyr · Ozone Rush 6');
     await expect(page.locator('select option')).toHaveCount(2);
     await expect(page.locator('.maplibregl-canvas')).toBeVisible({ timeout: 30_000 });
     // Атрибуция Esri обязательна по лицензии (ТЗ §11.3).

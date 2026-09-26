@@ -5,6 +5,7 @@ import {
   DEFAULT_PRIVACY,
   FLIGHT_STATUSES,
   GLIDE_KINDS,
+  GLIDER_CERTIFICATIONS,
   LOCALES,
   PRIVACY_LEVELS,
   SITE_SOURCES,
@@ -28,6 +29,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
@@ -36,12 +38,10 @@ import { citext, geography } from './columns.js';
 
 /**
  * Схема по ТЗ §9: users и flights (Фаза 0, задача 0.4), thermals и glides (задача 2.5),
- * oauth_accounts и sessions (задача 2.10), sites (задача 2.13).
+ * oauth_accounts и sessions (задача 2.10), sites (задача 2.13а), gliders (задача 2.13б).
  *
  * Отступления от текста §9, обязательные по CLAUDE.md:
  * - дистанции хранятся в метрах (`*_m integer`), а не в км: внутри системы только СИ;
- * - FK на gliders не объявлен — таблицы ещё нет, колонка уже есть,
- *   ограничение добавится миграцией вместе с таблицей (задача 2.13б).
  */
 
 /** CHECK по списку значений из core: один источник правды для БД и API. */
@@ -149,6 +149,35 @@ export const sites = pgTable(
   ],
 );
 
+/** Крылья пилота (ТЗ §9, задача 2.13б). У пилота не больше одного крыла по умолчанию. */
+export const gliders = pgTable(
+  'gliders',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    manufacturer: text('manufacturer').notNull(),
+    model: text('model').notNull(),
+    size: text('size'),
+    /** EN-A..EN-D, CCC; null — не указан. */
+    certification: text('certification', { enum: GLIDER_CERTIFICATIONS }),
+    purchasedAt: date('purchased_at', { mode: 'string' }),
+    retiredAt: date('retired_at', { mode: 'string' }),
+    /** Крыло по умолчанию: его получают новые полёты пилота. */
+    isDefault: boolean('is_default').notNull().default(false),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    check('gliders_certification_check', oneOf(t.certification, GLIDER_CERTIFICATIONS)),
+    index('gliders_user_idx').on(t.userId),
+    // Одно крыло по умолчанию на пилота — гарантия БД, а не только кода.
+    uniqueIndex('gliders_one_default_idx')
+      .on(t.userId)
+      .where(sql`${t.isDefault}`),
+  ],
+);
+
 export const flights = pgTable(
   'flights',
   {
@@ -173,8 +202,8 @@ export const flights = pgTable(
     pilotNameRaw: text('pilot_name_raw'),
     gliderRaw: text('glider_raw'),
 
-    // привязки; FK на gliders — вместе с таблицей (задача 2.13б)
-    gliderId: uuid('glider_id'),
+    // привязки
+    gliderId: uuid('glider_id').references(() => gliders.id, { onDelete: 'set null' }),
     takeoffSiteId: uuid('takeoff_site_id').references(() => sites.id, { onDelete: 'set null' }),
     landingSiteId: uuid('landing_site_id').references(() => sites.id, { onDelete: 'set null' }),
     /**
