@@ -80,6 +80,7 @@ const record = (overrides: Partial<FlightRecord> = {}): FlightRecord => ({
   privacy: 'unlisted',
   shareToken: null,
   publicTrackObjectKey: null,
+  previewObjectKey: null,
   ...overrides,
 });
 
@@ -118,6 +119,9 @@ describe('обработка одного полёта', { timeout: PROCESSOR_TE
     // Трек для посторонних (задача 3.7) — рядом с полным, с суффиксом .public.track.
     expect(ready[0]?.publicTrackObjectKey).toMatch(/^tracks\/.*\.public\.track$/);
     expect(objects.has(ready[0]?.publicTrackObjectKey ?? '')).toBe(true);
+    // Превью для мессенджеров (задача 3.8): без ключа подложки — на тёмном фоне, но есть.
+    expect(ready[0]?.previewObjectKey).toMatch(/^previews\/.*\.jpg$/);
+    expect([...(objects.get(ready[0]?.previewObjectKey ?? '') ?? []).slice(0, 2)]).toEqual([0xff, 0xd8]);
     const trackKey = ready[0]?.trackObjectKey ?? '';
     expect(trackKey).toMatch(/^tracks\/.*\.track$/);
     expect(readTrack(objects.get(trackKey) ?? new Uint8Array()).pointCount).toBe(960);

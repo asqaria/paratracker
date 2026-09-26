@@ -110,6 +110,7 @@ function harness(options: { google?: boolean } = {}): Harness {
           privacy: 'unlisted',
           shareToken: null,
           publicTrackObjectKey: null,
+          previewObjectKey: null,
         });
       },
       find: () => Promise.resolve(null),

@@ -30,7 +30,8 @@ export default defineConfig(({ mode }) => {
     envPrefix: ['VITE_'],
     server: {
       // В dev фронт и API на одном origin: без CORS, как за обратным прокси в проде.
-      proxy: { '/api': `http://127.0.0.1:${apiPort}` },
+      // /s/ — ссылка «поделиться»: страницу с превью для мессенджеров отдаёт API (задача 3.8).
+      proxy: { '/api': `http://127.0.0.1:${apiPort}`, '/s/': `http://127.0.0.1:${apiPort}` },
     },
   };
 });

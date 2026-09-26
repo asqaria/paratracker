@@ -23,6 +23,7 @@ import {
   RETENTION_SWEEP_INTERVAL_S,
 } from './constants.js';
 import { createPipelinePool } from './pool.js';
+import { esriTileSource } from './esri-tiles.js';
 import { createFlightProcessor } from './processor.js';
 import { createFlightQueue } from './queue.js';
 import { createRetentionSweep } from './retention.js';
@@ -60,6 +61,10 @@ const processor = createFlightProcessor({
   notify: (event) => notifyFlightStatus(database.db, event),
   onError: (error, flightId) => logger.error({ err: error, flightId }, 'flight processing failed'),
   onReady: (flightId, summary) => logger.info({ flightId, ...summary }, 'flight ready'),
+  tiles:
+    config.ARCGIS_API_KEY && config.ARCGIS_TILE_URL
+      ? esriTileSource(config.ARCGIS_TILE_URL, config.ARCGIS_API_KEY)
+      : null,
 });
 
 const queue = createFlightQueue({

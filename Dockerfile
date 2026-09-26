@@ -49,6 +49,8 @@ COPY --from=build /repo/packages/db/dist packages/db/dist
 COPY --from=build /repo/packages/db/drizzle packages/db/drizzle
 COPY --from=build /repo/apps/api/dist apps/api/dist
 COPY --from=build /repo/apps/worker/dist apps/worker/dist
+# Шрифт для подписей на превью полёта (задача 3.8): в alpine их нет, а librsvg без шрифта рисует пустоту.
+RUN apk add --no-cache font-dejavu
 USER node
 CMD ["node", "apps/api/dist/server.js"]
 
