@@ -1,9 +1,12 @@
 import {
+  Cartesian3,
   CallbackProperty,
   HeadingPitchRoll,
   JulianDate,
   Math as CesiumMath,
+  PropertyBag,
   Quaternion,
+  TranslationRotationScale,
   Transforms,
   type Entity,
   type SampledPositionProperty,
@@ -11,6 +14,7 @@ import {
 } from 'cesium';
 
 import { PARAGLIDER_MODEL_PATH, type GliderAttitude } from './glider-attitude';
+import { GLIDER_NODES, nodeTransforms, type GliderNode, type GliderPose, type NodeTransform } from './glider-pose';
 
 /**
  * Пилот на сцене — модель параплана (ТЗ §12, задача 2.9), а не точка.
@@ -29,11 +33,48 @@ const GLIDER_MAX_SCALE = 200;
  */
 const MODEL_HEADING_OFFSET_DEG = -90;
 
-/** Добавляет модель; attitudeAt — поза в момент времени (UNIX мс). */
+/**
+ * Узлы модели по позе (glider-pose.ts): поза считается раз на момент времени,
+ * преобразования — в объекты Cesium, которые переиспользуются между кадрами.
+ */
+function nodeTransformations(poseAt: (timeMs: number) => GliderPose): PropertyBag {
+  let cachedMs = Number.NaN;
+  let cached: Record<GliderNode, NodeTransform> | null = null;
+  const transformsAt = (time: JulianDate): Record<GliderNode, NodeTransform> => {
+    const ms = JulianDate.toDate(time).getTime();
+    if (!cached || ms !== cachedMs) {
+      cached = nodeTransforms(poseAt(ms));
+      cachedMs = ms;
+    }
+    return cached;
+  };
+  const bag = new PropertyBag();
+  for (const node of GLIDER_NODES) {
+    const trs = new TranslationRotationScale();
+    bag.addProperty(
+      node,
+      new CallbackProperty((time) => {
+        if (!time) return trs;
+        const { translation, rotation, scale } = transformsAt(time)[node];
+        trs.translation = Cartesian3.fromArray([...translation], 0, trs.translation);
+        trs.rotation = Quaternion.unpack([...rotation], 0, trs.rotation);
+        trs.scale = Cartesian3.fromArray([...scale], 0, trs.scale);
+        return trs;
+      }, false),
+    );
+  }
+  return bag;
+}
+
+/**
+ * Добавляет модель; attitudeAt — курс и крен в момент времени (UNIX мс),
+ * poseAt — поза пилота и крыла (на земле — стоит, идёт, разбег, посадка).
+ */
 export function addGlider(
   viewer: Viewer,
   position: SampledPositionProperty,
   attitudeAt: (timeMs: number) => GliderAttitude,
+  poseAt: (timeMs: number) => GliderPose,
 ): Entity {
   // Пилот стоит — курса нет: держим последний, а не разворачиваем на север.
   let lastHeadingDeg = 0;
@@ -58,6 +99,7 @@ export function addGlider(
       uri: `${import.meta.env.BASE_URL}${PARAGLIDER_MODEL_PATH}`,
       minimumPixelSize: GLIDER_MIN_PIXEL_SIZE,
       maximumScale: GLIDER_MAX_SCALE,
+      nodeTransformations: nodeTransformations(poseAt),
     },
   });
 }
