@@ -132,3 +132,41 @@ export interface Thermal {
   efficiency: number;
   strength: ThermalStrength;
 }
+
+/** Полёт — от взлёта до посадки, индексы точек трека; вне него — ходьба по земле. */
+export interface FlightRange {
+  takeoff: number;
+  landing: number;
+}
+
+/** 'dynamic' — высота почти не терялась (ТЗ §6.4): качество не определено. */
+export type GlideKind = 'glide' | 'dynamic';
+
+/**
+ * Глайд (переход), ТЗ §6.4: от взлёта или конца термика до начала следующего
+ * термика или посадки. Круги поиска, не ставшие термиком, — часть перехода.
+ * Индексы — точки сетки 1 Гц; всё в СИ.
+ */
+export interface Glide {
+  startIndex: number;
+  endIndex: number;
+  /** UTC, мс. */
+  startTimeMs: number;
+  endTimeMs: number;
+  durationS: number;
+  /** Путь по земле, м: сумма шагов трека; через разрывы записи не набегает. */
+  distanceM: number;
+  /** Высота входа минус высота выхода, м; отрицательная — пилот набрал. */
+  altLossM: number;
+  /** distance / altLoss, не больше GLIDE.maxGlideRatio; null — 'dynamic'. */
+  glideRatio: number | null;
+  kind: GlideKind;
+  /** distance / duration. */
+  avgGroundSpeedMs: number;
+  /** −altLoss / duration: снижение — отрицательное. */
+  avgVzMs: number;
+  /** Азимут от начала к концу, градусы [0, 360); NaN — вернулся в точку старта. */
+  headingDeg: number;
+  /** Насколько прямо шёл: расстояние по прямой / путь, 0..1. */
+  headingConsistency: number;
+}

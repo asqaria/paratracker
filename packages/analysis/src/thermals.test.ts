@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { detectCircles } from './circles.js';
 import { cleanAndDerive } from './clean-derive.js';
 import { computeMotion } from './motion.js';
+import { flight, LAT0, LON0, M_LAT, M_LON, START, type Leg } from './testing/legs.js';
 import { expectation, parseFixture } from './testing/tracks.js';
 import { detectThermals, type ThermalColumns } from './thermals.js';
 
@@ -87,46 +88,8 @@ describe('detectThermals на baseline.igc — две спирали генер�
 
 /* ── Синтетика: условия §6.3 ────────────────────────────────────────────── */
 
-const LAT0 = 43.2;
-const LON0 = 76.9;
-const M_LAT = 111_320;
-const mLon = M_LAT * Math.cos((LAT0 * Math.PI) / 180);
-const START = Date.UTC(2026, 6, 15, 10);
 /** IGC пишет минуты с тремя знаками: 60 000 шагов на градус. */
 const IGC_MINUTE_STEPS = 60_000;
-
-interface Leg {
-  seconds: number;
-  /** Градусов поворота в секунду: 18 — круг за 20 с; 0 — прямо. */
-  turnDegS: number;
-  climbMs: number;
-}
-
-/** Трек из участков: вираж или прямая с заданным набором; 10 м/с, окружность радиусом v/ω. */
-function flight(legs: Leg[]): ThermalColumns {
-  const east: number[] = [0];
-  const north: number[] = [0];
-  const up: number[] = [1500];
-  let heading = 0;
-  for (const leg of legs) {
-    for (let s = 0; s < leg.seconds; s++) {
-      heading += leg.turnDegS;
-      east.push((east.at(-1) ?? 0) + 10 * Math.sin((heading * Math.PI) / 180));
-      north.push((north.at(-1) ?? 0) + 10 * Math.cos((heading * Math.PI) / 180));
-      up.push((up.at(-1) ?? 0) + leg.climbMs);
-    }
-  }
-  const n = east.length;
-  const t = Float64Array.from({ length: n }, (_, s) => START + s * 1000);
-  const lat = Float64Array.from(north, (y) => LAT0 + y / M_LAT);
-  const lon = Float64Array.from(east, (x) => LON0 + x / mLon);
-  const altitude = Float64Array.from(up);
-  const vSpeed = Float64Array.from(up, (_, s) => (up[Math.min(n - 1, s + 1)] ?? 0) - (up[Math.max(0, s - 1)] ?? 0)).map(
-    (d, s) => d / (s === 0 || s === n - 1 ? 1 : 2),
-  );
-  const { heading: headings } = computeMotion(t, lat, lon, { intervalS: 1, minMovementM: MOTION.minMovementForHeadingM, turnRate: false });
-  return { t, lat, lon, altitude, heading: headings, vSpeed };
-}
 
 const thermals = (columns: ThermalColumns): Thermal[] => detectThermals(columns, detectCircles(columns, PARAGLIDER), PARAGLIDER);
 const glide: Leg = { seconds: 60, turnDegS: 0, climbMs: -1 };
@@ -228,7 +191,7 @@ describe('detectThermals — условия §6.3', () => {
     // Координаты округлены, как в IGC: до 0.001′ (1/60000 градуса ≈ 1.85 м по широте).
     const igc = (deg: number): number => Math.round(deg * IGC_MINUTE_STEPS) / IGC_MINUTE_STEPS;
     const lat = Float64Array.from({ length: n }, (_, s) => igc(LAT0 + (25 * Math.cos(0.4 * s)) / M_LAT));
-    const lon = Float64Array.from({ length: n }, (_, s) => igc(LON0 + (9 * s + 25 * Math.sin(0.4 * s)) / mLon));
+    const lon = Float64Array.from({ length: n }, (_, s) => igc(LON0 + (9 * s + 25 * Math.sin(0.4 * s)) / M_LON));
     const altitude = Float64Array.from({ length: n }, (_, s) => 1500 + 2 * s);
     const vSpeed = new Float64Array(n).fill(2);
     const { heading } = computeMotion(t, lat, lon, { intervalS: 1, minMovementM: MOTION.minMovementForHeadingM, turnRate: false });
