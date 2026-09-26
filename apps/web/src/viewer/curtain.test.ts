@@ -14,29 +14,13 @@ const START_MS = Date.UTC(2026, 6, 15, 10);
 const times = (n: number): Float64Array => Float64Array.from({ length: n }, (_, i) => START_MS + i * 1000);
 
 describe('curtainSamples', () => {
-  it('только участок полёта: от взлёта до посадки, ходьба — без занавеса', () => {
-    const samples = curtainSamples(times(1000), { takeoff: 120, landing: 900 });
-    expect(samples[0]).toBe(120);
-    expect(samples.at(-1)).toBe(900);
-  });
-
-  it('точка раз в CURTAIN.sampleStepS секунд; посадка — всегда последней', () => {
-    const samples = curtainSamples(times(1000), { takeoff: 100, landing: 903 });
-    const steps = samples.slice(1).map((index, k) => index - (samples[k] ?? 0));
-    expect(steps.slice(0, -1).every((step) => step === CURTAIN.sampleStepS)).toBe(true);
-    expect(steps.at(-1)).toBeLessThanOrEqual(CURTAIN.sampleStepS);
-  });
-
-  it('разрыв записи — шаг по времени, а не по номеру точки', () => {
-    // 60 точек, потом разрыв на 5 минут, потом ещё 60.
-    const t = Float64Array.from([...times(60), ...Array.from({ length: 60 }, (_, i) => START_MS + 360_000 + i * 1000)]);
-    const samples = curtainSamples(t, { takeoff: 0, landing: 119 });
-    const gapCrossing = samples.findIndex((index) => index >= 60);
-    expect(samples[gapCrossing]).toBe(60);
+  it('каждая точка участка полёта — те же вершины, что у линии и тени; ходьба — без занавеса', () => {
+    const samples = curtainSamples({ takeoff: 120, landing: 130 });
+    expect(samples).toEqual([120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130]);
   });
 
   it('полёта нет (takeoff ≥ landing) — занавеса нет', () => {
-    expect(curtainSamples(times(100), { takeoff: 99, landing: 99 })).toEqual([]);
+    expect(curtainSamples({ takeoff: 99, landing: 99 })).toEqual([]);
   });
 });
 
