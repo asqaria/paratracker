@@ -10,44 +10,47 @@ export type TrackState =
   | { status: 'ready'; track: DecodedTrack }
   | { status: 'error'; message: string };
 
+/**
+ * Скачать и декодировать один трек. Свой воркер на трек: сравнение (задача 3.12)
+ * грузит до 8 треков параллельно, и декодирование не встаёт в очередь.
+ */
+export async function loadTrack(url: string, signal: AbortSignal): Promise<DecodedTrack> {
+  const response = await fetch(url, { signal });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const buffer = await response.arrayBuffer();
+  signal.throwIfAborted();
+
+  const worker = new Worker(new URL('./decode-track.worker.ts', import.meta.url), { type: 'module' });
+  try {
+    return await new Promise<DecodedTrack>((resolve, reject) => {
+      signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+      worker.onmessage = (event: MessageEvent<DecodeResponse>) => {
+        if (event.data.ok) resolve(event.data.track);
+        else reject(new Error(event.data.message));
+      };
+      worker.onerror = (event) => reject(new Error(event.message));
+      const request: DecodeRequest = { buffer };
+      worker.postMessage(request, [buffer]);
+    });
+  } finally {
+    worker.terminate();
+  }
+}
+
 export function useTrack(url: string): TrackState {
   const [state, setState] = useState<TrackState>({ status: 'loading' });
 
   useEffect(() => {
     const controller = new AbortController();
-    const worker = new Worker(new URL('./decode-track.worker.ts', import.meta.url), { type: 'module' });
-    let cancelled = false;
-
-    worker.onmessage = (event: MessageEvent<DecodeResponse>) => {
-      if (cancelled) return;
-      setState(
-        event.data.ok ? { status: 'ready', track: event.data.track } : { status: 'error', message: event.data.message },
-      );
-    };
-    worker.onerror = (event) => {
-      if (!cancelled) setState({ status: 'error', message: event.message });
-    };
-
     setState({ status: 'loading' });
-    void (async () => {
-      try {
-        const response = await fetch(url, { signal: controller.signal });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const buffer = await response.arrayBuffer();
-        if (cancelled) return;
-        const request: DecodeRequest = { buffer };
-        worker.postMessage(request, [buffer]);
-      } catch (error) {
-        if (cancelled || controller.signal.aborted) return;
+    loadTrack(url, controller.signal).then(
+      (track) => setState({ status: 'ready', track }),
+      (error: unknown) => {
+        if (controller.signal.aborted) return;
         setState({ status: 'error', message: error instanceof Error ? error.message : String(error) });
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-      worker.terminate();
-    };
+      },
+    );
+    return () => controller.abort();
   }, [url]);
 
   return state;

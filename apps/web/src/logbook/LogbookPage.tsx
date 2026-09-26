@@ -5,8 +5,9 @@ import { lazy, Suspense, useState } from 'react';
 import { useMe } from '../auth/session';
 import { UserMenu } from '../auth/UserMenu';
 import { LocaleSwitch } from '../i18n/LocaleSwitch';
-import { useLocaleStore, useT } from '../i18n/locale';
+import { fill, useLocaleStore, useT } from '../i18n/locale';
 import { fetchGliders, GLIDERS_QUERY_KEY } from '../gliders/gliders-api';
+import { compareHash } from '../compare/compare-refs';
 import { SETTINGS_HASH } from '../routing';
 import { fetchLogbookSites, PGE_URL } from '../sites/create-site';
 import { fetchImageryCapabilities } from '../viewer/imagery-capabilities';
@@ -58,6 +59,8 @@ function LogbookContent() {
   const [filters, setFilters] = useState<LogbookFilters>(NO_FILTERS);
   /** Год статистики; null — последний, в котором пилот летал. */
   const [year, setYear] = useState<number | null>(null);
+  /** Отмеченные для сравнения треков (задача 3.12). */
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const stats = useQuery({ queryKey: [...LOGBOOK_QUERY_KEY, 'stats', year], queryFn: () => fetchSeasonStats(year) });
   const sites = useQuery({ queryKey: [...LOGBOOK_QUERY_KEY, 'sites'], queryFn: () => fetchLogbookSites() });
   const gliders = useQuery({ queryKey: GLIDERS_QUERY_KEY, queryFn: () => fetchGliders() });
@@ -138,11 +141,31 @@ function LogbookContent() {
             {t('gliders.title')}
           </a>
         </div>
+        {selected.size > 0 ? (
+          <a
+            data-panel="compare-selected"
+            href={compareHash([...selected].map((flightId) => ({ kind: 'id' as const, flightId })))}
+            className="mb-3 inline-block rounded bg-accent px-3 py-1.5 font-semibold text-void compact:min-h-11"
+          >
+            {fill(t('compare.open'), { n: String(selected.size) })}
+          </a>
+        ) : (
+          <p className="mb-3 text-xs text-secondary">{t('compare.selectHint')}</p>
+        )}
         <LogbookList
           items={items}
           hasMore={list.hasNextPage}
           loadingMore={list.isFetchingNextPage}
           onMore={() => void list.fetchNextPage()}
+          selected={selected}
+          onToggle={(flightId) =>
+            setSelected((current) => {
+              const next = new Set(current);
+              if (next.has(flightId)) next.delete(flightId);
+              else next.add(flightId);
+              return next;
+            })
+          }
         />
       </section>
       {/* Места из paragliding.earth — CC BY-SA 3.0: ссылка на источник обязательна. */}

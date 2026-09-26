@@ -92,3 +92,17 @@ describe('routeFromLocation — встраиваемый просмотрщик 
     expect(routeFromLocation('/embed/', '#/s/abcdEFGH12')).toEqual({ kind: 'shared', token: 'abcdEFGH12' });
   });
 });
+
+describe('routeFromHash — сравнение треков (задача 3.12)', () => {
+  it('#/compare?f=… — состав из адреса; пустой — страница без полётов', () => {
+    const id = '11111111-2222-4333-8444-555555555555';
+    expect(routeFromHash(`#/compare?f=${id},tokenABC_12`)).toEqual({
+      kind: 'compare',
+      refs: [
+        { kind: 'id', flightId: id },
+        { kind: 'share', token: 'tokenABC_12' },
+      ],
+    });
+    expect(routeFromHash('#/compare')).toEqual({ kind: 'compare', refs: [] });
+  });
+});

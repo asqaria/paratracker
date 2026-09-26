@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { ComparePage } from './compare/ComparePage';
 import { FlightViewerPage } from './flight/FlightViewerPage';
 import { GlidersPage } from './gliders/GlidersPage';
 import { HealthPage } from './health/HealthPage';
@@ -40,6 +41,7 @@ function Screen({ route }: { route: Route }) {
   if (route.kind === 'settings') return <GlidersPage />;
   if (route.kind === 'shared') return <SharedFlightPage token={route.token} />;
   if (route.kind === 'embed') return <SharedFlightPage token={route.token} embed />;
+  if (route.kind === 'compare') return <ComparePage refs={route.refs} />;
   if (route.kind === 'flight') {
     return <FlightViewerPage flightId={route.flightId} trackUrl={route.trackUrl} review={route.review === true} />;
   }
