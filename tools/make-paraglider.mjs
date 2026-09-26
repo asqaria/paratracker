@@ -404,23 +404,29 @@ loft(
   () => parts.pilot,
 );
 
-// Руки — от плеч к тормозным клевантам у свободных концов.
-for (const side of [1, -1]) {
-  const shoulder = [side * 0.2, 0.33, -0.37];
-  const elbow = [side * 0.33, 0.26, -0.2];
-  const hand = [side * 0.3, 0.44, -0.1];
-  const limb = [shoulder, elbow, hand];
+/**
+ * Трубка по точкам limb с радиусами radii: руки и ноги. Сечение — круг в
+ * плоскости, перпендикулярной оси; опорный вектор — не параллельный оси.
+ */
+function tube(limb, radii, target, segments = 8) {
   const rings = limb.map((at, k) => {
-    const tangent = normalize(sub(limb[Math.min(k + 1, 2)], limb[Math.max(k - 1, 0)]));
-    const u = normalize(cross(tangent, [0, 1, 0]));
+    const tangent = normalize(sub(limb[Math.min(k + 1, limb.length - 1)], limb[Math.max(k - 1, 0)]));
+    const reference = Math.abs(tangent[1]) > 0.9 ? [0, 0, 1] : [0, 1, 0];
+    const u = normalize(cross(tangent, reference));
     const v = normalize(cross(u, tangent));
-    const r = [0.05, 0.045, 0.04][k];
-    return Array.from({ length: 8 }, (_, j) => {
-      const phi = (2 * Math.PI * j) / 8;
+    const r = radii[k];
+    return Array.from({ length: segments }, (_, j) => {
+      const phi = (2 * Math.PI * j) / segments;
       return add(at, add(scale(u, r * Math.cos(phi)), scale(v, r * Math.sin(phi))));
     });
   });
-  surface(rings, { wrap: true, outward: (i, j) => sub(rings[i][j], limb[i]), pick: () => parts.pilot });
+  surface(rings, { wrap: true, outward: (i, j) => sub(rings[i][j], limb[i]), pick: () => target });
+}
+
+// Руки — от плеч к тормозным клевантам у свободных концов.
+for (const side of [1, -1]) {
+  const hand = [side * 0.3, 0.44, -0.1];
+  tube([[side * 0.2, 0.33, -0.37], [side * 0.33, 0.26, -0.2], hand], [0.05, 0.045, 0.04], parts.pilot);
   ellipsoid(hand, [0.045, 0.045, 0.045], parts.pilot, { rings: 4, segments: 8 });
 }
 
@@ -504,6 +510,75 @@ for (const side of [1, -1]) {
   }
 }
 
+/* ── Пилот на земле: стоя, ноги, рюкзак ──────────────────────────────────── */
+
+/**
+ * На земле пилот стоит: точка трека — подвеска, на GROUND_BELOW_M выше земли
+ * (калибровка трека по земле кладёт её на высоту подвесной системы). Сцена
+ * переключает узлы по состоянию: в полёте — кокон, на земле — стоя, с ногами
+ * и, когда крыло сложено, с рюкзаком.
+ */
+const GROUND_BELOW_M = 1;
+const MATERIALS_OF_PILOT = ['harness', 'harness-accent', 'pilot', 'helmet', 'visor'];
+const partsOf = (names) => Object.fromEntries(names.map((name) => [name, part()]));
+const standing = partsOf(MATERIALS_OF_PILOT);
+const legs = { left: partsOf(['harness']), right: partsOf(['harness']) };
+const backpack = partsOf(['harness', 'harness-accent']);
+
+// Корпус — вертикально над подвеской, чуть впереди спинки.
+loft(
+  [
+    { at: [0, -0.14, -0.08], rx: 0, ry: 0 },
+    { at: [0, -0.1, -0.08], rx: 0.17, ry: 0.11 },
+    { at: [0, 0.25, -0.08], rx: 0.2, ry: 0.12 },
+    { at: [0, 0.42, -0.08], rx: 0.1, ry: 0.07 },
+    { at: [0, 0.49, -0.08], rx: 0.05, ry: 0.05 },
+    { at: [0, 0.51, -0.08], rx: 0, ry: 0 },
+  ],
+  12,
+  () => standing.pilot,
+);
+// Подвесная система стоя: спинка-протектор за корпусом, полоса-акцент по бокам.
+loft(
+  [
+    { at: [0, 0.34, -0.26], rx: 0, ry: 0 },
+    { at: [0, 0.3, -0.26], rx: 0.18, ry: 0.07 },
+    { at: [0, -0.1, -0.27], rx: 0.22, ry: 0.1 },
+    { at: [0, -0.34, -0.22], rx: 0.18, ry: 0.08 },
+    { at: [0, -0.38, -0.21], rx: 0, ry: 0 },
+  ],
+  HARNESS_SEGMENTS,
+  (i, j) => (i === 2 && SIDE_STRIPE.has(j) ? standing['harness-accent'] : standing.harness),
+);
+// Руки — к свободным концам над плечами.
+for (const side of [1, -1]) {
+  const hand = [side * 0.24, 0.52, -0.08];
+  tube([[side * 0.2, 0.38, -0.08], [side * 0.31, 0.18, -0.02], hand], [0.05, 0.045, 0.04], standing.pilot);
+  ellipsoid(hand, [0.045, 0.045, 0.045], standing.pilot, { rings: 4, segments: 8 });
+}
+const HEAD_STANDING = [0, 0.66, -0.08];
+ellipsoid(HEAD_STANDING, [0.125, 0.14, 0.14], standing.helmet, { rings: 8, segments: 12 });
+ellipsoid(HEAD_STANDING, [0.128, 0.143, 0.145], standing.visor, { rings: 3, segments: 8, latRange: [-25, 20], lonRange: [-60, 60] });
+
+/**
+ * Ноги — отдельные узлы с началом в бедре: сцена качает их вокруг оси X
+ * (шаг). Стопа — на земле, GROUND_BELOW_M ниже подвески.
+ */
+const HIP = (side) => [side * 0.1, -0.1, -0.08];
+for (const [side, target] of [
+  [1, legs.left],
+  [-1, legs.right],
+]) {
+  const hipY = HIP(side)[1];
+  const ankle = -GROUND_BELOW_M - hipY + 0.06;
+  tube([[0, 0, 0], [0, (ankle * 0.5), 0.03], [0, ankle, 0]], [0.08, 0.065, 0.05], target.harness);
+  ellipsoid([0, ankle - 0.02, 0.06], [0.05, 0.04, 0.11], target.harness, { rings: 4, segments: 8 });
+}
+
+// Рюкзак со сложенным крылом — за спиной, с полосой-акцентом.
+ellipsoid([0, 0.1, -0.38], [0.19, 0.28, 0.13], backpack.harness, { rings: 6, segments: 10 });
+ellipsoid([0, 0.1, -0.38], [0.195, 0.05, 0.135], backpack['harness-accent'], { rings: 2, segments: 10, latRange: [-40, 40] });
+
 /* ── Сборка GLB ──────────────────────────────────────────────────────────── */
 
 const FLOAT = 5126;
@@ -519,8 +594,8 @@ const gltf = {
   asset: { version: '2.0', generator: 'Skyline tools/make-paraglider.mjs' },
   scene: 0,
   scenes: [{ nodes: [0] }],
-  nodes: [{ mesh: 0, name: 'paraglider' }],
-  meshes: [{ name: 'paraglider', primitives: [] }],
+  nodes: [{ name: 'paraglider', children: [] }],
+  meshes: [],
   materials: [],
   accessors: [],
   bufferViews: [],
@@ -552,23 +627,52 @@ function addIndices(values) {
   return gltf.accessors.push({ bufferView: addView(data, ELEMENT_ARRAY_BUFFER), componentType: UNSIGNED_SHORT, count: values.length, type: 'SCALAR' }) - 1;
 }
 
+/** Материал по имени — один на модель, узлы делят его. */
+const materialIndex = new Map();
 function addMaterial(name) {
+  if (materialIndex.has(name)) return materialIndex.get(name);
   const { color, alpha = 1, metallicFactor, roughnessFactor } = MATERIALS[name];
   const material = { name, pbrMetallicRoughness: { baseColorFactor: [...color, alpha], metallicFactor, roughnessFactor } };
   if (alpha < 1) material.alphaMode = 'BLEND';
-  return gltf.materials.push(material) - 1;
+  const index = gltf.materials.push(material) - 1;
+  materialIndex.set(name, index);
+  return index;
 }
 
-for (const [name, p] of Object.entries(parts)) {
-  if (p.positions.length / 3 > 0xffff) throw new Error(`${name}: больше 65 535 вершин — не влезает в UNSIGNED_SHORT`);
-  gltf.meshes[0].primitives.push({
-    attributes: { POSITION: addVec3(p.positions, true), NORMAL: addVec3(p.normals, false) },
-    indices: addIndices(p.indices),
-    material: addMaterial(name),
-    mode: TRIANGLES,
-  });
+const pickParts = (source, names) => Object.fromEntries(names.map((name) => [name, source[name]]));
+const CANOPY_MATERIALS = Object.keys(parts).filter((name) => name.startsWith('canopy-') || name === 'risers');
+
+/**
+ * Узлы модели — их имена сцена использует в nodeTransformations (glider-pose.ts):
+ * купол со стропами и свободными концами (поднимается, опадает, прячется
+ * в рюкзак), пилот в коконе (полёт), пилот стоя с ногами и рюкзак (земля).
+ */
+const NODES = [
+  { name: 'canopy', parts: pickParts(parts, CANOPY_MATERIALS), lines: true },
+  { name: 'pilot-seated', parts: pickParts(parts, MATERIALS_OF_PILOT) },
+  { name: 'pilot-standing', parts: standing },
+  { name: 'leg-left', parts: legs.left, translation: HIP(1) },
+  { name: 'leg-right', parts: legs.right, translation: HIP(-1) },
+  { name: 'backpack', parts: backpack },
+];
+
+for (const node of NODES) {
+  const primitives = [];
+  for (const [name, p] of Object.entries(node.parts)) {
+    if (p.indices.length === 0) continue;
+    if (p.positions.length / 3 > 0xffff) throw new Error(`${node.name}/${name}: больше 65 535 вершин — не влезает в UNSIGNED_SHORT`);
+    primitives.push({
+      attributes: { POSITION: addVec3(p.positions, true), NORMAL: addVec3(p.normals, false) },
+      indices: addIndices(p.indices),
+      material: addMaterial(name),
+      mode: TRIANGLES,
+    });
+  }
+  if (node.lines) primitives.push({ attributes: { POSITION: addVec3(linePositions, true) }, material: addMaterial('lines'), mode: LINES });
+  const mesh = gltf.meshes.push({ name: node.name, primitives }) - 1;
+  const index = gltf.nodes.push({ name: node.name, mesh, ...(node.translation ? { translation: node.translation } : {}) }) - 1;
+  gltf.nodes[0].children.push(index);
 }
-gltf.meshes[0].primitives.push({ attributes: { POSITION: addVec3(linePositions, true) }, material: addMaterial('lines'), mode: LINES });
 gltf.buffers.push({ byteLength });
 
 const pad = (buffer, fill) => Buffer.concat([buffer, Buffer.alloc((4 - (buffer.length % 4)) % 4, fill)]);
@@ -588,5 +692,5 @@ const glb = Buffer.concat([header, chunk(0x4e4f534a, json), chunk(0x004e4942, bi
 
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, glb);
-const triangles = Object.values(parts).reduce((n, p) => n + p.indices.length / 3, 0);
+const triangles = NODES.flatMap((node) => Object.values(node.parts)).reduce((n, p) => n + p.indices.length / 3, 0);
 console.log(`${OUT}: ${glb.length} байт, ${triangles} треугольников, ${linePositions.length / 6} строп`);

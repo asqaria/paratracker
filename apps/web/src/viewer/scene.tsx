@@ -49,6 +49,7 @@ import { travelCourse } from './camera-course';
 import { cameraTarget, easeHalfWidth, targetHalfWidthS } from './camera-target';
 import { addGlider } from './glider';
 import { gliderAttitude } from './glider-attitude';
+import { gliderPose } from './glider-pose';
 import {
   CAMERA_POSES,
   DEFAULT_CAMERA_MODE,
@@ -453,10 +454,16 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
         clockRef.current = flightClock;
         // Пилот — модель параплана: курс по сглаженной траектории, крен в вираже.
         // На земле (до взлёта, после посадки) — без крена.
-        addGlider(viewer, flightClock.position, (timeMs) => {
-          const at = indexAt(track.t, timeMs);
-          return gliderAttitude(shown, timeMs, at >= range.takeoff && at <= range.landing);
-        });
+        addGlider(
+          viewer,
+          flightClock.position,
+          (timeMs) => {
+            const at = indexAt(track.t, timeMs);
+            return gliderAttitude(shown, timeMs, at >= range.takeoff && at <= range.landing);
+          },
+          // На земле — стоит, идёт, разбег с подъёмом крыла, посадка (glider-pose.ts).
+          (timeMs) => gliderPose(track, range, timeMs),
+        );
 
         // Кадровый обработчик: время → HUD и камера. Состояние React обновляется
         // только при смене точки, иначе перерисовка шла бы 60 раз в секунду.

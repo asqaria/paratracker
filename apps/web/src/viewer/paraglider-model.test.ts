@@ -17,6 +17,7 @@ import { PARAGLIDER_MODEL_PATH } from './glider-attitude';
 
 interface Gltf {
   asset: { version: string };
+  nodes: Array<{ name: string; mesh?: number; translation?: number[]; children?: number[] }>;
   materials: Array<{
     name: string;
     alphaMode?: string;
@@ -67,7 +68,8 @@ describe('модель параплана', () => {
     expect(glb.readUInt32LE(4)).toBe(2);
     expect(glb.readUInt32LE(8)).toBe(glb.length);
     expect(parse().asset.version).toBe('2.0');
-    expect(glb.length).toBeLessThan(150_000);
+    // Две позы пилота (кокон и стоя), ноги и рюкзак — больше одной позы, но десятки КБ.
+    expect(glb.length).toBeLessThan(170_000);
   });
 
   it('файл в репозитории — ровно то, что выдаёт генератор (детерминирован)', () => {
@@ -81,7 +83,7 @@ describe('модель параплана', () => {
     }
   });
 
-  it('треугольники — индексированные, с нормалями; не больше 6000 на всю модель', () => {
+  it('треугольники — индексированные, с нормалями; не больше 7000 на всю модель', () => {
     const gltf = parse();
     let triangles = 0;
     for (const primitive of primitives(gltf)) {
@@ -91,7 +93,7 @@ describe('модель параплана', () => {
       triangles += (gltf.accessors[primitive.indices ?? -1]?.count ?? 0) / 3;
     }
     expect(triangles).toBeGreaterThan(2000);
-    expect(triangles).toBeLessThanOrEqual(6000);
+    expect(triangles).toBeLessThanOrEqual(7000);
   });
 
   it('размеры настоящего крыла: размах 9–12 м, купол в 6–8 м над пилотом', () => {
@@ -125,6 +127,24 @@ describe('модель параплана', () => {
     // Основной цвет — акцент дизайн-системы #4DA3FF, переведённый из sRGB.
     const primary = materials.find((m) => m.name === 'canopy-primary')?.pbrMetallicRoughness.baseColorFactor ?? [];
     [0x4d, 0xa3, 0xff].forEach((byte, k) => expect(primary[k]).toBeCloseTo(linear(byte / 255), 4));
+  });
+
+  it('узлы поз — по именам, на которые опирается сцена (glider-pose.ts)', () => {
+    const names = parse().nodes.map((node) => node.name);
+    for (const name of ['canopy', 'pilot-seated', 'pilot-standing', 'leg-left', 'leg-right', 'backpack']) {
+      expect(names).toContain(name);
+    }
+  });
+
+  it('стоя: ноги от бедра до земли — на метр ниже точки подвеса (калибровка трека)', () => {
+    const gltf = parse();
+    for (const name of ['leg-left', 'leg-right']) {
+      const node = gltf.nodes.find((n) => n.name === name);
+      const mesh = gltf.meshes[node?.mesh ?? -1];
+      const minY = Math.min(...(mesh?.primitives ?? []).map((p) => gltf.accessors[p.attributes.POSITION]?.min?.[1] ?? Infinity));
+      const hipY = node?.translation?.[1] ?? Number.NaN;
+      expect(Math.abs(hipY + minY + 1)).toBeLessThan(0.03);
+    }
   });
 
   it('стропы полупрозрачные: видны вблизи, не перебивают купол', () => {
