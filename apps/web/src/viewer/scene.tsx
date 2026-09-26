@@ -91,6 +91,8 @@ import { SummaryPanel } from './SummaryPanel';
 import { TimelinePanel } from './TimelinePanel';
 import { VarioLegend } from './VarioLegend';
 import { buildTrackGeometry } from './track-geometry';
+import { currentColumn, thermalColumns, type ThermalColumn } from './thermal-columns';
+import { ThermalLayer } from './thermal-layer';
 import { TrackLayer } from './track-layer';
 import {
   COMPACT_MEDIA_QUERY,
@@ -296,6 +298,11 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<PlaybackSpeed>(DEFAULT_PLAYBACK_SPEED);
   const [cameraMode, setCameraMode] = useState<CameraMode>(DEFAULT_CAMERA_MODE);
+  /** Трек сцены — откалиброванный по земле; колонны термиков строятся по нему. */
+  const [sceneTrack, setSceneTrack] = useState<DecodedTrack | null>(null);
+  const [columnsShown, setColumnsShown] = useState(true);
+  const thermalLayerRef = useRef<ThermalLayer | null>(null);
+  const columnsRef = useRef<ThermalColumn[]>([]);
 
   useEffect(() => {
     const element = container.current;
@@ -359,6 +366,7 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
         const range = flightRange(track.t, track.gSpeed);
         const shown = await calibratedForScene(terrain, track, range);
         if (disposed) return;
+        setSceneTrack(shown);
 
         // Ходьба до взлёта и после посадки — серым: вариометр там — шум GPS на месте.
         const [r = 0, g = 0, b = 0, a = 0] = Color.fromCssColorString(documentColorTokens().secondary).toBytes();
@@ -635,6 +643,44 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
   }, [timeline]);
 
   const analytics = useFlightAnalytics(flightId);
+  // Данные запроса стабильны между рендерами, в отличие от объекта состояния вокруг них.
+  const analyticsData = analytics?.status === 'ready' ? analytics.analytics : null;
+
+  // Колонны термиков (ТЗ §7.2): по треку сцены, когда есть и он, и аналитика.
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || !sceneTrack || !analyticsData) return undefined;
+    const columns = thermalColumns(
+      sceneTrack,
+      analyticsData.thermals.map((th) => ({
+        startMs: Date.parse(th.startedAt),
+        endMs: Date.parse(th.endedAt),
+        avgClimbMs: th.avgClimbMs,
+        avgRadiusM: th.avgRadiusM,
+      })),
+    );
+    const layer = new ThermalLayer(viewer.scene, columns);
+    columnsRef.current = columns;
+    thermalLayerRef.current = layer;
+    viewer.scene.requestRender();
+    return () => {
+      layer.destroy();
+      thermalLayerRef.current = null;
+      columnsRef.current = [];
+    };
+  }, [sceneTrack, analyticsData]);
+
+  useEffect(() => {
+    thermalLayerRef.current?.setVisible(columnsShown);
+    viewerRef.current?.scene.requestRender();
+  }, [columnsShown, sceneTrack, analyticsData]);
+
+  // Термик, в котором пилот: со стороны (Free, Top) — плотнее; из следящей камеры,
+  // которая у самого пилота, то есть у стенки колонны, — скрыт.
+  useEffect(() => {
+    const style = cameraMode === 'free' || cameraMode === 'top' ? 'highlight' : 'hide';
+    thermalLayerRef.current?.setCurrent(currentColumn(columnsRef.current, timeMs), style);
+  }, [timeMs, cameraMode, sceneTrack, analyticsData]);
 
   /**
    * Клик по сегменту в аналитике: время — на его начало. Следящие камеры
@@ -752,7 +798,14 @@ export function Scene({ track, flightId = null, showGlow = false }: SceneProps) 
           </span>
         </div>
         {analytics !== null && (
-          <AnalyticsPanel state={analytics} timeline={timeline} timeMs={timeMs} onSelect={selectSegment} />
+          <AnalyticsPanel
+            state={analytics}
+            timeline={timeline}
+            timeMs={timeMs}
+            onSelect={selectSegment}
+            columnsShown={columnsShown}
+            onColumnsShown={setColumnsShown}
+          />
         )}
         </div>
       </div>

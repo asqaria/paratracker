@@ -142,6 +142,16 @@ describe('AnalyticsPanel', () => {
     expect(html).not.toContain(text['viewer.analytics.thermalCount']);
   });
 
+  it('переключатель колонн на сцене — только если есть термики и обработчик', () => {
+    const withToggle = (state: AnalyticsState, shown: boolean): string =>
+      renderToString(
+        <AnalyticsPanel state={state} timeline={timeline} timeMs={START_MS} defaultOpen onSelect={() => {}} columnsShown={shown} onColumnsShown={() => {}} />,
+      );
+    expect(withToggle(ready(), true)).toContain(text['viewer.analytics.columns']);
+    expect(withToggle(ready(), false)).toMatch(/aria-pressed="false"[^>]*>.*?Термики на сцене|aria-pressed="false"[^>]*>.*?Thermals in 3D/);
+    expect(render(ready())).not.toContain(text['viewer.analytics.columns']);
+  });
+
   it('загрузка и ошибка — своими строками', () => {
     expect(render({ status: 'loading' })).toContain(text['viewer.analytics.loading']);
     expect(render({ status: 'error' })).toContain(text['viewer.analytics.error']);

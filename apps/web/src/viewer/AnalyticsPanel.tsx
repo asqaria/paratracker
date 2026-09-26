@@ -30,6 +30,9 @@ export interface AnalyticsPanelProps {
   onSelect: (segment: SelectedSegment) => void;
   defaultOpen?: boolean;
   defaultTab?: AnalyticsTab;
+  /** Колонны термиков на сцене (ТЗ §7.2); без обработчика переключателя нет. */
+  columnsShown?: boolean;
+  onColumnsShown?: (shown: boolean) => void;
 }
 
 const TABS: ReadonlyArray<{ id: AnalyticsTab; label: MessageKey }> = [
@@ -46,7 +49,16 @@ interface Row {
   climbMs: number | null;
 }
 
-export function AnalyticsPanel({ state, timeline, timeMs, onSelect, defaultOpen = false, defaultTab = 'thermals' }: AnalyticsPanelProps) {
+export function AnalyticsPanel({
+  state,
+  timeline,
+  timeMs,
+  onSelect,
+  defaultOpen = false,
+  defaultTab = 'thermals',
+  columnsShown = true,
+  onColumnsShown,
+}: AnalyticsPanelProps) {
   const t = useT();
   const [open, setOpen] = useState(defaultOpen);
   const [tab, setTab] = useState<AnalyticsTab>(defaultTab);
@@ -79,6 +91,19 @@ export function AnalyticsPanel({ state, timeline, timeMs, onSelect, defaultOpen 
           )}
           {state.status === 'ready' && (
             <Content analytics={state.analytics} timeline={timeline} timeMs={timeMs} tab={tab} onTab={setTab} onSelect={onSelect} />
+          )}
+          {state.status === 'ready' && state.analytics.thermals.length > 0 && onColumnsShown && (
+            <button
+              type="button"
+              aria-pressed={columnsShown}
+              onClick={() => onColumnsShown(!columnsShown)}
+              className="mt-2 flex items-center gap-2 text-xs text-secondary aria-pressed:text-primary compact:min-h-11"
+            >
+              <span aria-hidden="true" className="grid size-3.5 place-items-center rounded-sm border border-subtle">
+                {columnsShown ? '✓' : ''}
+              </span>
+              {t('viewer.analytics.columns')}
+            </button>
           )}
         </div>
       )}
