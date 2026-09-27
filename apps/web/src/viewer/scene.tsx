@@ -22,6 +22,7 @@ import {
   Viewer,
 } from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
+import { autoEdit } from '@skyline/analysis';
 import type { WindBandDto, WindDto } from '@skyline/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -54,7 +55,8 @@ import {
   type CameraMode,
 } from './camera-modes';
 import type { DecodedTrack } from './decode-track';
-import { setupFlightClock, type FlightClock } from './flight-clock';
+import { filmCamera, filmFrameAt, filmPlan, filmTimeline, type Film, type FilmPlanShot } from './film';
+import { setupFlightClock, toJulian, type FlightClock } from './flight-clock';
 import {
   flightRange,
 } from './ground-calibration';
@@ -171,6 +173,14 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
   const [trackShown, setTrackShown] = useState<TrackShown>(DEFAULT_TRACK_SHOWN);
   const trackShownRef = useRef<TrackShown>(DEFAULT_TRACK_SHOWN);
   const adjustRef = useRef<CameraAdjust | null>(adjustFor(DEFAULT_CAMERA_MODE));
+  /**
+   * Фильм по автомонтажу (задачи 4.1–4.2): пока он идёт, время и камеру ставит
+   * кадровый обработчик, панели скрыты. plan — точки и позы на стыках сцен,
+   * считаются в первом кадре (нужен откалиброванный трек сцены).
+   */
+  const filmRef = useRef<{ film: Film; startNowMs: number; plan: FilmPlanShot[] | null } | null>(null);
+  const [filming, setFilming] = useState(false);
+  const onFilmEndRef = useRef<() => void>(() => undefined);
 
   // Конфиг читается один раз и не роняет рендер: без переменных окружения
   // пользователь должен увидеть причину, а не пустой экран.
@@ -335,6 +345,11 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
         let halfWidthS: number | null = null;
         let lastHeadingDeg = Number.NaN;
         let lastWindFrameMs: number | null = null;
+        /** Курс полёта в момент ms; пока стоим — ближайший известный. */
+        const courseAt = (ms: number): number => {
+          const course = travelCourse(track, ms);
+          return Number.isNaN(course) ? nearestHeading(track.heading, indexAt(track.t, ms)) : course;
+        };
         const onPreRender = (): void => {
           // Курс камеры — стрелкам колонки ветра: CSS-переменная, без перерисовки React.
           const headingDeg = viewer ? CesiumMath.toDegrees(viewer.camera.heading) : 0;
@@ -345,6 +360,13 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
           const frameNowMs = performance.now();
           const elapsedS = frameSeconds(lastFrameMs, frameNowMs);
           lastFrameMs = frameNowMs;
+          // Фильм: время полёта задаёт монтаж, а не часы (они стоят).
+          const filmNow = filmRef.current;
+          const filmFrame = filmNow ? filmFrameAt(filmNow.film, (frameNowMs - filmNow.startNowMs) / MS_PER_SECOND) : null;
+          if (filmNow && viewer) {
+            if (filmFrame) viewer.clock.currentTime = toJulian(filmFrame.flightMs);
+            else onFilmEndRef.current();
+          }
           const current = flightClock.currentTimeMs();
           // Поле течёт только при проигрывании: на паузе сцена не рисуется непрерывно (ТЗ §7.7).
           const windNow = windRef.current;
@@ -371,6 +393,13 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
           layer.update(trackShownRef.current, flownByTime(vertexTimes, trailEndMs), trailEnd, trailEndMs);
           curtainRef.current?.update(trackShownRef.current === 'all' ? null : trailEndMs);
           if (layer.pending) scene.requestRender();
+
+          if (filmNow && filmFrame && viewer) {
+            filmNow.plan ??= filmPlan(filmNow.film, shown, courseAt);
+            const film = filmCamera(filmNow.plan, filmFrame, shown, courseAt, smoothHeadingRef, elapsedS);
+            if (film) lookAtAboveGround(viewer, Cartesian3.fromDegrees(film.at.lon, film.at.lat, film.at.alt), film.at.alt, film.pose);
+            return;
+          }
 
           const mode = cameraModeRef.current;
           const modePose = CAMERA_POSES[mode];
@@ -423,7 +452,7 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
     const viewer = viewerRef.current;
     if (!viewer) return;
     viewer.clock.shouldAnimate = playing;
-    viewer.scene.requestRenderMode = !playing;
+    viewer.scene.requestRenderMode = !playing && filmRef.current === null;
     viewer.scene.requestRender();
   }, [playing]);
 
@@ -584,6 +613,48 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
   const ownGliders = useOwnGliders();
   // Данные запроса стабильны между рендерами, в отличие от объекта состояния вокруг них.
   const analyticsData = analytics?.status === 'ready' ? analytics.analytics : null;
+  /** Монтаж фильма (задача 4.1): без аналитики — взлёт, рекорд высоты, заход и посадка. */
+  const filmScenes = useMemo(() => {
+    const iso = (value: string) => Date.parse(value);
+    return autoEdit({
+      t: track.t,
+      alt: track.alt,
+      range: flightRange(track.t, track.gSpeed),
+      thermals: (analyticsData?.thermals ?? []).map((th) => ({ startTimeMs: iso(th.startedAt), endTimeMs: iso(th.endedAt), gainM: th.gainM })),
+      glides: (analyticsData?.glides ?? []).map((g) => ({
+        startTimeMs: iso(g.startedAt),
+        endTimeMs: iso(g.endedAt),
+        distanceM: g.distanceM,
+        kind: g.kind,
+      })),
+    });
+  }, [track, analyticsData]);
+
+  const stopFilm = useCallback(() => {
+    filmRef.current = null;
+    smoothHeadingRef.current = null;
+    setFilming(false);
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    viewer.scene.requestRenderMode = !viewer.clock.shouldAnimate;
+    // Свободная камера после фильма — без привязки к последней точке слежения (ТЗ §7.4).
+    if (CAMERA_POSES[cameraModeRef.current] === null) viewer.camera.lookAtTransform(Matrix4.IDENTITY);
+    viewer.scene.requestRender();
+  }, []);
+  useEffect(() => {
+    onFilmEndRef.current = stopFilm;
+  }, [stopFilm]);
+
+  const startFilm = useCallback(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || filmScenes.length === 0) return;
+    setPlaying(false);
+    viewer.clock.shouldAnimate = false;
+    viewer.scene.requestRenderMode = false;
+    smoothHeadingRef.current = null;
+    filmRef.current = { film: filmTimeline(filmScenes), startNowMs: performance.now(), plan: null };
+    setFilming(true);
+  }, [filmScenes]);
   useEffect(() => {
     windRef.current = analyticsData ? { profile: analyticsData.wind.profile, flight: analyticsData.wind.flight } : null;
     viewerRef.current?.scene.requestRender();
@@ -739,6 +810,11 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
   };
 
   const togglePlay = useCallback(() => {
+    // Во время фильма пробел — выход из фильма, а не пуск часов под ним.
+    if (filmRef.current) {
+      onFilmEndRef.current();
+      return;
+    }
     // Доиграли до посадки — следующий запуск с начала.
     if (timeMs >= timeline.endMs) seekTo(timeline.startMs);
     setPlaying((value) => !value);
@@ -771,7 +847,7 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
         сводку, а не наезжает на неё. Пустое место ряда пропускает жесты к сцене.
         Отступы — не меньше выреза экрана (viewport-fit=cover).
       */}
-      <div className="pointer-events-none absolute left-4 right-4 top-4 flex flex-wrap items-start gap-2 compact:left-[max(0.5rem,env(safe-area-inset-left))] compact:right-[max(0.5rem,env(safe-area-inset-right))] compact:top-[max(0.5rem,env(safe-area-inset-top))]">
+      <div className={`${filming ? 'invisible' : ''} pointer-events-none absolute left-4 right-4 top-4 flex flex-wrap items-start gap-2 compact:left-[max(0.5rem,env(safe-area-inset-left))] compact:right-[max(0.5rem,env(safe-area-inset-right))] compact:top-[max(0.5rem,env(safe-area-inset-top))]`}>
         <div className="pointer-events-auto flex flex-col gap-2">
           {/* На телефоне сводка, подложка и аналитика — в шторке снизу. */}
           <div className="compact:hidden">
@@ -805,6 +881,11 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
               <a data-panel="compare-link" href={compareLink} className="glass rounded-xl px-3 py-2 text-sm text-accent">
                 {t('viewer.compare')}
               </a>
+            )}
+            {!embed && filmScenes.length > 0 && (
+              <button type="button" data-panel="film-play" onClick={startFilm} className="glass rounded-xl px-3 py-2 text-sm text-accent">
+                {t('film.play')}
+              </button>
             )}
             {!embed && (
               <button
@@ -854,12 +935,14 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
       */}
       <div className="pointer-events-none absolute bottom-0 left-0 right-0">
         {/* На телефоне легенда — в шторке: поверх сцены она съедала высоту. */}
-        <div className="px-4 pb-2 compact:hidden">
+        <div className={`px-4 pb-2 compact:hidden ${filming ? 'invisible' : ''}`}>
           <VarioLegend />
         </div>
 
         {/* Телефон: шторка — сводка всегда видна, остальное по жесту (ТЗ §8.3). */}
-        <div className="pointer-events-auto hidden px-[max(0.5rem,env(safe-area-inset-left))] pb-1 compact:block">
+        <div
+          className={`pointer-events-auto hidden px-[max(0.5rem,env(safe-area-inset-left))] pb-1 compact:block ${filming ? 'invisible' : ''}`}
+        >
           <BottomSheet summary={<SummaryLine summary={track.summary} />}>
             <div className="flex flex-col gap-3">
               <SummaryPanel summary={track.summary} bare />
@@ -869,6 +952,11 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
                 <a href={compareLink} className="flex min-h-11 items-center text-sm text-accent">
                   {t('viewer.compare')}
                 </a>
+              )}
+              {!embed && filmScenes.length > 0 && (
+                <button type="button" onClick={startFilm} className="flex min-h-11 items-center text-sm text-accent">
+                  {t('film.play')}
+                </button>
               )}
               {!embed && (
                 <button type="button" onClick={() => setStoryOpen(true)} className="flex min-h-11 items-center text-sm text-accent">
@@ -907,24 +995,38 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
 
         <SceneAttribution entries={imagery.attribution} />
 
-        <TimelinePanel
-          track={track}
-          timeline={timeline}
-          timeMs={timeMs}
-          playing={playing}
-          speed={speed}
-          cameraMode={cameraMode}
-          trackShown={trackShown}
-          onTrackShown={setTrackShown}
-          curtainOn={curtainOn}
-          {...(curtainInMode(cameraMode) ? { onCurtainOn: setCurtainOn } : {})}
-          onTogglePlay={togglePlay}
-          onSeekTo={seekTo}
-          onSpeed={setSpeed}
-          onCameraMode={setCameraMode}
-          agl={agl}
-        />
+        {/* Во время фильма таймлайн убран совсем: атрибуция ложится к низу кадра. */}
+        <div className={filming ? 'hidden' : ''}>
+          <TimelinePanel
+            track={track}
+            timeline={timeline}
+            timeMs={timeMs}
+            playing={playing}
+            speed={speed}
+            cameraMode={cameraMode}
+            trackShown={trackShown}
+            onTrackShown={setTrackShown}
+            curtainOn={curtainOn}
+            {...(curtainInMode(cameraMode) ? { onCurtainOn: setCurtainOn } : {})}
+            onTogglePlay={togglePlay}
+            onSeekTo={seekTo}
+            onSpeed={setSpeed}
+            onCameraMode={setCameraMode}
+            agl={agl}
+          />
+        </div>
       </div>
+      {/* Фильм (задача 4.2): панели скрыты, атрибуция остаётся — она обязательна. */}
+      {filming && (
+        <button
+          type="button"
+          data-panel="film-stop"
+          onClick={stopFilm}
+          className="glass absolute right-4 top-4 rounded-xl px-3 py-2 text-sm text-accent compact:right-[max(0.5rem,env(safe-area-inset-right))] compact:top-[max(0.5rem,env(safe-area-inset-top))] compact:min-h-11"
+        >
+          {t('film.stop')}
+        </button>
+      )}
       {storyOpen && (
         <StoryDialog
           track={track}
