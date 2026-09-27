@@ -62,10 +62,11 @@ describe('поле ветра', () => {
     expect(dartScale(100)).toBe(WIND_PARTICLES.maxScale);
   });
 
-  it('между камерой и пилотом — гаснут, у пилота и дальше — видны', () => {
+  it('у камеры — гаснут, на уровне пилота и дальше — видны', () => {
     expect(cameraFade(20, 100)).toBe(0);
-    expect(cameraFade(50, 100)).toBe(0);
-    expect(cameraFade(62.5, 100)).toBeCloseTo(0.5, 9);
-    expect(cameraFade(100, 100)).toBe(1);
+    expect(cameraFade(75, 100)).toBe(0);
+    expect(cameraFade(85, 100)).toBeCloseTo(0.5, 9);
+    expect(cameraFade(95, 100)).toBe(1);
+    expect(cameraFade(300, 100)).toBe(1);
   });
 });

@@ -16,8 +16,8 @@ import { downwindDeg, type WindHere } from './wind-arrows';
 import { cameraFade, dartScale, particleAlpha, spawnParticle, stepParticles, WIND_PARTICLES, type Particle } from './wind-particles';
 
 /**
- * Поле ветра у пилота (задача 3.14): частицы из wind-particles.ts — плоские
- * полупрозрачные наконечники в 3D, горизонтально, носом по ветру своей высоты.
+ * Поле ветра у пилота (задача 3.14): частицы из wind-particles.ts — бирюзовые
+ * полупрозрачные 3D-стрелки (dart-model.ts), горизонтально, носом по ветру своей высоты.
  * Перспектива настоящая: поле читается объёмом. Сущностей немного (count),
  * их положение, курс, размер и прозрачность — CallbackProperty от состояния,
  * которое кадр обновляет в update().
@@ -71,7 +71,7 @@ export class WindFieldLayer {
   /**
    * pilot — где пилот; windAtUp — ветер на высоте «пилот + up», null — пилот
    * на земле: поля нет. dtS — сколько поле течёт в этом кадре (на паузе 0).
-   * camera — где камера: между ней и пилотом наконечники гаснут.
+   * camera — где камера: между ней и пилотом стрелки гаснут.
    */
   update(
     pilot: Cartesian3 | undefined,
