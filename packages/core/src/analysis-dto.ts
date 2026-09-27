@@ -73,6 +73,9 @@ export const FlightDetailsResponse = z.object({
   pilotName: z.string().nullable(),
   /** Адрес профиля пилота /u/{имя} (задача 3.11); null — анонимная загрузка. */
   pilotUsername: z.string().nullable(),
+  /** Лайки (задача 3.10а): сколько и лайкнул ли спрашивающий (аноним — false). */
+  likeCount: z.number().int().nonnegative(),
+  likedByMe: z.boolean(),
   /** Спрашивающий — владелец полёта: может добавить место, править полёт. */
   canEdit: z.boolean(),
   /** Видимость полёта (задача 3.7); у анонимной загрузки — «по ссылке». */

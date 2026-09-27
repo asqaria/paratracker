@@ -41,7 +41,8 @@ export interface FlightDetailsRecord {
   /** Имя пилота (задача 3.12): профиль, логин, заголовок IGC — что есть первым. */
   pilotName: string | null;
   /** Логин владельца — адрес профиля (задача 3.11); null — анонимная загрузка. */
-  pilotUsername: string | null;
+  pilotUsername: string | null;  /** Лайки полёта (задача 3.10а). */
+  likeCount: number;
 }
 
 export interface ThermalRecord {
@@ -120,6 +121,7 @@ export async function findFlightDetails(db: Database, id: string): Promise<Fligh
       xc: flights.xcTurnpoints,
       pilotName: sql<string | null>`coalesce(${users.displayName}, ${users.username}::text, ${flights.pilotNameRaw})`,
       pilotUsername: sql<string | null>`${users.username}::text`,
+      likeCount: flights.likeCount,
     })
     .from(flights)
     .leftJoin(users, eq(users.id, flights.userId))

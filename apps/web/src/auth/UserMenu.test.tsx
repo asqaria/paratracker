@@ -34,8 +34,10 @@ describe('UserMenuView', () => {
     expect(html).toContain('href="/api/v1/auth/oauth/google?returnTo=%23%2Fflight%2Fabc"');
   });
 
-  it('Google на сервере не настроен — кнопки нет', () => {
-    expect(render({ me: null, providers: { google: false } })).toBe('');
+  it('Google на сервере не настроен — кнопки входа нет, лента есть', () => {
+    const html = render({ me: null, providers: { google: false } });
+    expect(html).not.toContain(t['auth.signIn']);
+    expect(html).toContain('href="#/feed"');
   });
 
   it('вошёл — аватар, имя и выход', () => {

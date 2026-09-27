@@ -48,6 +48,7 @@ function harness() {
         calls.push(query);
         return Promise.resolve({ items: [ENTRY], next: { sortKey: ENTRY.startedAt ?? new Date(0), id: FLIGHT_ID } });
       },
+      follows: (_userId, viewerId) => Promise.resolve({ followers: 4, following: 2, followedByViewer: viewerId !== null }),
     },
   });
   return { app, calls };
@@ -63,6 +64,9 @@ describe('GET /api/v1/users/:username (задача 3.11)', () => {
       avatarUrl: null,
       memberSince: '2026-09-01T00:00:00.000Z',
       totals: PROFILE.totals,
+      followers: 4,
+      following: 2,
+      followedByMe: false,
     });
     expect(res.json()).not.toHaveProperty('id');
   });

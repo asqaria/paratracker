@@ -1,5 +1,5 @@
 import { LogbookResponse, PublicProfileResponse, Username } from '@skyline/core';
-import type { LogbookCursor, LogbookPage, PublicProfile } from '@skyline/db';
+import type { FollowCounts, LogbookCursor, LogbookPage, PublicProfile } from '@skyline/db';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
@@ -15,6 +15,8 @@ export interface ProfileRoutesDeps {
   find(username: string): Promise<PublicProfile | null>;
   /** Публичные полёты пилота, курсорная пагинация как у логбука. */
   flights(query: { userId: string; limit: number; after?: LogbookCursor }): Promise<LogbookPage>;
+  /** Подписчики, подписки и подписан ли смотрящий (задача 3.10а). */
+  follows(userId: string, viewerId: string | null): Promise<FollowCounts>;
 }
 
 const HTTP = { badRequest: 400, notFound: 404 } as const;
@@ -34,6 +36,7 @@ export function registerProfileRoutes(app: FastifyInstance, deps: ProfileRoutesD
   app.get('/users/:username', async (request, reply) => {
     const profile = await profileOf(request.params);
     if (!profile) return sendProblem(reply, problem(HTTP.notFound, { detail: 'Pilot not found' }));
+    const follows = await deps.follows(profile.id, request.userId);
     return reply.send(
       PublicProfileResponse.parse({
         username: profile.username,
@@ -41,6 +44,9 @@ export function registerProfileRoutes(app: FastifyInstance, deps: ProfileRoutesD
         avatarUrl: profile.avatarUrl,
         memberSince: profile.memberSince.toISOString(),
         totals: profile.totals,
+        followers: follows.followers,
+        following: follows.following,
+        followedByMe: follows.followedByViewer,
       }),
     );
   });

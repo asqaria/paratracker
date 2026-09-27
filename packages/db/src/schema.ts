@@ -377,3 +377,45 @@ export const thermalReviews = pgTable('thermal_reviews', {
   labels: jsonb('labels').$type<ThermalReviewLabels>().notNull(),
   updatedAt: timestamptz('updated_at').notNull().defaultNow(),
 });
+
+/**
+ * Подписки пилотов (задача 3.10а, ТЗ §9): лента «Подписки» — публичные полёты
+ * тех, на кого подписан. Подписаться на себя нельзя — проверяет база.
+ */
+export const follows = pgTable(
+  'follows',
+  {
+    followerId: uuid('follower_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    followeeId: uuid('followee_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.followerId, t.followeeId] }),
+    check('follows_not_self_check', sql`${t.followerId} <> ${t.followeeId}`),
+    // «Сколько подписчиков» и кто подписан на пилота.
+    index('follows_followee_idx').on(t.followeeId),
+  ],
+);
+
+/**
+ * Лайки полётов (задача 3.10а, ТЗ §9). Счётчик — flights.like_count: лента
+ * показывает его у каждой карточки, считать строки на каждый показ дорого.
+ * Лайк и счётчик меняются в одной транзакции.
+ */
+export const likes = pgTable(
+  'likes',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    flightId: uuid('flight_id')
+      .notNull()
+      .references(() => flights.id, { onDelete: 'cascade' }),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.flightId] }), index('likes_flight_idx').on(t.flightId)],
+);

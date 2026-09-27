@@ -1,7 +1,7 @@
 import type { AuthProvidersResponse, MeResponse } from '@skyline/core';
 
 import { useT } from '../i18n/locale';
-import { LOGBOOK_HASH } from '../routing';
+import { FEED_HASH, LOGBOOK_HASH } from '../routing';
 import { signInUrl, useLogout, useMe, useProviders } from './session';
 
 /** Размер аватара в шапке, px. */
@@ -18,10 +18,17 @@ interface UserMenuViewProps {
 /** Вход и выход (задача 2.10). Вход — только через Google, паролей нет. */
 export function UserMenuView({ me, providers, onSignOut, currentHash }: UserMenuViewProps) {
   const t = useT();
+  // Лента (задача 3.10а) — всем, со входом и без: в ней полёты «Все».
+  const feed = (
+    <a href={FEED_HASH} className="text-sm text-secondary hover:text-primary">
+      {t('feed.title')}
+    </a>
+  );
 
   if (me) {
     return (
       <div data-panel="user-menu" aria-label={t('auth.account')} className="flex items-center gap-2 text-sm">
+        {feed}
         {me.avatarUrl !== null && (
           <img
             src={me.avatarUrl}
@@ -45,13 +52,16 @@ export function UserMenuView({ me, providers, onSignOut, currentHash }: UserMenu
 
   if (me === null && providers?.google) {
     return (
-      <a href={signInUrl(currentHash)} className="rounded bg-subtle px-3 py-1 text-sm text-primary">
-        {t('auth.signIn')}
-      </a>
+      <div className="flex items-center gap-3">
+        {feed}
+        <a href={signInUrl(currentHash)} className="rounded bg-subtle px-3 py-1 text-sm text-primary">
+          {t('auth.signIn')}
+        </a>
+      </div>
     );
   }
 
-  return null;
+  return me === null ? feed : null;
 }
 
 export function UserMenu() {

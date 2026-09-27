@@ -685,6 +685,7 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
     onXcRouteShown: setXcRouteShown,
     onShowXcRoute: showXcRoute,
     ...(privacy ? { privacy } : {}),
+    share: share ?? null,
   };
 
   const togglePlay = useCallback(() => {
