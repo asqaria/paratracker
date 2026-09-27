@@ -419,3 +419,33 @@ export const likes = pgTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.flightId] }), index('likes_flight_idx').on(t.flightId)],
 );
+
+/**
+ * Комментарии к полёту (задача 3.10б, ТЗ §9). timecode_s — момент полёта в
+ * секундах от started_at: у владельца и у постороннего (трек без земли, 3.7)
+ * время перемотки одно и то же. Ответы — в один уровень: parent_id ведёт
+ * только на комментарий верхнего уровня (проверяет API). Удалённый с ответами
+ * остаётся строкой с deleted_at — ветка разбора не рвётся.
+ */
+export const comments = pgTable(
+  'comments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    flightId: uuid('flight_id')
+      .notNull()
+      .references(() => flights.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    parentId: uuid('parent_id').references((): AnyPgColumn => comments.id, { onDelete: 'cascade' }),
+    body: text('body').notNull(),
+    timecodeS: integer('timecode_s'),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    editedAt: timestamptz('edited_at'),
+    deletedAt: timestamptz('deleted_at'),
+  },
+  (t) => [
+    index('comments_flight_created_idx').on(t.flightId, t.createdAt),
+    check('comments_timecode_check', sql`${t.timecodeS} IS NULL OR ${t.timecodeS} >= 0`),
+  ],
+);

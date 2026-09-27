@@ -686,6 +686,7 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
     onShowXcRoute: showXcRoute,
     ...(privacy ? { privacy } : {}),
     share: share ?? null,
+    onSeekTo: seekTo,
   };
 
   const togglePlay = useCallback(() => {
@@ -781,14 +782,19 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
         с отступами: при фиксированном bottom панель накрывала атрибуцию,
         а она обязательна по лицензиям и не скрывается (ТЗ §4.4, §11.3).
       */}
-      <div className="absolute bottom-0 left-0 right-0">
+      {/*
+        Нижний поток прозрачен для кликов: его пустая часть над таймлайном
+        перекрывала низ панели аналитики. Клики — только у шторки, атрибуции
+        и таймлайна; легенда — подпись, не орган управления.
+      */}
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0">
         {/* На телефоне легенда — в шторке: поверх сцены она съедала высоту. */}
         <div className="px-4 pb-2 compact:hidden">
           <VarioLegend />
         </div>
 
         {/* Телефон: шторка — сводка всегда видна, остальное по жесту (ТЗ §8.3). */}
-        <div className="hidden px-[max(0.5rem,env(safe-area-inset-left))] pb-1 compact:block">
+        <div className="pointer-events-auto hidden px-[max(0.5rem,env(safe-area-inset-left))] pb-1 compact:block">
           <BottomSheet summary={<SummaryLine summary={track.summary} />}>
             <div className="flex flex-col gap-3">
               <SummaryPanel summary={track.summary} bare />

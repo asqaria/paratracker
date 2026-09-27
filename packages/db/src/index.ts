@@ -101,3 +101,11 @@ export {
   type FollowState,
   type LikeState,
 } from './repositories/social.js';
+export {
+  addComment,
+  deleteComment,
+  findComment,
+  listComments,
+  type CommentRecord,
+  type CommentRef,
+} from './repositories/comments.js';

@@ -289,6 +289,17 @@ const ru = {
   'follow.unfollow': 'Отписаться',
   'follow.followers': 'Подписчики',
   'follow.following': 'Подписки',
+  'comments.title': 'Комментарии',
+  'comments.titleCount': 'Комментарии · {n}',
+  'comments.placeholder': 'Комментарий к полёту',
+  'comments.replyPlaceholder': 'Ответ',
+  'comments.attach': 'К моменту {time}',
+  'comments.send': 'Отправить',
+  'comments.reply': 'Ответить',
+  'comments.delete': 'Удалить',
+  'comments.deleted': 'Комментарий удалён',
+  'comments.error': 'Не получилось — попробуйте ещё раз',
+  'comments.signIn': 'Войдите, чтобы комментировать',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -583,6 +594,17 @@ const en: Messages = {
   'follow.unfollow': 'Unfollow',
   'follow.followers': 'Followers',
   'follow.following': 'Following',
+  'comments.title': 'Comments',
+  'comments.titleCount': 'Comments · {n}',
+  'comments.placeholder': 'Comment on this flight',
+  'comments.replyPlaceholder': 'Reply',
+  'comments.attach': 'At {time}',
+  'comments.send': 'Send',
+  'comments.reply': 'Reply',
+  'comments.delete': 'Delete',
+  'comments.deleted': 'Comment deleted',
+  'comments.error': 'Something went wrong — try again',
+  'comments.signIn': 'Sign in to comment',
 };
 
 export const messages: Record<Locale, Messages> = { ru, en };

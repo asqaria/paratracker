@@ -134,7 +134,16 @@ function FeedCard({ item }: { item: FeedItem }) {
           <a href={profileHash(item.pilot.username)} className="truncate font-semibold hover:text-accent">
             {pilotName}
           </a>
-          <span className="ml-auto">
+          <span className="ml-auto flex items-center gap-1">
+            {item.commentCount > 0 && (
+              <a
+                href={flightHash(item.flightId)}
+                aria-label={`${t('comments.title')}: ${item.commentCount}`}
+                className="numeric px-1 text-sm text-secondary hover:text-primary"
+              >
+                💬 {item.commentCount}
+              </a>
+            )}
             <LikeButton flightId={item.flightId} likeCount={item.likeCount} likedByMe={item.likedByMe} />
           </span>
         </div>

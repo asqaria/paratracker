@@ -28,6 +28,7 @@ const ITEM = {
   likeCount: 2,
   likedByMe: false,
   hasPreview: false,
+  commentCount: 0,
 };
 const PROFILE = {
   username: 'aigerim',
