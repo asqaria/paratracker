@@ -82,3 +82,4 @@ export {
   type UserProfile,
 } from './repositories/users.js';
 export * from './schema.js';
+export { listSameDayFlights, type SameDayRecord } from './repositories/same-day.js';

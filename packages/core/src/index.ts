@@ -1,5 +1,6 @@
 export * from './analysis-dto.js';
 export * from './auth-dto.js';
+export * from './compare-dto.js';
 export * from './constants.js';
 export * from './derived.js';
 export * from './flight.js';
