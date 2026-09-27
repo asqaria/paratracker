@@ -46,6 +46,8 @@ export const FeedItem = z.object({
   likedByMe: z.boolean(),
   /** Есть картинка-превью (задача 3.8): GET /flights/{id}/preview.jpg. */
   hasPreview: z.boolean(),
+  /** Комментарии (задача 3.10б). */
+  commentCount: z.number().int().nonnegative(),
 });
 export type FeedItem = z.infer<typeof FeedItem>;
 

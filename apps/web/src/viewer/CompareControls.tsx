@@ -48,7 +48,7 @@ export function CompareControls(props: CompareControlsProps) {
   );
 
   return (
-    <section data-panel="timeline" className="glass pb-[env(safe-area-inset-bottom)]">
+    <section data-panel="timeline" className="pointer-events-auto glass pb-[env(safe-area-inset-bottom)]">
       <div className="flex items-center gap-3 px-4 pt-2 compact:px-3">
         <button
           type="button"

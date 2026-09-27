@@ -497,7 +497,7 @@ export function CompareScene({ flights, onRemove, toolbar }: CompareSceneProps) 
         </div>
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0">
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0">
         <SceneAttribution entries={imagery.attribution} />
         <CompareControls
           startMs={timeline.startMs}

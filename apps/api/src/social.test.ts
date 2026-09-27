@@ -41,6 +41,7 @@ const ITEM: FeedRecord = {
   likeCount: 2,
   likedByMe: false,
   hasPreview: true,
+  commentCount: 0,
 };
 
 function harness() {

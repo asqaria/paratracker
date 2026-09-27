@@ -5,6 +5,7 @@ import type { GliderDto, Privacy } from '@skyline/core';
 
 import { GliderLine } from '../gliders/GliderLine';
 import { formatLocalStart } from '../logbook/format-logbook';
+import { CommentsSection } from '../comments/CommentsSection';
 import { LikeButton } from '../feed/LikeButton';
 import { profileHash } from '../routing';
 import { PrivacyControl } from '../sharing/PrivacyControl';
@@ -58,6 +59,8 @@ export interface AnalyticsPanelProps {
   /** Приватность и ссылка своего полёта (задача 3.7); без них — не показываются. */
   /** Токен ссылки: лайк полёта «По ссылке» (задача 3.10а) — с ним, как и сам полёт. */
   share?: string | null;
+  /** Перемотка к моменту комментария (задача 3.10б). */
+  onSeekTo?: (timeMs: number) => void;
   privacy?: {
     onPrivacy: (privacy: Privacy) => Promise<void>;
     onShareLink: () => Promise<string>;
@@ -98,6 +101,7 @@ export function AnalyticsPanel({
   onShowXcRoute,
   privacy,
   share,
+  onSeekTo,
 }: AnalyticsPanelProps) {
   const t = useT();
   const locale = useLocaleStore((state) => state.locale);
@@ -109,7 +113,13 @@ export function AnalyticsPanel({
     <section
       aria-label={t('viewer.analytics')}
       data-panel="analytics"
-      className={embedded ? 'text-sm' : 'w-80 rounded-xl glass text-sm compact:max-h-[45dvh] compact:w-72 compact:overflow-y-auto'}
+      // Высота — до таймлайна снизу (легенда, атрибуция, график ≈ 20rem): с комментариями
+      // (задача 3.10б) панель длиннее экрана, и низ уходил под таймлайн — прокрутка внутри.
+      className={
+        embedded
+          ? 'text-sm'
+          : 'max-h-[calc(100dvh-20rem)] w-80 overflow-y-auto rounded-xl glass text-sm compact:max-h-[45dvh] compact:w-72'
+      }
     >
       {!embedded && (
       <button
@@ -194,6 +204,16 @@ export function AnalyticsPanel({
           )}
           {state.status === 'ready' && (
             <Content analytics={state.analytics} timeline={timeline} timeMs={timeMs} tab={tab} onTab={setTab} onSelect={onSelect} embedded={embedded} />
+          )}
+          {state.status === 'ready' && state.analytics.details.startedAt !== null && onSeekTo && (
+            <CommentsSection
+              flightId={state.analytics.details.flightId}
+              share={share ?? null}
+              startedAtMs={Date.parse(state.analytics.details.startedAt)}
+              timelineStartMs={timeline.startMs}
+              timeMs={timeMs}
+              onSeekTo={onSeekTo}
+            />
           )}
           {state.status === 'ready' && state.analytics.details.canEdit && state.analytics.thermals.length > 0 && (
             <a href={reviewHash(state.analytics.details.flightId)} className="mt-2 block text-xs text-accent">

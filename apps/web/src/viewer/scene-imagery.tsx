@@ -150,7 +150,7 @@ export function SceneAttribution({ entries }: { entries: readonly AttributionEnt
   const t = useT();
   const [open, setOpen] = useState(false);
   return (
-    <div data-panel="attribution" className="flex items-center bg-void/70 text-xs text-secondary compact:text-2xs">
+    <div data-panel="attribution" className="pointer-events-auto flex items-center bg-void/70 text-xs text-secondary compact:text-2xs">
       <AttributionLine entries={entries} className={open ? '' : 'compact:hidden'} />
       <AttributionLine entries={collapsedAttribution(entries)} className={open ? 'hidden' : 'hidden compact:block'} />
       <button

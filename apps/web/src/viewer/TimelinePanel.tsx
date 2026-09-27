@@ -149,7 +149,7 @@ export function TimelinePanel(props: TimelinePanelProps) {
 
   return (
     // Снизу — отступ под полоску «домой» iPhone (viewport-fit=cover в index.html).
-    <section data-panel="timeline" className="glass pb-[env(safe-area-inset-bottom)]">
+    <section data-panel="timeline" className="pointer-events-auto glass pb-[env(safe-area-inset-bottom)]">
       {/*
         На телефоне (compact) ряд кнопок не помещается: скорость — одна кнопка
         по кругу, камера — системный список, телеметрия — сеткой: в альбомной

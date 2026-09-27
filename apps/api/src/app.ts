@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 
 import { registerAnalysisRoutes, type AnalysisRoutesDeps } from './analysis.js';
+import { registerCommentRoutes, type CommentRoutesDeps } from './comments.js';
 import { registerAuthHook, registerAuthRoutes, type AuthDeps } from './auth/routes.js';
 import { API_V1_PREFIX } from './constants.js';
 import { registerFlightSettingsRoutes, type FlightSettingsDeps } from './flight-settings.js';
@@ -44,6 +45,8 @@ export interface AppOptions {
   profiles?: ProfileRoutesDeps;
   /** Лента, лайки, подписки (задача 3.10а). */
   social?: SocialRoutesDeps;
+  /** Комментарии к полёту (задача 3.10б). */
+  comments?: CommentRoutesDeps;
 }
 
 export function buildApp(options: AppOptions): FastifyInstance {
@@ -67,6 +70,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       if (options.sharePage) registerSharePreviewRoute(v1, options.sharePage);
       if (options.profiles) registerProfileRoutes(v1, options.profiles);
       if (options.social) registerSocialRoutes(v1, options.social);
+      if (options.comments) registerCommentRoutes(v1, options.comments);
       done();
     },
     { prefix: API_V1_PREFIX },

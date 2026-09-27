@@ -3,6 +3,7 @@ import { and, count, desc, eq, exists, gt, isNotNull, sql, type SQL } from 'driz
 
 import type { Database } from '../client.js';
 import { flights, follows, likes, sites, users } from '../schema.js';
+import { liveCommentCount } from './comments.js';
 
 /**
  * Лента, лайки и подписки (задача 3.10а). Кто видит полёт — решает вызывающий
@@ -93,6 +94,8 @@ export interface FeedRecord {
   likeCount: number;
   likedByMe: boolean;
   hasPreview: boolean;
+  /** Живые комментарии (задача 3.10б). */
+  commentCount: number;
 }
 
 export interface FeedCursor {
@@ -157,6 +160,7 @@ export async function listFeed(
       likeCount: flights.likeCount,
       likedByMe,
       hasPreview: sql<boolean>`${flights.previewObjectKey} is not null`,
+      commentCount: liveCommentCount(flights.id),
     })
     .from(flights)
     .innerJoin(users, eq(users.id, flights.userId))
@@ -178,6 +182,7 @@ export async function listFeed(
     likeCount: row.likeCount,
     likedByMe: row.likedByMe,
     hasPreview: row.hasPreview,
+    commentCount: row.commentCount,
   }));
   const last = page.at(-1);
   return { items: page, next: rows.length > query.limit && last ? { startedAt: last.startedAt, id: last.flightId } : null };
