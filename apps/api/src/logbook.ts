@@ -52,10 +52,10 @@ const HTTP = { badRequest: 400, unauthorized: 401 } as const;
 /** Курсор снаружи непрозрачен: base64url от ключа сортировки и id. */
 const CursorPayload = z.object({ k: z.iso.datetime(), id: z.uuid() });
 
-const encodeCursor = (cursor: LogbookCursor): string =>
+export const encodeCursor = (cursor: LogbookCursor): string =>
   Buffer.from(JSON.stringify({ k: cursor.sortKey.toISOString(), id: cursor.id })).toString('base64url');
 
-function decodeCursor(value: string): LogbookCursor | null {
+export function decodeCursor(value: string): LogbookCursor | null {
   try {
     const parsed = CursorPayload.safeParse(JSON.parse(Buffer.from(value, 'base64url').toString('utf8')));
     return parsed.success ? { sortKey: new Date(parsed.data.k), id: parsed.data.id } : null;
@@ -66,7 +66,7 @@ function decodeCursor(value: string): LogbookCursor | null {
 
 const iso = (date: Date | null): string | null => (date ? date.toISOString() : null);
 
-const toEntry = (record: LogbookEntryRecord): LogbookEntry => ({
+export const toEntry = (record: LogbookEntryRecord): LogbookEntry => ({
   ...record,
   startedAt: iso(record.startedAt),
   uploadedAt: record.uploadedAt.toISOString(),

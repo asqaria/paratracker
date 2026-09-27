@@ -6,6 +6,7 @@ import { GlidersPage } from './gliders/GlidersPage';
 import { HealthPage } from './health/HealthPage';
 import { ClaimOnSignIn } from './logbook/ClaimOnSignIn';
 import { LogbookPage } from './logbook/LogbookPage';
+import { ProfilePage } from './profile/ProfilePage';
 import { SharedFlightPage } from './sharing/SharedFlightPage';
 import { routeFromLocation, type Route } from './routing';
 import { UploadPage } from './upload/UploadPage';
@@ -42,6 +43,7 @@ function Screen({ route }: { route: Route }) {
   if (route.kind === 'shared') return <SharedFlightPage token={route.token} />;
   if (route.kind === 'embed') return <SharedFlightPage token={route.token} embed />;
   if (route.kind === 'compare') return <ComparePage refs={route.refs} />;
+  if (route.kind === 'profile') return <ProfilePage username={route.username} />;
   if (route.kind === 'flight') {
     return <FlightViewerPage flightId={route.flightId} trackUrl={route.trackUrl} review={route.review === true} />;
   }

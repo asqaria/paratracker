@@ -8,7 +8,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 const FLIGHT = '11111111-2222-4333-8444-555555555555';
 const ANONYMOUS = '22222222-2222-4333-8444-555555555555';
-const ME = { id: FLIGHT, username: 'asqar', displayName: 'Асқар Дүйсен', avatarUrl: null, locale: 'ru', units: 'metric' };
+const ME = { id: FLIGHT, username: 'asqar', displayName: 'Асқар Дүйсен', avatarUrl: null, locale: 'ru', units: 'metric', defaultPrivacy: 'unlisted' };
 const ENTRY = {
   id: FLIGHT,
   status: 'ready',

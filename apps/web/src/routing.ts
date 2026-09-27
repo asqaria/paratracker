@@ -29,6 +29,10 @@ const EMBED_PATH = /^\/embed\/([\w-]{8,64})\/?$/;
 /** Сравнение треков (задача 3.12): #/compare?f=… — состав в адресе (compare-refs.ts). */
 const COMPARE_HASH = /^#\/compare(?:\?(.*))?$/;
 
+/** Публичный профиль пилота (задача 3.11): #/u/{имя}. */
+const PROFILE_HASH = /^#\/u\/([a-z0-9._-]{3,24})$/i;
+export const profileHash = (username: string): string => `#/u/${username}`;
+
 /** Адрес iframe для чужого сайта. */
 export const embedPath = (token: string): string => `/embed/${token}`;
 /** Полная страница полёта по ссылке — из встроенного просмотрщика «Открыть в Skyline». */
@@ -60,6 +64,8 @@ export type Route =
   | { kind: 'embed'; token: string }
   /** Сравнение треков (задача 3.12). */
   | { kind: 'compare'; refs: FlightRef[] }
+  /** Публичный профиль пилота (задача 3.11). */
+  | { kind: 'profile'; username: string }
   /** flightId null — демо-трек: его нет в API, аналитики к нему нет. */
   | { kind: 'flight'; flightId: string | null; trackUrl: string; review?: true };
 
@@ -73,6 +79,8 @@ export function routeFromHash(hash: string): Route {
   if (hash === HEALTH_HASH) return { kind: 'health' };
   if (hash === LOGBOOK_HASH) return { kind: 'logbook' };
   if (hash === SETTINGS_HASH) return { kind: 'settings' };
+  const profile = PROFILE_HASH.exec(hash)?.[1];
+  if (profile !== undefined) return { kind: 'profile', username: profile.toLowerCase() };
   const compare = COMPARE_HASH.exec(hash);
   if (compare) return { kind: 'compare', refs: refsFromQuery(compare[1] ?? '') };
   const share = SHARE_HASH.exec(hash)?.[1];

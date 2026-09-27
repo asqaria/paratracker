@@ -59,7 +59,8 @@ export async function logout(fetchImpl: typeof fetch = fetch): Promise<void> {
   await fetchImpl(LOGOUT_URL, { method: 'POST', headers: ACCEPT_JSON });
 }
 
-const ME_KEY = ['me'] as const;
+/** Ключ запроса текущего пользователя: настройки профиля кладут в него ответ PATCH. */
+export const ME_KEY = ['me'] as const;
 
 /** Текущий пользователь; undefined — ещё выясняем. */
 export function useMe(): MeResponse | null | undefined {

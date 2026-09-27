@@ -76,6 +76,7 @@ const analytics = (overrides: Partial<FlightAnalytics['details']> = {}): FlightA
     privacy: 'unlisted',
     timezone: 'Asia/Almaty',
     pilotName: null,
+    pilotUsername: null,
     canEdit: false,
     ...overrides,
   },

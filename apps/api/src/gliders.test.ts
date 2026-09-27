@@ -27,7 +27,11 @@ function harness(options: { create?: GliderRecord | null; update?: GliderRecord 
     jwtSecret: SECRET,
     publicUrl: 'https://skyline.example',
     google: null,
-    users: { signIn: () => Promise.reject(new Error('unused')), profile: () => Promise.resolve(null) },
+    users: {
+      signIn: () => Promise.reject(new Error('unused')),
+      profile: () => Promise.resolve(null),
+      update: () => Promise.reject(new Error('unused')),
+    },
     sessions: {
       create: () => Promise.resolve(),
       rotate: () => Promise.resolve({ kind: 'invalid' }),

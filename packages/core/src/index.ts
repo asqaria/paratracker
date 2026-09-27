@@ -11,6 +11,7 @@ export * from './imagery.js';
 export * from './logbook-dto.js';
 export * from './parse.js';
 export * from './problem.js';
+export * from './profile-dto.js';
 export * from './review-dto.js';
 export * from './site.js';
 export * from './site-dto.js';

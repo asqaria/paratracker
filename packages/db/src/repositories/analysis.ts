@@ -40,6 +40,8 @@ export interface FlightDetailsRecord {
   xc: XcScore | null;
   /** Имя пилота (задача 3.12): профиль, логин, заголовок IGC — что есть первым. */
   pilotName: string | null;
+  /** Логин владельца — адрес профиля (задача 3.11); null — анонимная загрузка. */
+  pilotUsername: string | null;
 }
 
 export interface ThermalRecord {
@@ -117,6 +119,7 @@ export async function findFlightDetails(db: Database, id: string): Promise<Fligh
       gliderRaw: flights.gliderRaw,
       xc: flights.xcTurnpoints,
       pilotName: sql<string | null>`coalesce(${users.displayName}, ${users.username}::text, ${flights.pilotNameRaw})`,
+      pilotUsername: sql<string | null>`${users.username}::text`,
     })
     .from(flights)
     .leftJoin(users, eq(users.id, flights.userId))

@@ -106,3 +106,10 @@ describe('routeFromHash — сравнение треков (задача 3.12)'
     expect(routeFromHash('#/compare')).toEqual({ kind: 'compare', refs: [] });
   });
 });
+
+describe('routeFromHash — профиль пилота (задача 3.11)', () => {
+  it('#/u/{имя} — без учёта регистра; не имя — лендинг', () => {
+    expect(routeFromHash('#/u/Asqar.T')).toEqual({ kind: 'profile', username: 'asqar.t' });
+    expect(routeFromHash('#/u/ab')).toEqual({ kind: 'landing' });
+  });
+});

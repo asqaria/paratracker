@@ -138,7 +138,7 @@ function LogbookContent() {
             </select>
           )}
           <a href={SETTINGS_HASH} className="ml-auto text-accent">
-            {t('gliders.title')}
+            {t('settings.title')}
           </a>
         </div>
         {selected.size > 0 ? (

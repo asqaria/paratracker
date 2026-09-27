@@ -15,6 +15,7 @@ const ME = {
   avatarUrl: 'https://lh3.googleusercontent.com/a/photo',
   locale: 'ru',
   units: 'metric',
+  defaultPrivacy: 'unlisted',
 } as const;
 
 const render = (props: Partial<Parameters<typeof UserMenuView>[0]>) =>

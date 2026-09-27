@@ -31,6 +31,7 @@ const details = (flightId: string, pilotName: string | null) => ({
   glider: null,
   gliderRaw: null,
   pilotName,
+  pilotUsername: null,
   canEdit: false,
   privacy: 'unlisted',
 });

@@ -1,8 +1,8 @@
-import type { AuthProvider, Locale, UnitSystem } from '@skyline/core';
-import { and, eq, isNull, like, or } from 'drizzle-orm';
+import { USERNAME, type AuthProvider, type Locale, type Privacy, type ProfilePatch, type ProfileTotals, type UnitSystem } from '@skyline/core';
+import { and, eq, isNull, like, or, sql } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
-import { oauthAccounts, sessions, users } from '../schema.js';
+import { flights, oauthAccounts, sessions, users } from '../schema.js';
 
 /**
  * Пользователи и сессии (задача 2.10). Вход — только через OAuth: паролей нет.
@@ -25,6 +25,8 @@ export interface UserProfile {
   avatarUrl: string | null;
   locale: Locale;
   units: UnitSystem;
+  /** Видимость новых полётов (задача 3.11). */
+  defaultPrivacy: Privacy;
 }
 
 export interface NewSession {
@@ -42,15 +44,8 @@ export type RotateResult =
   /** Неизвестен, просрочен или отозван выходом. */
   | { kind: 'invalid' };
 
-const USERNAME = {
-  /** Короче — не узнать в ленте; длиннее — не влезает в карточку. */
-  minLength: 3,
-  maxLength: 24,
-  /** Когда из email не вышло ничего осмысленного. */
-  fallback: 'pilot',
-  /** Сколько раз переподбирать имя, если его заняли между проверкой и вставкой. */
-  insertAttempts: 3,
-} as const;
+/** Сколько раз переподбирать имя, если его заняли между проверкой и вставкой. */
+const USERNAME_INSERT_ATTEMPTS = 3;
 
 /** Postgres: нарушение UNIQUE. */
 const UNIQUE_VIOLATION = '23505';
@@ -81,8 +76,12 @@ async function freeUsername(db: Database, base: string): Promise<string> {
   }
 }
 
-const isUniqueViolation = (error: unknown): boolean =>
-  typeof error === 'object' && error !== null && 'code' in error && error.code === UNIQUE_VIOLATION;
+/** Ошибка Postgres — сама или внутри DrizzleQueryError (cause). */
+const isUniqueViolation = (error: unknown): boolean => {
+  if (typeof error !== 'object' || error === null) return false;
+  if ('code' in error && error.code === UNIQUE_VIOLATION) return true;
+  return 'cause' in error && isUniqueViolation(error.cause);
+};
 
 /**
  * Вход через провайдера: найти по (provider, subject), иначе по email
@@ -130,7 +129,7 @@ export async function signInWithOAuth(
       return { userId, created: true };
     } catch (error) {
       // Имя заняли между подбором и вставкой — подобрать заново.
-      if (!isUniqueViolation(error) || attempt >= USERNAME.insertAttempts) throw error;
+      if (!isUniqueViolation(error) || attempt >= USERNAME_INSERT_ATTEMPTS) throw error;
     }
   }
 }
@@ -144,11 +143,93 @@ export async function findUserProfile(db: Database, id: string): Promise<UserPro
       avatarUrl: users.avatarUrl,
       locale: users.locale,
       units: users.units,
+      defaultPrivacy: users.defaultPrivacy,
     })
     .from(users)
     .where(eq(users.id, id));
   return row ?? null;
 }
+
+export type UpdateProfileResult =
+  | { kind: 'ok'; profile: UserProfile }
+  /** Имя занято другим пилотом (без учёта регистра — citext). */
+  | { kind: 'taken' }
+  | { kind: 'not_found' };
+
+/** Настройки профиля (задача 3.11): имя, адрес профиля, видимость новых полётов. */
+export async function updateUserProfile(db: Database, id: string, patch: ProfilePatch): Promise<UpdateProfileResult> {
+  const set = {
+    ...(patch.displayName === undefined ? {} : { displayName: patch.displayName }),
+    ...(patch.username === undefined ? {} : { username: patch.username }),
+    ...(patch.defaultPrivacy === undefined ? {} : { defaultPrivacy: patch.defaultPrivacy }),
+  };
+  if (Object.keys(set).length > 0) {
+    try {
+      const rows = await db.update(users).set(set).where(eq(users.id, id)).returning({ id: users.id });
+      if (rows.length === 0) return { kind: 'not_found' };
+    } catch (error) {
+      if (isUniqueViolation(error)) return { kind: 'taken' };
+      throw error;
+    }
+  }
+  const profile = await findUserProfile(db, id);
+  return profile ? { kind: 'ok', profile } : { kind: 'not_found' };
+}
+
+export interface PublicProfile {
+  id: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  memberSince: Date;
+  totals: ProfileTotals;
+}
+
+/**
+ * Публичный профиль по имени (задача 3.11): итоги — только по полётам «Все»
+ * (решение владельца 27.09.2026), скрытые не выдаются даже суммой.
+ */
+export async function findPublicProfile(db: Database, username: string): Promise<PublicProfile | null> {
+  const [user] = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      displayName: users.displayName,
+      avatarUrl: users.avatarUrl,
+      memberSince: users.createdAt,
+    })
+    .from(users)
+    .where(eq(users.username, username));
+  if (!user) return null;
+  const [totals] = await db
+    .select({
+      flights: sql<number>`count(*)::int`,
+      airtimeS: sql<number>`coalesce(sum(${flights.airtimeS}), 0)::int`,
+      distanceM: sql<number>`coalesce(sum(${flights.distanceTrackM}), 0)::int`,
+      maxAltM: sql<number | null>`max(${flights.maxAltM})`,
+      longestAirtimeS: sql<number | null>`max(${flights.airtimeS})`,
+      longestDistanceM: sql<number | null>`max(${flights.distanceTrackM})`,
+      bestXcScore: sql<number | null>`max(${flights.xcScore})::float8`,
+    })
+    .from(flights)
+    .where(and(eq(flights.userId, user.id), eq(flights.privacy, 'public'), eq(flights.status, 'ready')));
+  return {
+    ...user,
+    totals: totals ?? {
+      flights: 0,
+      airtimeS: 0,
+      distanceM: 0,
+      maxAltM: null,
+      longestAirtimeS: null,
+      longestDistanceM: null,
+      bestXcScore: null,
+    },
+  };
+}
+
+/** Видимость новых полётов пилота — подзапросом: загрузка и перенос берут её из профиля. */
+export const defaultPrivacyOf = (userId: string) =>
+  sql`(select ${users.defaultPrivacy} from ${users} where ${users.id} = ${userId})`;
 
 export async function createSession(db: Database, session: NewSession): Promise<void> {
   await db.insert(sessions).values(session);
