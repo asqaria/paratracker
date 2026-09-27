@@ -300,6 +300,9 @@ const ru = {
   'comments.deleted': 'Комментарий удалён',
   'comments.error': 'Не получилось — попробуйте ещё раз',
   'comments.signIn': 'Войдите, чтобы комментировать',
+  'wind.title': 'Ветер по высотам',
+  'wind.band': '{low}–{high} м',
+  'wind.flight': 'В среднем',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -605,6 +608,9 @@ const en: Messages = {
   'comments.deleted': 'Comment deleted',
   'comments.error': 'Something went wrong — try again',
   'comments.signIn': 'Sign in to comment',
+  'wind.title': 'Wind by altitude',
+  'wind.band': '{low}–{high} m',
+  'wind.flight': 'Average',
 };
 
 export const messages: Record<Locale, Messages> = { ru, en };

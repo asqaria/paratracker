@@ -22,6 +22,7 @@ import {
   Viewer,
 } from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
+import type { WindBandDto, WindDto } from '@skyline/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { documentColorTokens } from '../design/tokens';
@@ -89,6 +90,10 @@ import {
   type TrackShown,
 } from './track-progress';
 import { useHotkeys } from './use-hotkeys';
+import { windAt } from './wind-arrows';
+import { WindColumn } from './WindColumn';
+import { WindFieldLayer } from './wind-layer';
+import { WIND_COLOR } from './wind-palette';
 import { ImageryButtons, SceneAttribution, useSceneImagery } from './scene-imagery';
 import { calibratedForScene, createSkylineViewer, lookAtAboveGround, sceneTrackLayer } from './scene-kit';
 
@@ -117,6 +122,9 @@ export interface SceneProps {
   /** Встроен в чужой сайт (задача 3.9): сцена, таймлайн, сводка — без аналитики и настроек. */
   embed?: boolean;
 }
+
+/** Курс камеры для стрелок колонки ветра обновляется, когда сдвинулся хотя бы на полградуса. */
+const HEADING_CSS_STEP_DEG = 0.5;
 
 /** Перелёт свободной камеры к сегменту из аналитики: длительность, наклон, дальность в радиусах сегмента. */
 const SEGMENT_FLIGHT_S = 1.2;
@@ -150,6 +158,10 @@ function applyCameraInputs(viewer: Viewer, mode: CameraMode): void {
 export function Scene({ track, flightId = null, showGlow = false, review = false, share, embed = false }: SceneProps) {
   const t = useT();
   const container = useRef<HTMLDivElement | null>(null);
+  /** Корень сцены: на нём CSS-переменная --camera-heading для стрелок колонки ветра. */
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  /** Ветер для стрелки у пилота (задача 3.14): приходит с аналитикой, сцена его не ждёт. */
+  const windRef = useRef<{ profile: WindBandDto[]; flight: WindDto | null } | null>(null);
   const viewerRef = useRef<Viewer | null>(null);
   const clockRef = useRef<FlightClock | null>(null);
   const cameraModeRef = useRef<CameraMode>(DEFAULT_CAMERA_MODE);
@@ -312,17 +324,40 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
           // На земле — стоит, идёт, разбег с подъёмом крыла, посадка (glider-pose.ts).
           (timeMs) => gliderPose(track, range, timeMs),
         );
+        // Поле ветра (задача 3.14): штрихи текут по ветру своей высоты — только в воздухе.
+        const windField = new WindFieldLayer(viewer, WIND_COLOR);
 
         // Кадровый обработчик: время → HUD и камера. Состояние React обновляется
         // только при смене точки, иначе перерисовка шла бы 60 раз в секунду.
         let lastIndex = -1;
         let lastFrameMs: number | null = null;
         let halfWidthS: number | null = null;
+        let lastHeadingDeg = Number.NaN;
+        let lastWindFrameMs: number | null = null;
         const onPreRender = (): void => {
+          // Курс камеры — стрелкам колонки ветра: CSS-переменная, без перерисовки React.
+          const headingDeg = viewer ? CesiumMath.toDegrees(viewer.camera.heading) : 0;
+          if (!(Math.abs(headingDeg - lastHeadingDeg) < HEADING_CSS_STEP_DEG)) {
+            lastHeadingDeg = headingDeg;
+            rootRef.current?.style.setProperty('--camera-heading', `${headingDeg.toFixed(1)}deg`);
+          }
           const frameNowMs = performance.now();
           const elapsedS = frameSeconds(lastFrameMs, frameNowMs);
           lastFrameMs = frameNowMs;
           const current = flightClock.currentTimeMs();
+          // Поле течёт только при проигрывании: на паузе сцена не рисуется непрерывно (ТЗ §7.7).
+          const windNow = windRef.current;
+          const windIndex = indexAt(track.t, current);
+          const flying = windNow !== null && windIndex >= range.takeoff && windIndex <= range.landing;
+          const pilotAt = flying ? flightClock.position.getValue(JulianDate.fromDate(new Date(current))) : undefined;
+          const pilotAltM = track.alt[windIndex] ?? Number.NaN;
+          windField.update(
+            pilotAt,
+            flying ? (upM) => windAt(windNow.profile, windNow.flight, pilotAltM + upM) : null,
+            viewer?.clock.shouldAnimate ? frameSeconds(lastWindFrameMs, performance.now()) : 0,
+            viewer ? viewer.camera.positionWC : Cartesian3.ZERO,
+          );
+          lastWindFrameMs = performance.now();
           const index = indexAt(track.t, current);
           if (index !== lastIndex) {
             lastIndex = index;
@@ -548,6 +583,17 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
   const ownGliders = useOwnGliders();
   // Данные запроса стабильны между рендерами, в отличие от объекта состояния вокруг них.
   const analyticsData = analytics?.status === 'ready' ? analytics.analytics : null;
+  useEffect(() => {
+    windRef.current = analyticsData ? { profile: analyticsData.wind.profile, flight: analyticsData.wind.flight } : null;
+    viewerRef.current?.scene.requestRender();
+  }, [analyticsData]);
+  const windHere = analyticsData
+    ? windAt(analyticsData.wind.profile, analyticsData.wind.flight, track.alt[indexAt(track.t, timeMs)] ?? Number.NaN)
+    : null;
+  const windColumn = (bare: boolean) =>
+    analyticsData ? (
+      <WindColumn profile={analyticsData.wind.profile} flight={analyticsData.wind.flight} here={windHere} bare={bare} />
+    ) : null;
 
   // Колонны термиков (ТЗ §7.2): по треку сцены, когда есть и он, и аналитика.
   useEffect(() => {
@@ -713,7 +759,7 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
       : compareHash([share === undefined ? { kind: 'id', flightId } : { kind: 'share', token: share }]);
 
   return (
-    <div className="relative h-dvh w-full">
+    <div ref={rootRef} className="relative h-dvh w-full">
       {/* touch-none: жесты на сцене — камере, а не прокрутке и зуму страницы. */}
       <div ref={container} className="h-full w-full touch-none" data-testid="cesium-container" />
 
@@ -727,6 +773,7 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
           {/* На телефоне сводка, подложка и аналитика — в шторке снизу. */}
           <div className="compact:hidden">
             <SummaryPanel summary={track.summary} />
+            {windColumn(false)}
           </div>
           {error !== null && (
             <p role="alert" className="glass rounded-xl px-3 py-2 text-danger">
@@ -799,6 +846,7 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
             <div className="flex flex-col gap-3">
               <SummaryPanel summary={track.summary} bare />
               <VarioLegend />
+              {windColumn(true)}
               {compareLink !== null && (
                 <a href={compareLink} className="flex min-h-11 items-center text-sm text-accent">
                   {t('viewer.compare')}
