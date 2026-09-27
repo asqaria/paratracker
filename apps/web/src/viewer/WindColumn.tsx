@@ -4,6 +4,7 @@ import { fill, useLocaleStore, useT } from '../i18n/locale';
 import { compassPoint } from './format-analytics';
 import { groundSpeed } from './units';
 import { downwindDeg, layersTopDown, type WindHere } from './wind-arrows';
+import { WIND_COLOR } from './wind-palette';
 
 /**
  * Ветер по высотам в углу сцены (задача 3.14): слой — стрелка, румб, скорость;
@@ -21,13 +22,20 @@ export interface WindColumnProps {
 
 function Arrow({ fromDeg }: { fromDeg: number }) {
   return (
-    <span
+    <svg
       aria-hidden
-      className="inline-block w-4 text-center text-accent"
-      style={{ transform: `rotate(calc(${downwindDeg(fromDeg)}deg - var(--camera-heading, 0deg)))` }}
+      width="14"
+      height="14"
+      viewBox="-7 -7 14 14"
+      className="shrink-0"
+      style={{ color: WIND_COLOR, transform: `rotate(calc(${downwindDeg(fromDeg)}deg - var(--camera-heading, 0deg)))` }}
     >
-      ↑
-    </span>
+      {/* Тонкая стрелка «куда сносит» — цвета наконечников поля на сцене. */}
+      <g fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M0,6 L0,-6" />
+        <path d="M-3,-3 L0,-6 L3,-3" />
+      </g>
+    </svg>
   );
 }
 

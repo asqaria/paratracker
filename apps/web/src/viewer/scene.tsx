@@ -92,7 +92,8 @@ import {
 import { useHotkeys } from './use-hotkeys';
 import { windAt } from './wind-arrows';
 import { WindColumn } from './WindColumn';
-import { WindArrowLayer } from './wind-layer';
+import { WindFieldLayer } from './wind-layer';
+import { WIND_COLOR } from './wind-palette';
 import { ImageryButtons, SceneAttribution, useSceneImagery } from './scene-imagery';
 import { calibratedForScene, createSkylineViewer, lookAtAboveGround, sceneTrackLayer } from './scene-kit';
 
@@ -323,18 +324,8 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
           // На земле — стоит, идёт, разбег с подъёмом крыла, посадка (glider-pose.ts).
           (timeMs) => gliderPose(track, range, timeMs),
         );
-        // Стрелка ветра (задача 3.14) — только в воздухе: на земле ветер слоя не про пилота.
-        new WindArrowLayer(
-          viewer,
-          flightClock.position,
-          (timeMs) => {
-            const wind = windRef.current;
-            const at = indexAt(track.t, timeMs);
-            if (!wind || at < range.takeoff || at > range.landing) return null;
-            return windAt(wind.profile, wind.flight, track.alt[at] ?? Number.NaN);
-          },
-          { fill: documentColorTokens().primary, outline: documentColorTokens().void },
-        );
+        // Поле ветра (задача 3.14): штрихи текут по ветру своей высоты — только в воздухе.
+        const windField = new WindFieldLayer(viewer, WIND_COLOR);
 
         // Кадровый обработчик: время → HUD и камера. Состояние React обновляется
         // только при смене точки, иначе перерисовка шла бы 60 раз в секунду.
@@ -342,6 +333,7 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
         let lastFrameMs: number | null = null;
         let halfWidthS: number | null = null;
         let lastHeadingDeg = Number.NaN;
+        let lastWindFrameMs: number | null = null;
         const onPreRender = (): void => {
           // Курс камеры — стрелкам колонки ветра: CSS-переменная, без перерисовки React.
           const headingDeg = viewer ? CesiumMath.toDegrees(viewer.camera.heading) : 0;
@@ -353,6 +345,19 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
           const elapsedS = frameSeconds(lastFrameMs, frameNowMs);
           lastFrameMs = frameNowMs;
           const current = flightClock.currentTimeMs();
+          // Поле течёт только при проигрывании: на паузе сцена не рисуется непрерывно (ТЗ §7.7).
+          const windNow = windRef.current;
+          const windIndex = indexAt(track.t, current);
+          const flying = windNow !== null && windIndex >= range.takeoff && windIndex <= range.landing;
+          const pilotAt = flying ? flightClock.position.getValue(JulianDate.fromDate(new Date(current))) : undefined;
+          const pilotAltM = track.alt[windIndex] ?? Number.NaN;
+          windField.update(
+            pilotAt,
+            flying ? (upM) => windAt(windNow.profile, windNow.flight, pilotAltM + upM) : null,
+            viewer?.clock.shouldAnimate ? frameSeconds(lastWindFrameMs, performance.now()) : 0,
+            viewer ? viewer.camera.positionWC : Cartesian3.ZERO,
+          );
+          lastWindFrameMs = performance.now();
           const index = indexAt(track.t, current);
           if (index !== lastIndex) {
             lastIndex = index;

@@ -12,10 +12,16 @@ import { describe, expect, it } from 'vitest';
 
 const SRC = fileURLToPath(new URL('..', import.meta.url));
 /**
- * Палитры трека — данные, не UI: вариометр и цвета пилотов в сравнении (задача 3.12).
+ * Палитры трека — данные, не UI: вариометр, цвета пилотов в сравнении (задача 3.12)
+ * и цвет ветра на сцене (задача 3.14).
  * tokens.ts — единственное место, где собирается rgb() из токена.
  */
-const ALLOWED_COLORS = new Set(['viewer/vario-palette.ts', 'viewer/compare-palette.ts', 'design/tokens.ts']);
+const ALLOWED_COLORS = new Set([
+  'viewer/vario-palette.ts',
+  'viewer/compare-palette.ts',
+  'viewer/wind-palette.ts',
+  'design/tokens.ts',
+]);
 const RAW_COLOR = /#[0-9a-fA-F]{3,8}\b|\brgba?\(/;
 const BLOCK_COMMENT = /\/\*[\s\S]*?\*\//g;
 const LINE_COMMENT = /(^|[^:])\/\/.*$/gm;

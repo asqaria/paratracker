@@ -1,81 +1,101 @@
 import {
-  Cartesian2,
+  CallbackPositionProperty,
   CallbackProperty,
+  Cartesian3,
+  Color,
+  ColorBlendMode,
+  HeadingPitchRoll,
   Math as CesiumMath,
-  JulianDate,
-  VerticalOrigin,
-  type Entity,
-  type PositionProperty,
+  Matrix4,
+  Transforms,
   type Viewer,
 } from 'cesium';
 
-import { arrowScale, screenRotationDeg, WIND_ARROW, type WindHere } from './wind-arrows';
+import { dartModelUri } from './dart-model';
+import { downwindDeg, type WindHere } from './wind-arrows';
+import { cameraFade, dartScale, particleAlpha, spawnParticle, stepParticles, WIND_PARTICLES, type Particle } from './wind-particles';
 
 /**
- * Стрелка ветра у пилота (задача 3.14): значок в плоскости экрана чуть ниже
- * пилота, повёрнут относительно курса камеры — «куда сносит» так же, как в
- * колонке слоёв. Одна сущность на сцену; ветер — слоя, в котором пилот.
+ * Поле ветра у пилота (задача 3.14): частицы из wind-particles.ts — плоские
+ * полупрозрачные наконечники в 3D, горизонтально, носом по ветру своей высоты.
+ * Перспектива настоящая: поле читается объёмом. Сущностей немного (count),
+ * их положение, курс, размер и прозрачность — CallbackProperty от состояния,
+ * которое кадр обновляет в update().
  */
 
-/** Стрелка «вверх» с тёмной обводкой — читается и на снегу, и на лесе. */
-function arrowImage(fill: string, outline: string): HTMLCanvasElement {
-  const size = WIND_ARROW.sizePx;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return canvas;
-  const u = size / 12;
-  ctx.beginPath();
-  ctx.moveTo(6 * u, 0.8 * u);
-  ctx.lineTo(10.6 * u, 6 * u);
-  ctx.lineTo(7.6 * u, 6 * u);
-  ctx.lineTo(7.6 * u, 11.2 * u);
-  ctx.lineTo(4.4 * u, 11.2 * u);
-  ctx.lineTo(4.4 * u, 6 * u);
-  ctx.lineTo(1.4 * u, 6 * u);
-  ctx.closePath();
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = u;
-  ctx.strokeStyle = outline;
-  ctx.stroke();
-  ctx.fillStyle = fill;
-  ctx.fill();
-  return canvas;
+/** Нос модели — по +Z glTF: Cesium ставит его на восток при курсе 0; компасный курс B → heading = B − 90° (как у пилота). */
+const MODEL_HEADING_OFFSET_DEG = -90;
+
+interface DartState {
+  position: Cartesian3;
+  headingDeg: number;
+  scale: number;
+  alpha: number;
 }
 
-export class WindArrowLayer {
-  private readonly entity: Entity;
+export class WindFieldLayer {
+  private readonly particles: Particle[];
+  private readonly states: DartState[];
+  private readonly enu = new Matrix4();
+  private readonly rand = Math.random;
+  private visible = false;
 
-  constructor(
-    viewer: Viewer,
-    pilot: PositionProperty,
-    windAtTime: (timeMs: number) => WindHere | null,
-    colors: { fill: string; outline: string },
-  ) {
-    const windOf = (time: JulianDate | undefined): WindHere | null =>
-      time ? windAtTime(JulianDate.toDate(time).getTime()) : null;
-    this.entity = viewer.entities.add({
-      position: pilot,
-      billboard: {
-        image: arrowImage(colors.fill, colors.outline),
-        verticalOrigin: VerticalOrigin.CENTER,
-        pixelOffset: new Cartesian2(0, WIND_ARROW.offsetBelowPx),
-        // Значок не прячется за склоном: ветер нужен и когда пилот у рельефа.
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        show: new CallbackProperty((time) => windOf(time) !== null, false),
-        scale: new CallbackProperty((time) => arrowScale(windOf(time)?.speedMs ?? 0), false),
-        // Cesium вращает против часовой, наш угол — по часовой от «вверх».
-        rotation: new CallbackProperty((time) => {
-          const wind = windOf(time);
-          if (!wind) return 0;
-          return -CesiumMath.toRadians(screenRotationDeg(wind.dirDeg, CesiumMath.toDegrees(viewer.camera.heading)));
-        }, false),
-      },
-    });
+  constructor(viewer: Viewer, fill: string) {
+    const color = Color.fromCssColorString(fill);
+    const uri = dartModelUri();
+    this.particles = Array.from({ length: WIND_PARTICLES.count }, () => spawnParticle(this.rand, true));
+    this.states = this.particles.map(() => ({ position: new Cartesian3(), headingDeg: 0, scale: 0, alpha: 0 }));
+    for (const state of this.states) {
+      viewer.entities.add({
+        position: new CallbackPositionProperty(() => state.position, false),
+        orientation: new CallbackProperty(
+          () =>
+            Transforms.headingPitchRollQuaternion(
+              state.position,
+              new HeadingPitchRoll(CesiumMath.toRadians(state.headingDeg + MODEL_HEADING_OFFSET_DEG), 0, 0),
+            ),
+          false,
+        ),
+        model: {
+          show: new CallbackProperty(() => this.visible && state.alpha > 0, false),
+          uri,
+          scale: new CallbackProperty(() => WIND_PARTICLES.lengthM * state.scale, false),
+          minimumPixelSize: WIND_PARTICLES.minPixels,
+          color: new CallbackProperty(() => color.withAlpha(state.alpha), false),
+          colorBlendMode: ColorBlendMode.REPLACE,
+        },
+      });
+    }
   }
 
-  setVisible(visible: boolean): void {
-    this.entity.show = visible;
+  /**
+   * pilot — где пилот; windAtUp — ветер на высоте «пилот + up», null — пилот
+   * на земле: поля нет. dtS — сколько поле течёт в этом кадре (на паузе 0).
+   * camera — где камера: между ней и пилотом наконечники гаснут.
+   */
+  update(
+    pilot: Cartesian3 | undefined,
+    windAtUp: ((upM: number) => WindHere | null) | null,
+    dtS: number,
+    camera: Cartesian3,
+  ): void {
+    this.visible = Boolean(pilot && windAtUp);
+    if (!pilot || !windAtUp) return;
+    if (dtS > 0) stepParticles(this.particles, dtS, windAtUp, this.rand);
+    Transforms.eastNorthUpToFixedFrame(pilot, undefined, this.enu);
+    const pilotToCamera = Cartesian3.distance(pilot, camera);
+    this.particles.forEach((p, i) => {
+      const state = this.states[i];
+      if (!state) return;
+      const wind = windAtUp(p.up);
+      if (!wind) {
+        state.alpha = 0;
+        return;
+      }
+      Matrix4.multiplyByPoint(this.enu, new Cartesian3(p.east, p.north, p.up), state.position);
+      state.headingDeg = downwindDeg(wind.dirDeg);
+      state.scale = dartScale(wind.speedMs);
+      state.alpha = particleAlpha(p.ageS, p.lifeS) * cameraFade(Cartesian3.distance(state.position, camera), pilotToCamera);
+    });
   }
 }
