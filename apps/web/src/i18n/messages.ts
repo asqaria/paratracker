@@ -274,6 +274,21 @@ const ru = {
   'profile.stats.longest': 'Самый долгий',
   'profile.stats.bestXc': 'Лучший XC',
   'flight.pilot': 'Пилот',
+  'feed.title': 'Лента',
+  'feed.scope.following': 'Подписки',
+  'feed.scope.all': 'Все',
+  'feed.loading': 'Загружаем ленту…',
+  'feed.error': 'Не получилось загрузить ленту',
+  'feed.empty': 'Публичных полётов пока нет',
+  'feed.emptyFollowing': 'У пилотов, на которых вы подписаны, пока нет публичных полётов. Загляните во «Все»',
+  'feed.more': 'Ещё',
+  'like.add': 'Нравится',
+  'like.remove': 'Убрать отметку «нравится»',
+  'like.signIn': 'Войдите, чтобы отметить полёт',
+  'follow.follow': 'Подписаться',
+  'follow.unfollow': 'Отписаться',
+  'follow.followers': 'Подписчики',
+  'follow.following': 'Подписки',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -553,6 +568,21 @@ const en: Messages = {
   'profile.stats.longest': 'Longest',
   'profile.stats.bestXc': 'Best XC',
   'flight.pilot': 'Pilot',
+  'feed.title': 'Feed',
+  'feed.scope.following': 'Following',
+  'feed.scope.all': 'Everyone',
+  'feed.loading': 'Loading feed…',
+  'feed.error': 'Could not load the feed',
+  'feed.empty': 'No public flights yet',
+  'feed.emptyFollowing': 'Pilots you follow have no public flights yet. Check “Everyone”',
+  'feed.more': 'More',
+  'like.add': 'Like',
+  'like.remove': 'Unlike',
+  'like.signIn': 'Sign in to like this flight',
+  'follow.follow': 'Follow',
+  'follow.unfollow': 'Unfollow',
+  'follow.followers': 'Followers',
+  'follow.following': 'Following',
 };
 
 export const messages: Record<Locale, Messages> = { ru, en };

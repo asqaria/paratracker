@@ -113,3 +113,9 @@ describe('routeFromHash — профиль пилота (задача 3.11)', ()
     expect(routeFromHash('#/u/ab')).toEqual({ kind: 'landing' });
   });
 });
+
+describe('routeFromHash — лента (задача 3.10а)', () => {
+  it('#/feed', () => {
+    expect(routeFromHash('#/feed')).toEqual({ kind: 'feed' });
+  });
+});

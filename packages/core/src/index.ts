@@ -3,6 +3,7 @@ export * from './auth-dto.js';
 export * from './compare-dto.js';
 export * from './constants.js';
 export * from './derived.js';
+export * from './feed-dto.js';
 export * from './flight.js';
 export * from './flight-dto.js';
 export * from './glider.js';

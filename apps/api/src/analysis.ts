@@ -25,6 +25,8 @@ export interface AnalysisRoutesDeps {
   thermals(flightId: string): Promise<ThermalRecord[]>;
   /** Полёты того же дня с того же места (задача 3.12в): публичные и свои. */
   sameDay?(flightId: string, viewerId: string | null): Promise<SameDayRecord[]>;
+  /** Лайкнул ли вошедший полёт (задача 3.10а). */
+  likedBy?(userId: string, flightId: string): Promise<boolean>;
   glides(flightId: string): Promise<GlideRecord[]>;
 }
 
@@ -36,7 +38,7 @@ const wind = (dirDeg: number | null, speedMs: number | null): WindDto | null =>
   dirDeg === null || speedMs === null ? null : { dirDeg, speedMs };
 
 /** viewerId — вошедший; владельцу можно добавить место старта и править полёт. */
-function toDetails(flight: FlightDetailsRecord, viewerId: string | null): FlightDetailsResponse {
+function toDetails(flight: FlightDetailsRecord, viewerId: string | null, likedByMe: boolean): FlightDetailsResponse {
   return FlightDetailsResponse.parse({
     flightId: flight.id,
     status: flight.status,
@@ -56,6 +58,8 @@ function toDetails(flight: FlightDetailsRecord, viewerId: string | null): Flight
     xc: flight.xc,
     pilotName: flight.pilotName,
     pilotUsername: flight.pilotUsername,
+    likeCount: flight.likeCount,
+    likedByMe,
     canEdit: viewerId !== null && viewerId === flight.userId,
     privacy: flight.privacy,
   });
@@ -135,7 +139,9 @@ export function registerAnalysisRoutes(app: FastifyInstance, deps: AnalysisRoute
 
   app.get('/flights/:id', async (request, reply) => {
     const flight = await flightOf(request, reply);
-    return flight ? reply.send(toDetails(flight, request.userId)) : reply;
+    if (!flight) return reply;
+    const likedByMe = request.userId !== null && deps.likedBy ? await deps.likedBy(request.userId, flight.id) : false;
+    return reply.send(toDetails(flight, request.userId, likedByMe));
   });
 
   app.get('/flights/:id/thermals', async (request, reply) => {

@@ -1,5 +1,5 @@
-import type { ProfileTotals } from '@skyline/core';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import type { ProfileTotals, PublicProfileResponse } from '@skyline/core';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { useMe } from '../auth/session';
@@ -12,6 +12,7 @@ import { LogbookList } from '../logbook/LogbookList';
 import { SETTINGS_HASH } from '../routing';
 import { formatDuration } from '../viewer/format-summary';
 import { kilometres, metres } from '../viewer/units';
+import { FEED_QUERY_KEY, setFollow } from '../feed/feed-api';
 import { fetchProfile, fetchProfileFlights, profileKey } from './profile-api';
 
 /**
@@ -61,7 +62,7 @@ export function ProfilePage({ username }: { username: string }) {
       )}
       {profile.data && (
         <div className="flex flex-col gap-6">
-          <section data-panel="profile-card" className="flex items-center gap-4">
+          <section data-panel="profile-card" className="flex flex-wrap items-center gap-4">
             {profile.data.avatarUrl ? (
               <img src={profile.data.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-16 w-16 rounded-full" />
             ) : (
@@ -79,7 +80,11 @@ export function ProfilePage({ username }: { username: string }) {
                   ),
                 })}
               </p>
+              <p data-panel="profile-follows" className="numeric text-sm text-secondary">
+                {t('follow.followers')}: {profile.data.followers} · {t('follow.following')}: {profile.data.following}
+              </p>
             </div>
+            {me && !own && <FollowButton profile={profile.data} />}
           </section>
 
           <ProfileTotalsView totals={profile.data.totals} />
@@ -156,5 +161,40 @@ export function ProfileTotalsView({ totals }: { totals: ProfileTotals }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+/** Подписка на пилота (задача 3.10а): его полёты «Все» попадут во вкладку «Подписки». */
+function FollowButton({ profile }: { profile: PublicProfileResponse }) {
+  const t = useT();
+  const client = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const toggle = (): void => {
+    setBusy(true);
+    setFollow(profile.username, !profile.followedByMe)
+      .then((state) => {
+        client.setQueryData(profileKey(profile.username), {
+          ...profile,
+          followedByMe: state.following,
+          followers: state.followers,
+        });
+        return client.invalidateQueries({ queryKey: FEED_QUERY_KEY });
+      })
+      .catch(() => undefined)
+      .finally(() => setBusy(false));
+  };
+  return (
+    <button
+      type="button"
+      data-follow
+      aria-pressed={profile.followedByMe}
+      disabled={busy}
+      onClick={toggle}
+      className={`ml-auto rounded px-3 py-1.5 text-sm font-semibold disabled:opacity-50 compact:min-h-11 ${
+        profile.followedByMe ? 'bg-subtle text-primary' : 'bg-accent text-void'
+      }`}
+    >
+      {t(profile.followedByMe ? 'follow.unfollow' : 'follow.follow')}
+    </button>
   );
 }

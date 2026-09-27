@@ -57,6 +57,7 @@ const details = (overrides: Partial<FlightDetailsRecord> = {}): FlightDetailsRec
   gliderRaw: 'OZONE Rush6',
   pilotName: 'Иван Петров',
   pilotUsername: 'ivan',
+  likeCount: 3,
   xc: XC,
   ...overrides,
 });
@@ -152,6 +153,8 @@ describe('GET /api/v1/flights/:id', () => {
       xc: XC,
       pilotName: 'Иван Петров',
       pilotUsername: 'ivan',
+      likeCount: 3,
+      likedByMe: false,
       // Аноним смотрит анонимный полёт — править нечего.
       canEdit: false,
       privacy: 'unlisted',

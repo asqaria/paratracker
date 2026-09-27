@@ -280,3 +280,9 @@ export async function revokeSession(db: Database, tokenHash: string, now: Date):
     .set({ revokedAt: now })
     .where(and(eq(sessions.tokenHash, tokenHash), isNull(sessions.revokedAt)));
 }
+
+/** id пилота по логину (без учёта регистра — citext); null — нет такого. */
+export async function findUserIdByUsername(db: Database, username: string): Promise<string | null> {
+  const [row] = await db.select({ id: users.id }).from(users).where(eq(users.username, username));
+  return row?.id ?? null;
+}

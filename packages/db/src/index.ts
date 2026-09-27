@@ -73,6 +73,7 @@ export {
 export {
   createSession,
   findPublicProfile,
+  findUserIdByUsername,
   findUserProfile,
   revokeSession,
   rotateSession,
@@ -87,3 +88,16 @@ export {
 } from './repositories/users.js';
 export * from './schema.js';
 export { listSameDayFlights, type SameDayRecord } from './repositories/same-day.js';
+export {
+  followCounts,
+  likedBy,
+  listFeed,
+  setFollow,
+  setLike,
+  type FeedCursor,
+  type FeedPage,
+  type FeedRecord,
+  type FollowCounts,
+  type FollowState,
+  type LikeState,
+} from './repositories/social.js';

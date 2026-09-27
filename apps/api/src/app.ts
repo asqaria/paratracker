@@ -13,6 +13,7 @@ import { registerProfileRoutes, type ProfileRoutesDeps } from './profiles.js';
 import { registerReviewRoutes, type ReviewRoutesDeps } from './reviews.js';
 import { registerSharePageRoute, registerSharePreviewRoute, type SharePageDeps } from './share-page.js';
 import { registerSiteRoutes, type SiteRoutesDeps } from './sites.js';
+import { registerSocialRoutes, type SocialRoutesDeps } from './social.js';
 import { registerTileRoutes, type TileRoutesDeps } from './tiles.js';
 
 export interface AppOptions {
@@ -41,6 +42,8 @@ export interface AppOptions {
   sharePage?: SharePageDeps;
   /** Публичные профили пилотов (задача 3.11): без входа. */
   profiles?: ProfileRoutesDeps;
+  /** Лента, лайки, подписки (задача 3.10а). */
+  social?: SocialRoutesDeps;
 }
 
 export function buildApp(options: AppOptions): FastifyInstance {
@@ -63,6 +66,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       if (options.tiles) registerTileRoutes(v1, options.tiles);
       if (options.sharePage) registerSharePreviewRoute(v1, options.sharePage);
       if (options.profiles) registerProfileRoutes(v1, options.profiles);
+      if (options.social) registerSocialRoutes(v1, options.social);
       done();
     },
     { prefix: API_V1_PREFIX },

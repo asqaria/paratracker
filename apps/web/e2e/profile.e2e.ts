@@ -29,6 +29,9 @@ const PROFILE = {
     longestDistanceM: 40_000,
     bestXcScore: 55.5,
   },
+  followers: 3,
+  following: 1,
+  followedByMe: false,
 };
 const ENTRY = {
   id: FLIGHT,

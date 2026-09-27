@@ -65,5 +65,10 @@ export const PublicProfileResponse = z.object({
   /** Когда зарегистрировался, ISO 8601 UTC. */
   memberSince: z.iso.datetime(),
   totals: ProfileTotals,
+  /** Подписчики и подписки (задача 3.10а). */
+  followers: z.number().int().nonnegative(),
+  following: z.number().int().nonnegative(),
+  /** Вошедший подписан на этого пилота; у анонима и у себя — false. */
+  followedByMe: z.boolean(),
 });
 export type PublicProfileResponse = z.infer<typeof PublicProfileResponse>;

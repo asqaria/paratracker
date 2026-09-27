@@ -5,6 +5,7 @@ import type { GliderDto, Privacy } from '@skyline/core';
 
 import { GliderLine } from '../gliders/GliderLine';
 import { formatLocalStart } from '../logbook/format-logbook';
+import { LikeButton } from '../feed/LikeButton';
 import { profileHash } from '../routing';
 import { PrivacyControl } from '../sharing/PrivacyControl';
 import { XcCard } from './XcCard';
@@ -55,6 +56,8 @@ export interface AnalyticsPanelProps {
   /** Показать весь XC-маршрут камерой сверху. */
   onShowXcRoute?: () => void;
   /** Приватность и ссылка своего полёта (задача 3.7); без них — не показываются. */
+  /** Токен ссылки: лайк полёта «По ссылке» (задача 3.10а) — с ним, как и сам полёт. */
+  share?: string | null;
   privacy?: {
     onPrivacy: (privacy: Privacy) => Promise<void>;
     onShareLink: () => Promise<string>;
@@ -94,6 +97,7 @@ export function AnalyticsPanel({
   onXcRouteShown,
   onShowXcRoute,
   privacy,
+  share,
 }: AnalyticsPanelProps) {
   const t = useT();
   const locale = useLocaleStore((state) => state.locale);
@@ -138,6 +142,15 @@ export function AnalyticsPanel({
           )}
           {state.status === 'ready' && (
             <div className="mb-2">
+              <div className="float-right">
+                <LikeButton
+                  key={state.analytics.details.flightId}
+                  flightId={state.analytics.details.flightId}
+                  likeCount={state.analytics.details.likeCount}
+                  likedByMe={state.analytics.details.likedByMe}
+                  share={share ?? null}
+                />
+              </div>
               {state.analytics.details.pilotName !== null && (
                 <p data-panel="flight-pilot" className="text-sm">
                   <span className="text-secondary">{t('flight.pilot')}: </span>

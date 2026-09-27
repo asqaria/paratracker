@@ -1,6 +1,6 @@
 import type { GlideDto, ThermalDto } from '@skyline/core';
 import { renderToString } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { useLocaleStore } from '../i18n/locale';
 import { messages, type MessageKey } from '../i18n/messages';
@@ -8,6 +8,12 @@ import { AnalyticsPanel } from './AnalyticsPanel';
 import type { AnalyticsState, FlightAnalytics } from './flight-analytics';
 import { glideRatioText, windText } from './format-analytics';
 import { kilometres, metres, verticalSpeed } from './units';
+
+// Кнопка лайка спрашивает, кто вошёл (useMe); здесь рендер без QueryClient — аноним.
+vi.mock('../auth/session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../auth/session')>()),
+  useMe: () => null,
+}));
 
 /**
  * Панель проверяется серверным рендером: разметка, цифры и выделение текущего
@@ -77,6 +83,8 @@ const analytics = (overrides: Partial<FlightAnalytics['details']> = {}): FlightA
     timezone: 'Asia/Almaty',
     pilotName: null,
     pilotUsername: null,
+    likeCount: 0,
+    likedByMe: false,
     canEdit: false,
     ...overrides,
   },
