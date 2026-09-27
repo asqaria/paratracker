@@ -303,6 +303,20 @@ const ru = {
   'wind.title': 'Ветер по высотам',
   'wind.band': '{low}–{high} м',
   'wind.flight': 'В среднем',
+  'story.open': 'Для сторис',
+  'story.title': 'Картинка для сторис',
+  'story.full': 'Со спутником',
+  'story.overlay': 'Прозрачная — поверх вашего фото',
+  'story.share': 'Поделиться',
+  'story.download': 'Скачать',
+  'story.rendering': 'Рисуем…',
+  'story.close': 'Закрыть',
+  'story.error': 'Не получилось нарисовать картинку',
+  'story.airtime': 'В воздухе',
+  'story.distance': 'Дистанция',
+  'story.maxAlt': 'Макс. высота',
+  'story.xc': 'Очки {rules}',
+  'story.gain': 'Макс. набор',
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -611,6 +625,20 @@ const en: Messages = {
   'wind.title': 'Wind by altitude',
   'wind.band': '{low}–{high} m',
   'wind.flight': 'Average',
+  'story.open': 'For stories',
+  'story.title': 'Image for stories',
+  'story.full': 'With satellite map',
+  'story.overlay': 'Transparent — over your own photo',
+  'story.share': 'Share',
+  'story.download': 'Download',
+  'story.rendering': 'Rendering…',
+  'story.close': 'Close',
+  'story.error': 'Could not render the image',
+  'story.airtime': 'Airtime',
+  'story.distance': 'Distance',
+  'story.maxAlt': 'Max altitude',
+  'story.xc': '{rules} points',
+  'story.gain': 'Max gain',
 };
 
 export const messages: Record<Locale, Messages> = { ru, en };

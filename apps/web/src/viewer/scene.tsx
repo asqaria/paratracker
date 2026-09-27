@@ -71,6 +71,7 @@ import { useCreateSite, useFlightAnalytics, useOwnGliders, usePrivacyControls, u
 import { SummaryLine, SummaryPanel } from './SummaryPanel';
 import { ReviewPanel } from '../review/ReviewPanel';
 import { compareHash } from '../compare/compare-refs';
+import { StoryDialog } from '../story/StoryDialog';
 import { shareHash } from '../routing';
 import { aglProfile } from './agl';
 import { TimelinePanel } from './TimelinePanel';
@@ -590,6 +591,8 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
   const windHere = analyticsData
     ? windAt(analyticsData.wind.profile, analyticsData.wind.flight, track.alt[indexAt(track.t, timeMs)] ?? Number.NaN)
     : null;
+  /** Картинка для сторис (задача 4.8). */
+  const [storyOpen, setStoryOpen] = useState(false);
   const windColumn = (bare: boolean) =>
     analyticsData ? (
       <WindColumn profile={analyticsData.wind.profile} flight={analyticsData.wind.flight} here={windHere} bare={bare} />
@@ -795,10 +798,25 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
             {t('embed.open')}
           </a>
         )}
-        {compareLink !== null && (
-          <a data-panel="compare-link" href={compareLink} className="glass rounded-xl px-3 py-2 text-sm text-accent compact:hidden">
-            {t('viewer.compare')}
-          </a>
+        {/* Одним рядом: колонка не растёт, аналитика не уходит под таймлайн. */}
+        {(compareLink !== null || !embed) && (
+          <div className="flex gap-2 compact:hidden">
+            {compareLink !== null && (
+              <a data-panel="compare-link" href={compareLink} className="glass rounded-xl px-3 py-2 text-sm text-accent">
+                {t('viewer.compare')}
+              </a>
+            )}
+            {!embed && (
+              <button
+                type="button"
+                data-panel="story-open"
+                onClick={() => setStoryOpen(true)}
+                className="glass rounded-xl px-3 py-2 text-sm text-accent"
+              >
+                {t('story.open')}
+              </button>
+            )}
+          </div>
         )}
         <div data-panel="imagery" className="flex flex-col gap-2 rounded-xl glass p-3 text-sm compact:hidden">
           <span className="text-secondary">{t('viewer.imagery')}</span>
@@ -852,6 +870,11 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
                   {t('viewer.compare')}
                 </a>
               )}
+              {!embed && (
+                <button type="button" onClick={() => setStoryOpen(true)} className="flex min-h-11 items-center text-sm text-accent">
+                  {t('story.open')}
+                </button>
+              )}
               <div data-panel="sheet-imagery" className="flex items-center justify-between gap-2 text-sm">
                 <span className="text-secondary">{t('viewer.imagery')}</span>
                 {imageryButtons}
@@ -902,6 +925,15 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
           agl={agl}
         />
       </div>
+      {storyOpen && (
+        <StoryDialog
+          track={track}
+          details={analyticsData?.details ?? null}
+          config={config}
+          esriAvailable={imagery.shownSources.some((source) => source.id === 'esri')}
+          onClose={() => setStoryOpen(false)}
+        />
+      )}
     </div>
   );
 }
