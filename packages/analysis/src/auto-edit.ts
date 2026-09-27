@@ -149,13 +149,35 @@ export function autoEdit(input: AutoEditInput): CutScene[] {
     .sort((a, b) => a.fromMs - b.fromMs)
     .map((s) => {
       const durationS = CINEMA.sceneS[s.kind];
+      const { fromMs, toMs } = capWindow(s, ms(CINEMA.maxTimeScale * durationS));
       return {
         kind: s.kind,
         camera: CAMERA[s.kind],
-        fromMs: s.fromMs,
-        toMs: s.toMs,
+        fromMs,
+        toMs,
         durationS,
-        timeScale: (s.toMs - s.fromMs) / TIME.msPerSecond / durationS,
+        timeScale: (toMs - fromMs) / TIME.msPerSecond / durationS,
       };
     });
+}
+
+/**
+ * Окно не длиннее maxMs (потолок ускорения): термик — верх набора, глайд —
+ * середина, заход — последние секунды перед посадкой, остальное — начало.
+ */
+function capWindow(s: { kind: CutKind; fromMs: number; toMs: number }, maxMs: number): { fromMs: number; toMs: number } {
+  const span = s.toMs - s.fromMs;
+  if (span <= maxMs) return { fromMs: s.fromMs, toMs: s.toMs };
+  switch (s.kind) {
+    case 'firstThermal':
+    case 'bestThermal':
+    case 'finalApproach':
+      return { fromMs: s.toMs - maxMs, toMs: s.toMs };
+    case 'longestGlide': {
+      const fromMs = s.fromMs + (span - maxMs) / 2;
+      return { fromMs, toMs: fromMs + maxMs };
+    }
+    default:
+      return { fromMs: s.fromMs, toMs: s.fromMs + maxMs };
+  }
 }

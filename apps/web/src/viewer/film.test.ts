@@ -1,7 +1,7 @@
 import type { CutScene } from '@skyline/analysis';
 import { describe, expect, it } from 'vitest';
 
-import { arcPoint, easeInOut, FILM, filmFrameAt, filmTimeline, scenePose } from './film';
+import { easeInOut, FILM, filmFrameAt, filmTimeline, pullback, scenePose } from './film';
 
 const scene = (kind: CutScene['kind'], camera: CutScene['camera'], fromS: number, toS: number, durationS: number): CutScene => ({
   kind,
@@ -77,16 +77,30 @@ describe('easeInOut', () => {
   });
 });
 
-describe('arcPoint — перелёт по Безье с подъёмом', () => {
-  const a = { lat: 43, lon: 77, alt: 1000 };
-  const b = { lat: 43, lon: 77.1, alt: 2000 };
+describe('pullback — перелёт с отъездом над треком', () => {
+  const a = { at: { lat: 43, lon: 77, alt: 1000 }, pose: { headingDeg: 350, pitchDeg: -12, rangeM: 70 } };
+  const b = { at: { lat: 43, lon: 77.1, alt: 2000 }, pose: { headingDeg: 10, pitchDeg: -8, rangeM: 90 } };
 
-  it('концы — точки сцен; посередине — выше прямой на половину подъёма', () => {
-    expect(arcPoint(a, b, 0, 400)).toEqual(a);
-    expect(arcPoint(a, b, 1, 400)).toEqual(b);
-    const mid = arcPoint(a, b, 0.5, 400);
-    expect(mid.lon).toBeCloseTo(77.05, 9);
-    expect(mid.alt).toBeCloseTo(1500 + 200, 9);
+  it('концы — стыки сцен', () => {
+    expect(pullback(a, b, 0)).toEqual(a);
+    expect(pullback(a, b, 1)).toEqual(b);
+  });
+
+  it('посередине: взгляд на середину пути, камера на вершине отъезда, взгляд сверху', () => {
+    const mid = pullback(a, b, 0.5);
+    expect(mid.at.lon).toBeCloseTo(77.05, 9);
+    expect(mid.at.alt).toBeCloseTo(1500, 9);
+    // ~8,1 км между точками → отъезд 1,2 × 8,1 ≈ 9,8 км, в пределах [0,6; 15] км.
+    expect(mid.pose.rangeM).toBeGreaterThan(9000);
+    expect(mid.pose.rangeM).toBeLessThan(FILM.maxPullbackM);
+    expect(mid.pose.pitchDeg).toBeCloseTo(FILM.pullbackPitchDeg, 9);
+    // Курс — кратчайшим путём через север, а не через юг.
+    expect(mid.pose.headingDeg).toBeCloseTo(360, 9);
+  });
+
+  it('сцены рядом — отъезд всё равно не ближе минимума', () => {
+    const near = { ...b, at: { ...a.at } };
+    expect(pullback(a, near, 0.5).pose.rangeM).toBeCloseTo(FILM.minPullbackM, 9);
   });
 });
 

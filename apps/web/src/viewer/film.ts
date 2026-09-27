@@ -6,33 +6,43 @@ import { cameraTarget, targetHalfWidthS, type TargetTrack } from './camera-targe
 
 /**
  * «Фильм» по автомонтажу (задачи 4.1–4.2, ТЗ §7.6): сцены autoEdit идут подряд,
- * между ними камера перелетает по кривой Безье с подъёмом, время полёта в
- * перелёте проматывается к началу следующей сцены. Здесь только чистая
- * математика: хронометраж, кадр по экранному времени, поза камеры сцены.
+ * между ними камера отъезжает вверх над треком и подлетает к пилоту в новом
+ * месте (кривая Безье по дальности и наклону), время полёта в перелёте
+ * проматывается. Здесь только чистая математика: хронометраж, кадр по
+ * экранному времени, поза камеры сцены и перелёта.
  */
 
+/**
+ * Дистанции подобраны по отзыву владельца на первый черновик («непонятно, где
+ * параплан»): с 260 м и 1,2 км крыло было точкой. Теперь оно всегда крупно,
+ * а общий вид местности даёт перелёт.
+ */
 export const FILM = {
-  /** Перелёт между сценами, с экрана: короче — рывок, длиннее — зритель ждёт. */
-  transitionS: 1.2,
+  /** Перелёт между сценами, с экрана: успеть увидеть сверху, куда пилот улетел. */
+  transitionS: 2.5,
   /** Низкий орбит взлёта: близко к пилоту, чуть сверху, облёт на треть круга. */
-  lowOrbit: { rangeM: 70, pitchDeg: -10, sweepDeg: 120 },
+  lowOrbit: { rangeM: 45, pitchDeg: -8, sweepDeg: 120 },
   /**
-   * Орбитальный подъём в термике: дальше, чтобы спираль была в кадре целиком
-   * (радиусы 30–60 м, как у Side), полкруга облёта, взгляд опускается — видно набор.
+   * Орбитальный подъём в термике: крыло крупно, в кадре — ближний виток
+   * (радиусы 30–60 м); полкруга облёта, взгляд опускается — видно набор.
    */
-  orbitClimb: { rangeM: 260, pitchFromDeg: -10, pitchToDeg: -30, sweepDeg: 180 },
-  /** Chase — как режим Chase просмотрщика, чуть дальше: на ускорении пилот не выпрыгивает из кадра. */
-  chase: { rangeM: 110, pitchDeg: -14 },
-  /** Широкий пролёт у вершины: видно, над чем пилот, медленный облёт. */
-  wideFlyby: { rangeM: 1200, pitchDeg: -25, sweepDeg: 60 },
-  /** Конец посадки — вид сверху издалека: поле и последняя коробочка. */
-  top: { rangeM: 1200, pitchDeg: -89 },
+  orbitClimb: { rangeM: 90, pitchFromDeg: -8, pitchToDeg: -22, sweepDeg: 180 },
+  /** Chase — как режим Chase просмотрщика (90 м), чуть ближе: крыло во весь кадр. */
+  chase: { rangeM: 70, pitchDeg: -12 },
+  /** Пролёт у вершины: пилот ещё различим, за ним горы; медленный облёт. */
+  wideFlyby: { rangeM: 250, pitchDeg: -15, sweepDeg: 60 },
+  /** Конец посадки — вид сверху: поле и последняя коробочка. */
+  top: { rangeM: 500, pitchDeg: -89 },
   /**
-   * Подъём перелёта: доля расстояния между сценами, но не выше 1,5 км —
-   * иначе на 100-километровом маршруте камера улетала бы в стратосферу.
+   * Отъезд перелёта: камера поднимается на дальность, с которой оба места
+   * в кадре, — расстояние между ними с запасом, но не дальше 15 км (длинный
+   * переход через хребет — достаточно видеть направление) и не ближе 600 м.
    */
-  arcLiftShare: 0.3,
-  maxArcLiftM: 1500,
+  pullbackShare: 1.2,
+  minPullbackM: 600,
+  maxPullbackM: 15000,
+  /** На высшей точке отъезда взгляд сверху под углом — видна земля и трек. */
+  pullbackPitchDeg: -55,
 } as const;
 
 export interface FilmShot {
@@ -116,25 +126,33 @@ export interface FilmPoint {
 }
 
 /**
- * Точка перелёта: квадратичная Безье от a к b, контрольная точка — над
- * серединой отрезка на liftM. Посередине перелёта камера выше прямой на liftM/2.
+ * Перелёт между сценами: камера смотрит на точку, скользящую по прямой от
+ * пилота в конце сцены к пилоту в начале следующей, а дальность и наклон
+ * идут по квадратичной Безье через «отъезд» — высоко над серединой, взгляд
+ * сверху. u — уже сглаженная доля перелёта.
  */
-export function arcPoint(a: FilmPoint, b: FilmPoint, u: number, liftM: number): FilmPoint {
+export function pullback(
+  a: { at: FilmPoint; pose: HeadingPitchRangeDeg },
+  b: { at: FilmPoint; pose: HeadingPitchRangeDeg },
+  u: number,
+): { at: FilmPoint; pose: HeadingPitchRangeDeg } {
   if (u <= 0) return a;
   if (u >= 1) return b;
-  const w0 = (1 - u) ** 2;
-  const w1 = 2 * (1 - u) * u;
-  const w2 = u * u;
-  const mid = { lat: (a.lat + b.lat) / 2, lon: (a.lon + b.lon) / 2, alt: (a.alt + b.alt) / 2 + liftM };
+  const distanceM = haversineDistance(a.at.lat, a.at.lon, b.at.lat, b.at.lon);
+  const topM = Math.min(FILM.maxPullbackM, Math.max(FILM.minPullbackM, distanceM * FILM.pullbackShare));
+  // Контрольная точка Безье — там, где кривая проходит через вершину в середине.
+  const control = (from: number, to: number, top: number): number => 2 * top - (from + to) / 2;
+  const bezier = (from: number, to: number, top: number): number =>
+    (1 - u) ** 2 * from + 2 * (1 - u) * u * control(from, to, top) + u * u * to;
   return {
-    lat: w0 * a.lat + w1 * mid.lat + w2 * b.lat,
-    lon: w0 * a.lon + w1 * mid.lon + w2 * b.lon,
-    alt: w0 * a.alt + w1 * mid.alt + w2 * b.alt,
+    at: { lat: lerp(a.at.lat, b.at.lat, u), lon: lerp(a.at.lon, b.at.lon, u), alt: lerp(a.at.alt, b.at.alt, u) },
+    pose: {
+      headingDeg: a.pose.headingDeg + shortestTurn(a.pose.headingDeg, b.pose.headingDeg) * u,
+      pitchDeg: bezier(a.pose.pitchDeg, b.pose.pitchDeg, FILM.pullbackPitchDeg),
+      rangeM: bezier(a.pose.rangeM, b.pose.rangeM, topM),
+    },
   };
 }
-
-/** Подъём перелёта по расстоянию между точками сцен, м. */
-export const arcLiftM = (distanceM: number): number => Math.min(FILM.maxArcLiftM, distanceM * FILM.arcLiftShare);
 
 const lerp = (a: number, b: number, u: number): number => a + (b - a) * u;
 
@@ -194,9 +212,8 @@ export function filmPlan(film: Film, track: TargetTrack, courseAt: (ms: number) 
 
 /**
  * Камера кадра фильма. В сцене — поза её камеры; курс для chase — пружиной,
- * как в просмотрщике. В перелёте — дуга Безье между стыками сцен, поза
- * плавно переходит, курс поворачивает кратчайшим путём; пружина курса
- * встаёт на курс следующей сцены, чтобы chase начался без рывка.
+ * как в просмотрщике. В перелёте — отъезд над треком (pullback); пружина
+ * курса встаёт на курс следующей сцены, чтобы chase начался без рывка.
  */
 export function filmCamera(
   plan: readonly FilmPlanShot[],
@@ -217,16 +234,6 @@ export function filmCamera(
   }
   const next = plan[frame.index + 1];
   if (!next) return null;
-  const e = easeInOut(frame.u);
-  const a = shot.out;
-  const b = next.in;
   heading.current = { headingDeg: next.startDeg, rateDegS: 0 };
-  return {
-    at: arcPoint(a.at, b.at, e, arcLiftM(haversineDistance(a.at.lat, a.at.lon, b.at.lat, b.at.lon))),
-    pose: {
-      headingDeg: a.pose.headingDeg + shortestTurn(a.pose.headingDeg, b.pose.headingDeg) * e,
-      pitchDeg: lerp(a.pose.pitchDeg, b.pose.pitchDeg, e),
-      rangeM: lerp(a.pose.rangeM, b.pose.rangeM, e),
-    },
-  };
+  return pullback(shot.out, next.in, easeInOut(frame.u));
 }
