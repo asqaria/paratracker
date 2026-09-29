@@ -51,6 +51,8 @@ export const ModelVerdictDto = z.object({
 });
 export type ModelVerdictDto = z.infer<typeof ModelVerdictDto>;
 
+const ProfilePointDto = z.object({ heightM: z.number(), temperatureC: z.number(), speedMs: z.number(), dirDeg: Degrees });
+
 export const ForecastHourDto = z.object({
   time: Iso,
   verdict: z.enum(FORECAST_VERDICTS),
@@ -59,7 +61,8 @@ export const ForecastHourDto = z.object({
   /** Главная модель — первой. */
   models: z.array(ModelVerdictDto),
   ceilingRangeM: z.tuple([z.number(), z.number()]).nullable(),
-  windProfile: z.array(z.object({ heightM: z.number(), speedMs: z.number(), dirDeg: Degrees })),
+  surface: ProfilePointDto,
+  profile: z.array(ProfilePointDto),
   cloudCoverPct: z.number(),
   precipitationMm: z.number(),
 });

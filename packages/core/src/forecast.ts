@@ -109,6 +109,14 @@ export interface ModelVerdict {
   upperWindMs: number;
 }
 
+/** Точка профиля: высота над эллипсоидом, температура, ветер «откуда». */
+export interface ProfilePoint {
+  heightM: number;
+  temperatureC: number;
+  speedMs: number;
+  dirDeg: number;
+}
+
 /** Час прогноза места: главная модель + согласие остальных. */
 export interface ForecastHour {
   timeMs: number;
@@ -119,8 +127,12 @@ export interface ForecastHour {
   models: ModelVerdict[];
   /** Разброс потолка по моделям, м; null — ни у одной нет профиля. */
   ceilingRangeM: [number, number] | null;
-  /** Ветер по высотам главной модели — от старта вверх. */
-  windProfile: { heightM: number; speedMs: number; dirDeg: number }[];
+  /**
+   * Профиль главной модели для диаграммы «время × высота» (задача П.6):
+   * земля модели (2 м и ветер 10 м) и уровни давления над ней по возрастанию.
+   */
+  surface: ProfilePoint;
+  profile: ProfilePoint[];
   cloudCoverPct: number;
   precipitationMm: number;
 }

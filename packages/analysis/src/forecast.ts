@@ -198,9 +198,10 @@ export function evaluateForecast(series: readonly ModelSeries[], site: ForecastS
       reasons: head?.reasons ?? ['no_data'],
       models,
       ceilingRangeM: ceilings.length > 0 ? [Math.min(...ceilings), Math.max(...ceilings)] : null,
-      windProfile: hour.levels
-        .filter((level) => level.heightM > site.elevationM)
-        .map((level) => ({ heightM: level.heightM, speedMs: level.windSpeedMs, dirDeg: level.windDirDeg })),
+      surface: { heightM: primary.surfaceM, temperatureC: hour.temperatureC, speedMs: hour.windSpeedMs, dirDeg: hour.windDirDeg },
+      profile: hour.levels
+        .filter((level) => level.heightM > primary.surfaceM)
+        .map((level) => ({ heightM: level.heightM, temperatureC: level.temperatureC, speedMs: level.windSpeedMs, dirDeg: level.windDirDeg })),
       cloudCoverPct: hour.cloudCoverPct,
       precipitationMm: hour.precipitationMm,
     };

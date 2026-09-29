@@ -173,6 +173,7 @@ export function MapPage({ site }: MapPageProps) {
                   <button
                     key={h.time}
                     type="button"
+                    data-hour={h.time}
                     aria-pressed={h.time === time}
                     onClick={() => setChosenTime(h.time)}
                     className="numeric min-w-9 rounded px-1.5 py-1 text-secondary aria-pressed:bg-accent aria-pressed:text-void compact:min-h-11"

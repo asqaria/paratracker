@@ -1,18 +1,20 @@
-import type { CompassPoint, ForecastHourDto } from '@skyline/core';
+import type { CompassPoint } from '@skyline/core';
 import { useQuery } from '@tanstack/react-query';
 
 import { fill, useLocaleStore, useT } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { compassPoint } from '../viewer/format-analytics';
-import { groundSpeed, KMH_PER_MS, metres, verticalSpeed } from '../viewer/units';
+import { groundSpeed, metres, verticalSpeed } from '../viewer/units';
 import { FORECAST_QUERY_KEY, fetchSiteForecast } from './forecast-api';
-import { VERDICT_COLOR } from './forecast-palette';
+import { INSTABILITY_COLOR, VERDICT_COLOR } from './forecast-palette';
 import { dayWindows, type LocalHour } from './forecast-time';
+import { Meteogram } from './Meteogram';
+import { INSTABILITY_CLASSES } from './meteogram-scale';
 
 /**
- * Панель места (задача П.3, ТЗ §6.9): вердикт дня, таблица по часам,
- * подробности выбранного часа — три модели и ветер по высотам. Прогноз не
- * заменяет оценку условий на старте — так и написано под ним.
+ * Панель места (задачи П.3, П.6, ТЗ §6.9): вердикт дня, диаграмма
+ * «время × высота» вместо таблиц и короткая карточка выбранного часа.
+ * Прогноз не заменяет оценку условий на старте — так и написано под ним.
  */
 
 interface SitePanelProps {
@@ -24,20 +26,13 @@ interface SitePanelProps {
   attribution: string;
 }
 
-/** Стрелка показывает, куда сносит: «откуда» + 180°. */
-const DOWNWIND_DEG = 180;
 const NO_VALUE = '—';
 const MODEL_NAME = { ecmwf: 'ECMWF', gfs: 'GFS', icon: 'ICON' } as const;
+/** Стрелка показывает, куда сносит: «откуда» + 180°. */
+const DOWNWIND_DEG = 180;
+const RAIN_DECIMALS = 1;
 
 const compassKey = (point: CompassPoint): MessageKey => `compass.${point.toLowerCase()}` as MessageKey;
-
-function WindArrow({ dirDeg }: { dirDeg: number }) {
-  return (
-    <span aria-hidden className="inline-block" style={{ transform: `rotate(${dirDeg + DOWNWIND_DEG}deg)` }}>
-      ↑
-    </span>
-  );
-}
 
 export function SitePanel({ slug, dayHours, time, onTime, attribution }: SitePanelProps) {
   const t = useT();
@@ -53,41 +48,36 @@ export function SitePanel({ slug, dayHours, time, onTime, attribution }: SitePan
     return hour ? [{ local, hour }] : [];
   });
   const selected = time === null ? undefined : byTime.get(time);
+  const primary = selected?.models[0];
   const windows = dayWindows(dayHours, (key) => byTime.get(key)?.verdict);
   const updated = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short', timeZone: site.timezone }).format(
     new Date(site.fetchedAt),
   );
-
-  // В таблице — только числа, единицы — в подписях строк: иначе столбцы в 13 часов не влезают.
-  const integer = new Intl.NumberFormat(locale, { maximumFractionDigits: 0, useGrouping: false });
-  const climb = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1, signDisplay: 'always' });
-  const num = (value: number | null | undefined, format: Intl.NumberFormat = integer): string =>
-    value === null || value === undefined || !Number.isFinite(value) ? NO_VALUE : format.format(value);
-  const kmh = (valueMs: number): string => num(valueMs * KMH_PER_MS);
-  const rows: { key: string; label: string; cell: (h: ForecastHourDto) => React.ReactNode }[] = [
-    {
-      key: 'wind',
-      label: t('forecast.row.wind'),
-      cell: (h) => {
-        const m = h.models[0];
-        return m ? (
-          <span className="flex flex-col items-center">
-            <WindArrow dirDeg={m.windDirDeg} />
-            <span>{kmh(m.windSpeedMs)}</span>
-          </span>
-        ) : (
-          NO_VALUE
-        );
-      },
-    },
-    { key: 'gust', label: t('forecast.row.gust'), cell: (h) => <span className="text-secondary">{kmh(h.models[0]?.gustMs ?? Number.NaN)}</span> },
-    { key: 'ceiling', label: t('forecast.row.ceiling'), cell: (h) => num(h.models[0]?.ceilingM) },
-    { key: 'thermal', label: t('forecast.row.thermal'), cell: (h) => num(h.models.find((m) => m.thermalMs !== null)?.thermalMs, climb) },
-    { key: 'base', label: t('forecast.row.cloudBase'), cell: (h) => num(h.models[0]?.cloudBaseM) },
-    { key: 'clouds', label: t('forecast.row.clouds'), cell: (h) => num(h.cloudCoverPct) },
-    { key: 'rain', label: t('forecast.row.rain'), cell: (h) => (h.precipitationMm > 0 ? h.precipitationMm.toFixed(1) : NO_VALUE) },
-    { key: 'storm', label: t('forecast.row.storm'), cell: (h) => t(`forecast.storm.${h.models[0]?.stormRisk ?? 'low'}`) },
-  ];
+  const climbMs = selected?.models.find((m) => m.thermalMs !== null)?.thermalMs ?? null;
+  const range = selected?.ceilingRangeM ?? null;
+  const facts: { label: string; value: string }[] =
+    selected && primary
+      ? [
+          {
+            label: t('forecast.col.wind'),
+            value: `${compassPoint(primary.windDirDeg, t)} ${groundSpeed(primary.windSpeedMs, locale, t)} · ${fill(t('forecast.gustsUpTo'), {
+              gust: groundSpeed(primary.gustMs, locale, t),
+            })}`,
+          },
+          {
+            label: t('forecast.col.ceiling'),
+            value: range ? `${metres(primary.ceilingM ?? range[0], locale, t)} (${metres(range[0], locale, t)}–${metres(range[1], locale, t)})` : NO_VALUE,
+          },
+          { label: t('forecast.col.thermal'), value: climbMs === null ? NO_VALUE : verticalSpeed(climbMs, locale, t) },
+          { label: t('forecast.col.cloudBase'), value: primary.cloudBaseM === null ? t('forecast.noCumulus') : metres(primary.cloudBaseM, locale, t) },
+          { label: t('forecast.col.clouds'), value: `${Math.round(selected.cloudCoverPct)}%` },
+          {
+            label: t('forecast.col.rain'),
+            value: selected.precipitationMm > 0 ? selected.precipitationMm.toFixed(RAIN_DECIMALS) : NO_VALUE,
+          },
+          { label: t('forecast.col.storm'), value: t(`forecast.storm.${primary.stormRisk}`) },
+        ]
+      : [];
 
   return (
     <div className="flex flex-col gap-4 text-sm">
@@ -107,107 +97,57 @@ export function SitePanel({ slug, dayHours, time, onTime, attribution }: SitePan
             (windows.xc === null ? '' : ` · ${fill(t('forecast.day.xc'), { from: String(windows.xc[0]), to: String(windows.xc[1]) })}`)}
       </p>
 
-      <div className="overflow-x-auto">
-        <table className="numeric w-full border-separate border-spacing-x-0.5 text-center text-xs">
-          <thead>
-            <tr>
-              <th className="sticky left-0 bg-void text-left font-normal text-secondary" />
-              {shown.map(({ local, hour }) => (
-                <th key={local.time} className="px-0.5">
-                  <button
-                    type="button"
-                    aria-pressed={local.time === time}
-                    onClick={() => onTime(local.time)}
-                    aria-label={`${String(local.hour).padStart(2, '0')}:00 ${t(`forecast.verdict.${hour.verdict}`)}`}
-                    className="flex w-full flex-col items-center gap-1 rounded py-1 aria-pressed:bg-subtle"
-                  >
-                    <span>{String(local.hour).padStart(2, '0')}</span>
-                    <span className="block h-2.5 w-full rounded-sm" style={{ background: VERDICT_COLOR[hour.verdict] }} />
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.key}>
-                <th scope="row" className="sticky left-0 bg-void pr-2 text-left font-normal text-secondary">
-                  {row.label}
-                </th>
-                {shown.map(({ local, hour }) => (
-                  <td key={local.time} className="px-0.5 py-1">
-                    {row.cell(hour)}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="flex flex-col gap-2">
+        <Meteogram hours={shown} elevationM={site.elevationM ?? shown[0]?.hour.surface.heightM ?? 0} time={time} onTime={onTime} />
+        <ul data-forecast="legend" className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-secondary">
+          {INSTABILITY_CLASSES.map((c) => (
+            <li key={c.id} className="flex items-center gap-1">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: INSTABILITY_COLOR[c.id] }} />
+              {t(`forecast.instability.${c.id}`)}
+            </li>
+          ))}
+          <li className="flex items-center gap-1">
+            <span className="inline-block h-0.5 w-3 bg-primary" />
+            {t('forecast.legend.ceiling')}
+          </li>
+          <li>☁ {t('forecast.legend.cloudBase')}</li>
+          <li>↗ {t('forecast.legend.wind')}</li>
+        </ul>
       </div>
 
       {selected && (
         <section data-forecast="hour" className="flex flex-col gap-3 rounded-xl bg-subtle p-3">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="inline-block h-3 w-3 rounded-full" style={{ background: VERDICT_COLOR[selected.verdict] }} />
             <span className="font-semibold">{t(`forecast.verdict.${selected.verdict}`)}</span>
-            <span className="text-secondary">· {t(`forecast.confidence.${selected.confidence}`)}</span>
+            {selected.reasons.length > 0 && (
+              <span className="text-secondary">· {selected.reasons.map((r) => t(`forecast.reason.${r}`)).join(', ')}</span>
+            )}
           </div>
-          {selected.reasons.length > 0 && (
-            <ul className="list-inside list-disc text-secondary">
-              {selected.reasons.map((reason) => (
-                <li key={reason}>{t(`forecast.reason.${reason}`)}</li>
-              ))}
-            </ul>
-          )}
 
-          <table className="numeric w-full text-left text-xs">
-            <thead className="text-secondary">
-              <tr>
-                <th className="font-normal">{t('forecast.model')}</th>
-                <th className="font-normal">{t('forecast.col.wind')}</th>
-                <th className="font-normal">{t('forecast.col.ceiling')}</th>
-                <th className="font-normal">{t('forecast.col.thermal')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {selected.models.map((m) => (
-                <tr key={m.model}>
-                  <td className="flex items-center gap-1.5 py-0.5">
-                    <span className="inline-block h-2 w-2 rounded-full" style={{ background: VERDICT_COLOR[m.verdict] }} />
-                    {MODEL_NAME[m.model]}
-                  </td>
-                  <td>
-                    {compassPoint(m.windDirDeg, t)} {groundSpeed(m.windSpeedMs, locale, t)}
-                  </td>
-                  <td>{m.ceilingM === null ? NO_VALUE : metres(m.ceilingM, locale, t)}</td>
-                  <td>{m.thermalMs === null ? NO_VALUE : verticalSpeed(m.thermalMs, locale, t)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {selected.ceilingRangeM && (
-            <p className="text-secondary">
-              {fill(t('forecast.ceilingRange'), {
-                from: metres(selected.ceilingRangeM[0], locale, t),
-                to: metres(selected.ceilingRangeM[1], locale, t),
-              })}
-            </p>
-          )}
+          <dl className="numeric grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+            {facts.map((fact) => (
+              <div key={fact.label} className="contents">
+                <dt className="text-secondary">{fact.label}</dt>
+                <dd>{fact.value}</dd>
+              </div>
+            ))}
+          </dl>
 
-          {selected.windProfile.length > 0 && (
-            <div>
-              <p className="mb-1 text-secondary">{t('forecast.windAloft')}</p>
-              <ul className="numeric flex flex-col-reverse gap-0.5 text-xs">
-                {selected.windProfile.map((level) => (
-                  <li key={level.heightM} className="flex items-center gap-2">
-                    <span className="w-16 text-secondary">{metres(level.heightM, locale, t)}</span>
-                    <WindArrow dirDeg={level.dirDeg} />
-                    <span>{groundSpeed(level.speedMs, locale, t)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            <span className="text-secondary">{t(`forecast.confidence.${selected.confidence}`)}:</span>
+            {selected.models.map((m) => (
+              <span key={m.model} className="numeric flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-full" style={{ background: VERDICT_COLOR[m.verdict] }} />
+                {MODEL_NAME[m.model]}
+                <span aria-hidden className="inline-block" style={{ transform: `rotate(${m.windDirDeg + DOWNWIND_DEG}deg)` }}>
+                  ↑
+                </span>
+                {groundSpeed(m.windSpeedMs, locale, t)}
+                {m.ceilingM !== null && ` · ${metres(m.ceilingM, locale, t)}`}
+              </span>
+            ))}
+          </div>
         </section>
       )}
 
