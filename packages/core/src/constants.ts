@@ -493,4 +493,9 @@ export const FORECAST = {
   airHeatCapacityJkgK: 1005,
   gravityMs2: 9.81,
   celsiusToKelvin: 273.15,
+  /**
+   * Ветер по высотам для диаграммы (задача П.7) — от модели, у которой больше
+   * уровней в слое полёта (старт … старт + 3 км): обычно GFS, каждые ~500 м.
+   */
+  windBandM: 3000,
 } as const;

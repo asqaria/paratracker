@@ -63,6 +63,9 @@ export const ForecastHourDto = z.object({
   ceilingRangeM: z.tuple([z.number(), z.number()]).nullable(),
   surface: ProfilePointDto,
   profile: z.array(ProfilePointDto),
+  /** Нет у прогнозов до задачи П.7 — тогда ветер берётся из profile. */
+  wind: z.array(ProfilePointDto).optional(),
+  windModel: z.enum(FORECAST_MODELS).optional(),
   cloudCoverPct: z.number(),
   precipitationMm: z.number(),
 });

@@ -11,6 +11,7 @@ import {
   type ModelHour,
   type ModelSeries,
   type ModelVerdict,
+  type ProfilePoint,
   type StormRisk,
 } from '@skyline/core';
 
@@ -175,6 +176,20 @@ function confidenceOf(verdicts: readonly ModelVerdict[]): ForecastConfidence {
  * нет — первой из списка); остальные модели сопоставляются по времени и дают
  * уверенность и разброс потолка.
  */
+/** Земля модели и её уровни давления выше неё — профиль для диаграммы. */
+function profileOf(hour: ModelHour, surfaceM: number): ProfilePoint[] {
+  return [
+    { heightM: surfaceM, temperatureC: hour.temperatureC, speedMs: hour.windSpeedMs, dirDeg: hour.windDirDeg },
+    ...hour.levels
+      .filter((level) => level.heightM > surfaceM)
+      .map((level) => ({ heightM: level.heightM, temperatureC: level.temperatureC, speedMs: level.windSpeedMs, dirDeg: level.windDirDeg })),
+  ];
+}
+
+/** Уровней модели в слое полёта: больше — подробнее ветер по высотам. */
+const levelsInBand = (hour: ModelHour, surfaceM: number): number =>
+  hour.levels.filter((level) => level.heightM > surfaceM && level.heightM <= surfaceM + FORECAST.windBandM).length;
+
 export function evaluateForecast(series: readonly ModelSeries[], site: ForecastSite): ForecastHour[] {
   const ordered = [...series].sort((a, b) => Number(b.model === FORECAST.primaryModel) - Number(a.model === FORECAST.primaryModel));
   const [primary, ...others] = ordered;
@@ -191,6 +206,15 @@ export function evaluateForecast(series: readonly ModelSeries[], site: ForecastS
     ];
     const ceilings = models.map((m) => m.ceilingM).filter((c): c is number => c !== null);
     const head = models[0];
+    // Ветер по высотам — у модели с большим числом уровней в слое полёта; при равенстве — раньше в списке.
+    let windSource = { model: primary.model, hour, surfaceM: primary.surfaceM };
+    for (const { series: s, at } of byTime) {
+      const other = at.get(hour.timeMs);
+      if (other && levelsInBand(other, s.surfaceM) > levelsInBand(windSource.hour, windSource.surfaceM)) {
+        windSource = { model: s.model, hour: other, surfaceM: s.surfaceM };
+      }
+    }
+    const [surface, ...profile] = profileOf(hour, primary.surfaceM);
     return {
       timeMs: hour.timeMs,
       verdict: head?.verdict ?? 'nofly',
@@ -198,10 +222,10 @@ export function evaluateForecast(series: readonly ModelSeries[], site: ForecastS
       reasons: head?.reasons ?? ['no_data'],
       models,
       ceilingRangeM: ceilings.length > 0 ? [Math.min(...ceilings), Math.max(...ceilings)] : null,
-      surface: { heightM: primary.surfaceM, temperatureC: hour.temperatureC, speedMs: hour.windSpeedMs, dirDeg: hour.windDirDeg },
-      profile: hour.levels
-        .filter((level) => level.heightM > primary.surfaceM)
-        .map((level) => ({ heightM: level.heightM, temperatureC: level.temperatureC, speedMs: level.windSpeedMs, dirDeg: level.windDirDeg })),
+      surface: surface ?? { heightM: primary.surfaceM, temperatureC: hour.temperatureC, speedMs: hour.windSpeedMs, dirDeg: hour.windDirDeg },
+      profile,
+      wind: profileOf(windSource.hour, windSource.surfaceM),
+      windModel: windSource.model,
       cloudCoverPct: hour.cloudCoverPct,
       precipitationMm: hour.precipitationMm,
     };
