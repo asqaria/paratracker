@@ -38,8 +38,6 @@ class FakeStream implements FlightEventStream {
   }
 }
 
-const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 5));
-
 describe('parseFlightEvent', () => {
   it('разбирает событие конвейера', () => {
     expect(parseFlightEvent(JSON.stringify(status({ progress: 0.5 })))).toEqual(status({ progress: 0.5 }));
@@ -103,10 +101,10 @@ describe('subscribeFlightStatus', () => {
       { openStream: () => stream, fetchImpl: fetchImpl as unknown as typeof fetch, pollIntervalMs: 1 },
     );
     stream.fail();
-    await settle();
+    // Не фиксированная пауза, а ожидание результата: на занятом раннере CI опрос не успевал за 5 мс.
+    await vi.waitFor(() => expect(onStatus).toHaveBeenCalledWith(status({ status: 'ready', trackReady: true })));
 
     expect(fetchImpl).toHaveBeenCalled();
-    expect(onStatus).toHaveBeenCalledWith(status({ status: 'ready', trackReady: true }));
     expect(stream.closed).toBe(true);
   });
 
@@ -128,10 +126,9 @@ describe('subscribeFlightStatus', () => {
       { openStream: () => stream, fetchImpl: fetchImpl as unknown as typeof fetch, pollIntervalMs: 1 },
     );
     stream.fail();
-    await settle();
+    await vi.waitFor(() => expect(onStatus).toHaveBeenCalledWith(status({ status: 'ready', trackReady: true })));
 
     expect(onError).toHaveBeenCalledWith(expect.stringContaining('502'));
-    expect(onStatus).toHaveBeenCalledWith(status({ status: 'ready', trackReady: true }));
   });
 
   it('отписка прекращает всё', () => {
