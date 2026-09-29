@@ -56,6 +56,8 @@ import {
 } from './camera-modes';
 import type { DecodedTrack } from './decode-track';
 import { filmCamera, filmFrameAt, filmPlan, filmTimeline, type Film, type FilmPlanShot } from './film';
+import { filmCard, sceneFacts, type FilmCard } from './film-titles';
+import { FilmOverlay } from './FilmOverlay';
 import { setupFlightClock, toJulian, type FlightClock } from './flight-clock';
 import {
   flightRange,
@@ -180,6 +182,9 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
    */
   const filmRef = useRef<{ film: Film; startNowMs: number; plan: FilmPlanShot[] | null } | null>(null);
   const [filming, setFilming] = useState(false);
+  /** Титры фильма (задача 4.3): сцена и карточка — меняются несколько раз за фильм, не каждый кадр. */
+  const [filmView, setFilmView] = useState<{ index: number; card: FilmCard } | null>(null);
+  const filmViewRef = useRef<{ index: number; card: FilmCard } | null>(null);
   const onFilmEndRef = useRef<() => void>(() => undefined);
 
   // Конфиг читается один раз и не роняет рендер: без переменных окружения
@@ -364,8 +369,15 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
           const filmNow = filmRef.current;
           const filmFrame = filmNow ? filmFrameAt(filmNow.film, (frameNowMs - filmNow.startNowMs) / MS_PER_SECOND) : null;
           if (filmNow && viewer) {
-            if (filmFrame) viewer.clock.currentTime = toJulian(filmFrame.flightMs);
-            else onFilmEndRef.current();
+            if (filmFrame) {
+              viewer.clock.currentTime = toJulian(filmFrame.flightMs);
+              const card = filmCard(filmNow.film, filmFrame);
+              const seen = filmViewRef.current;
+              if (seen?.index !== filmFrame.index || seen.card !== card) {
+                filmViewRef.current = { index: filmFrame.index, card };
+                setFilmView(filmViewRef.current);
+              }
+            } else onFilmEndRef.current();
           }
           const current = flightClock.currentTimeMs();
           // Поле течёт только при проигрывании: на паузе сцена не рисуется непрерывно (ТЗ §7.7).
@@ -629,9 +641,32 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
       })),
     });
   }, [track, analyticsData]);
+  /** Цифры сцен для подписей: термики и глайды — из аналитики, высота — из трека. */
+  const filmFacts = useMemo(() => {
+    const iso = (value: string) => Date.parse(value);
+    const input = {
+      thermals: (analyticsData?.thermals ?? []).map((th) => ({
+        startMs: iso(th.startedAt),
+        endMs: iso(th.endedAt),
+        gainM: th.gainM,
+        avgClimbMs: th.avgClimbMs,
+      })),
+      glides: (analyticsData?.glides ?? []).map((g) => ({
+        startMs: iso(g.startedAt),
+        endMs: iso(g.endedAt),
+        distanceM: g.distanceM,
+        glideRatio: g.glideRatio,
+      })),
+      t: track.t,
+      alt: track.alt,
+    };
+    return filmScenes.map((scene) => sceneFacts(scene, input));
+  }, [filmScenes, analyticsData, track]);
 
   const stopFilm = useCallback(() => {
     filmRef.current = null;
+    filmViewRef.current = null;
+    setFilmView(null);
     smoothHeadingRef.current = null;
     setFilming(false);
     const viewer = viewerRef.current;
@@ -1016,6 +1051,15 @@ export function Scene({ track, flightId = null, showGlow = false, review = false
           />
         </div>
       </div>
+      {filming && filmView && (
+        <FilmOverlay
+          card={filmView.card}
+          facts={filmFacts[filmView.index] ?? null}
+          details={analyticsData?.details ?? null}
+          track={track}
+          timeMs={timeMs}
+        />
+      )}
       {/* Фильм (задача 4.2): панели скрыты, атрибуция остаётся — она обязательна. */}
       {filming && (
         <button
