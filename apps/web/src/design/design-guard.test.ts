@@ -13,13 +13,14 @@ import { describe, expect, it } from 'vitest';
 const SRC = fileURLToPath(new URL('..', import.meta.url));
 /**
  * Палитры трека — данные, не UI: вариометр, цвета пилотов в сравнении (задача 3.12)
- * и цвет ветра на сцене (задача 3.14).
+ * цвет ветра на сцене (задача 3.14) и вердикты прогноза (задача П.3).
  * tokens.ts — единственное место, где собирается rgb() из токена.
  */
 const ALLOWED_COLORS = new Set([
   'viewer/vario-palette.ts',
   'viewer/compare-palette.ts',
   'viewer/wind-palette.ts',
+  'forecast/forecast-palette.ts',
   'design/tokens.ts',
 ]);
 const RAW_COLOR = /#[0-9a-fA-F]{3,8}\b|\brgba?\(/;
