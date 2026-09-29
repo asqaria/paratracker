@@ -64,7 +64,8 @@ export MSYS_NO_PATHCONV=1
 ARGS="--build-arg VITE_TERRAIN_URL=https://terrain.reearth.land/cesium-mesh/ellipsoid \
   --build-arg VITE_IMAGERY_WMTS_URL='https://tiles.maps.eox.at/wmts/1.0.0/{layer}/default/WGS84/{TileMatrix}/{TileRow}/{TileCol}.jpg' \
   --build-arg VITE_IMAGERY_WMTS_LAYER=s2cloudless-2025 \
-  --build-arg VITE_ESRI_TILE_URL='/api/v1/tiles/esri/{z}/{y}/{x}'"
+  --build-arg VITE_ESRI_TILE_URL='/api/v1/tiles/esri/{z}/{y}/{x}' \
+  --build-arg VITE_THERMAL_TILE_URL='https://thermal.kk7.ch/tiles/{layer}/{z}/{x}/{y}.png?src=skyline.gateapp.kz'"
 docker build $ARGS --target server -t skyline-server:latest .
 docker build $ARGS --target web -t skyline-web:latest .
 

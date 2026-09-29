@@ -8,6 +8,7 @@ import { mapHash } from '../routing';
 import { fetchImageryCapabilities } from '../viewer/imagery-capabilities';
 import { FORECAST_QUERY_KEY, fetchForecastMap } from './forecast-api';
 import { defaultHour, forecastDays } from './forecast-time';
+import { kk7Layer, kk7TileUrl, type Kk7Kind } from './kk7';
 import { SitePanel } from './SitePanel';
 
 const ForecastMap = lazy(() => import('./ForecastMap'));
@@ -16,6 +17,13 @@ const ForecastMap = lazy(() => import('./ForecastMap'));
 const esriTileUrl = (): string | null => {
   const env = import.meta.env as Record<string, string | undefined>;
   const value = (env.VITE_ESRI_TILE_URL ?? '').trim();
+  return value === '' ? null : value;
+};
+
+/** Шаблон тайлов карты термиков kk7 (VITE_THERMAL_TILE_URL, с {layer}); нет — слоёв нет. */
+const thermalTileUrl = (): string | null => {
+  const env = import.meta.env as Record<string, string | undefined>;
+  const value = (env.VITE_THERMAL_TILE_URL ?? '').trim();
   return value === '' ? null : value;
 };
 
@@ -53,6 +61,15 @@ export function MapPage({ site }: MapPageProps) {
   const time = chosenTime !== null && allTimes.includes(chosenTime) ? chosenTime : (defaultHour(days)?.time ?? null);
   const dayKey = days.find((day) => day.hours.some((h) => h.time === time))?.dayKey ?? days[0]?.dayKey ?? null;
   const dayHours = days.find((day) => day.dayKey === dayKey)?.hours ?? [];
+  // Карта термиков kk7: по умолчанию термики, коридоры — по кнопке.
+  const [kk7Shown, setKk7Shown] = useState<Record<Kk7Kind, boolean>>({ thermals: true, skyways: false });
+  const template = thermalTileUrl();
+  const kk7Time = time === null ? nowMs : Date.parse(time);
+  const kk7 = useMemo(() => {
+    const url = (kind: Kk7Kind): string | null =>
+      template === null || !current || !kk7Shown[kind] ? null : kk7TileUrl(template, kk7Layer(kind, current.lat, current.lon, kk7Time));
+    return { thermals: url('thermals'), skyways: url('skyways') };
+  }, [template, current, kk7Shown, kk7Time]);
   const dayLabel = (key: string, timezone: string): string =>
     new Intl.DateTimeFormat(locale, { weekday: 'short', day: 'numeric', month: 'short', timeZone: timezone }).format(
       new Date(`${key}T12:00:00Z`),
@@ -90,9 +107,26 @@ export function MapPage({ site }: MapPageProps) {
                 window.location.hash = mapHash(slug);
               }}
               esriTileUrl={imagery.data?.esri === true ? esriTileUrl() : null}
+              kk7={kk7}
             />
           </Suspense>
           </div>
+
+          {template !== null && (
+            <div data-panel="forecast-layers" className="absolute left-3 top-3 flex gap-1 rounded-xl glass p-1 text-sm">
+              {(['thermals', 'skyways'] as const).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  aria-pressed={kk7Shown[kind]}
+                  onClick={() => setKk7Shown((shown) => ({ ...shown, [kind]: !shown[kind] }))}
+                  className="rounded px-3 py-1 text-secondary aria-pressed:bg-subtle aria-pressed:text-primary compact:min-h-11"
+                >
+                  {t(`forecast.layer.${kind}`)}
+                </button>
+              ))}
+            </div>
+          )}
 
           {current && days.length > 0 && (
             <div data-panel="forecast-time" className="absolute bottom-8 left-3 right-3 flex flex-col gap-2 rounded-xl glass p-2 text-sm compact:static compact:m-2 compact:mb-0">

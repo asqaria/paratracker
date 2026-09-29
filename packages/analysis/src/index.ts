@@ -19,3 +19,4 @@ export { analyseFlight } from './flight-analysis.js';
 export { matchOnTrack, raceGaps, type RaceMatch, type RacePilot, type RaceTrack } from './race.js';
 export { autoEdit, type AutoEditInput, type CutCamera, type CutKind, type CutScene } from './auto-edit.js';
 export { cloudBase, evaluateForecast, evaluateModelHour, inSector, stormRisk, thermalCeiling, thermalStrength, thermalTop } from './forecast.js';
+export { sunPosition, type SunPosition } from './sun.js';

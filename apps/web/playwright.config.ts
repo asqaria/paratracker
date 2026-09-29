@@ -30,6 +30,7 @@ export default defineConfig({
       VITE_IMAGERY_WMTS_URL: 'https://tiles.e2e.invalid/wmts/{layer}/{TileMatrix}/{TileRow}/{TileCol}.jpg',
       VITE_IMAGERY_WMTS_LAYER: 's2cloudless-2025',
       VITE_ESRI_TILE_URL: '/api/v1/tiles/esri/{z}/{y}/{x}',
+      VITE_THERMAL_TILE_URL: 'https://kk7.e2e.invalid/tiles/{layer}/{z}/{x}/{y}.png',
     },
   },
 });
