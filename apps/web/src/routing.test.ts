@@ -5,6 +5,7 @@ import {
   flightHash,
   HEALTH_HASH,
   LOGBOOK_HASH,
+  mapHash,
   routeFromHash,
   routeFromLocation,
   SETTINGS_HASH,
@@ -117,5 +118,14 @@ describe('routeFromHash — профиль пилота (задача 3.11)', ()
 describe('routeFromHash — лента (задача 3.10а)', () => {
   it('#/feed', () => {
     expect(routeFromHash('#/feed')).toEqual({ kind: 'feed' });
+  });
+});
+
+describe('прогноз на карте (задача П.3)', () => {
+  it('#/map — карта; ?site= — открытое место; чужое — лендинг', () => {
+    expect(routeFromHash('#/map')).toEqual({ kind: 'map', site: null });
+    expect(routeFromHash('#/map?site=ush-konyr')).toEqual({ kind: 'map', site: 'ush-konyr' });
+    expect(routeFromHash(mapHash('ush-konyr'))).toEqual({ kind: 'map', site: 'ush-konyr' });
+    expect(routeFromHash('#/map?site=<x>')).toEqual({ kind: 'landing' });
   });
 });

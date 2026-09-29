@@ -14,7 +14,7 @@ export type Translate = (key: MessageKey) => string;
 const NO_VALUE = '—';
 const METRES_PER_KILOMETRE = 1000;
 /** 1 м/с = 3.6 км/ч. */
-const KMH_PER_MS = 3.6;
+export const KMH_PER_MS = 3.6;
 /** Дистанция — до сотни метров: точнее GNSS-трек после медианного фильтра не скажет. */
 const KILOMETRE_DECIMALS = 1;
 /** Варио — до десятой, как на приборах. */

@@ -1,7 +1,7 @@
 import type { AuthProvidersResponse, MeResponse } from '@skyline/core';
 
 import { useT } from '../i18n/locale';
-import { FEED_HASH, LOGBOOK_HASH } from '../routing';
+import { FEED_HASH, LOGBOOK_HASH, MAP_HASH } from '../routing';
 import { signInUrl, useLogout, useMe, useProviders } from './session';
 
 /** Размер аватара в шапке, px. */
@@ -19,10 +19,16 @@ interface UserMenuViewProps {
 export function UserMenuView({ me, providers, onSignOut, currentHash }: UserMenuViewProps) {
   const t = useT();
   // Лента (задача 3.10а) — всем, со входом и без: в ней полёты «Все».
+  // Прогноз (задача П.3) — рядом с лентой, тоже без входа.
   const feed = (
-    <a href={FEED_HASH} className="text-sm text-secondary hover:text-primary">
-      {t('feed.title')}
-    </a>
+    <>
+      <a href={MAP_HASH} className="text-sm text-secondary hover:text-primary">
+        {t('forecast.title')}
+      </a>
+      <a href={FEED_HASH} className="text-sm text-secondary hover:text-primary">
+        {t('feed.title')}
+      </a>
+    </>
   );
 
   if (me) {

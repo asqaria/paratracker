@@ -32,6 +32,11 @@ const COMPARE_HASH = /^#\/compare(?:\?(.*))?$/;
 /** Лента сообщества (задача 3.10а). */
 export const FEED_HASH = '#/feed';
 
+/** Прогноз для пилотов (задача П.3, ТЗ §6.9): #/map, место — #/map?site={slug}. */
+export const MAP_HASH = '#/map';
+const MAP_HASH_RE = /^#\/map(?:\?site=([a-z0-9-]{1,200}))?$/;
+export const mapHash = (site: string | null): string => (site === null ? MAP_HASH : `${MAP_HASH}?site=${site}`);
+
 /** Публичный профиль пилота (задача 3.11): #/u/{имя}. */
 const PROFILE_HASH = /^#\/u\/([a-z0-9._-]{3,24})$/i;
 export const profileHash = (username: string): string => `#/u/${username}`;
@@ -71,6 +76,8 @@ export type Route =
   | { kind: 'profile'; username: string }
   /** Лента сообщества (задача 3.10а). */
   | { kind: 'feed' }
+  /** Прогноз на карте (задача П.3); site — открытое место. */
+  | { kind: 'map'; site: string | null }
   /** flightId null — демо-трек: его нет в API, аналитики к нему нет. */
   | { kind: 'flight'; flightId: string | null; trackUrl: string; review?: true };
 
@@ -85,6 +92,8 @@ export function routeFromHash(hash: string): Route {
   if (hash === LOGBOOK_HASH) return { kind: 'logbook' };
   if (hash === SETTINGS_HASH) return { kind: 'settings' };
   if (hash === FEED_HASH) return { kind: 'feed' };
+  const map = MAP_HASH_RE.exec(hash);
+  if (map) return { kind: 'map', site: map[1] ?? null };
   const profile = PROFILE_HASH.exec(hash)?.[1];
   if (profile !== undefined) return { kind: 'profile', username: profile.toLowerCase() };
   const compare = COMPARE_HASH.exec(hash);
