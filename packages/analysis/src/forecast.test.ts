@@ -180,10 +180,14 @@ describe('evaluateForecast на реальном прогнозе по Уш-Ко
     }
   });
 
-  it('вердикт часа — вердикт ECMWF; ветер по высотам — только выше старта', () => {
+  it('вердикт часа — вердикт ECMWF; профиль — земля модели и уровни над ней по возрастанию', () => {
     for (const h of hours) {
       expect(h.verdict).toBe(h.models[0]?.verdict);
-      for (const level of h.windProfile) expect(level.heightM).toBeGreaterThan(ush.elevationM);
+      expect(h.surface.heightM).toBe(ecmwf.surfaceM);
+      const heights = h.profile.map((p) => p.heightM);
+      expect(heights).toEqual([...heights].sort((a, b) => a - b));
+      for (const height of heights) expect(height).toBeGreaterThan(h.surface.heightM);
+      expect(h.profile.every((p) => Number.isFinite(p.temperatureC))).toBe(true);
     }
   });
 

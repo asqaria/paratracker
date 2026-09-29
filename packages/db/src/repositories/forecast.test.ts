@@ -16,7 +16,8 @@ const hour = (timeMs: number): ForecastHour => ({
   reasons: [],
   models: [],
   ceilingRangeM: null,
-  windProfile: [],
+  surface: { heightM: 1900, temperatureC: 15, speedMs: 2, dirDeg: 0 },
+  profile: [],
   cloudCoverPct: 10,
   precipitationMm: 0,
 });

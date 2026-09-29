@@ -33,13 +33,15 @@ for (const viewport of VIEWPORTS) {
   test.describe(viewport.name, () => {
     test.use({ viewport: { width: viewport.width, height: viewport.height }, hasTouch: viewport.compact });
 
-    test('место на карте, панель по часам с 08 до 20, атрибуция и оговорка', async ({ page }) => {
+    test('место на карте, диаграмма и часы с 09 до 20, атрибуция и оговорка', async ({ page }) => {
       await openMap(page);
       await expect(page.locator('[data-site="ush-konyr"]')).toBeVisible();
       const panel = page.locator('[data-panel="forecast-site"]');
       await expect(panel.getByRole('heading', { name: 'Ush Konyr' })).toBeVisible();
+      await expect(panel.locator('[data-forecast="meteogram"]')).toBeVisible();
+      await expect(panel.locator('[data-forecast="legend"]')).toBeVisible();
       // Сегодня (30.09) — светлые часы 09…20: 08:00 уже прошло.
-      const hours = panel.locator('thead button');
+      const hours = page.locator('[data-panel="forecast-time"] [data-hour]');
       await expect(hours.first()).toContainText('09');
       await expect(hours.last()).toContainText('20');
       await expect(page.locator('[data-panel="forecast-attribution"]')).toContainText('Open-Meteo');
@@ -47,19 +49,24 @@ for (const viewport of VIEWPORTS) {
       expect(width).toBeLessThanOrEqual(viewport.width);
     });
 
-    test('выбор часа — подробности: три модели и ветер по высотам', async ({ page }) => {
+    test('выбор часа — карточка часа с тремя моделями; клик по диаграмме тоже выбирает час', async ({ page }) => {
       await openMap(page, '#/map?site=ush-konyr');
-      await page.locator('[data-panel="forecast-site"] thead button').filter({ hasText: '13' }).click();
+      await page.locator('[data-panel="forecast-time"] [data-hour]').filter({ hasText: '13' }).click();
       const hour = page.locator('[data-forecast="hour"]');
       await expect(hour).toBeVisible();
       for (const model of ['ECMWF', 'GFS', 'ICON']) await expect(hour).toContainText(model);
-      await expect(hour.getByText(/Ветер по высотам|Wind aloft/)).toBeVisible();
+      // Клик в правый край диаграммы — последний час дня.
+      const chart = page.locator('[data-forecast="meteogram"]');
+      const box = await chart.boundingBox();
+      if (!box) throw new Error('meteogram box expected');
+      await chart.click({ position: { x: box.width - 10, y: box.height / 2 } });
+      await expect(page.locator('[data-panel="forecast-time"] [data-hour][aria-pressed="true"]')).toContainText('20');
     });
 
     test('другой день — часы с 08', async ({ page }) => {
       await openMap(page);
       await page.locator('[data-panel="forecast-time"] [role="tab"]').nth(1).click();
-      await expect(page.locator('[data-panel="forecast-site"] thead button').first()).toContainText('08');
+      await expect(page.locator('[data-panel="forecast-time"] [data-hour]').first()).toContainText('08');
     });
   });
 }
@@ -77,7 +84,7 @@ test.describe('карта термиков kk7', () => {
     // 30.09, 09:00 по Алматы — 2 ч после восхода: осень, утро.
     await expect.poll(() => [...layers]).toContain('thermals_oct_04');
     // 13:00 — 6 ч после восхода: день.
-    await page.locator('[data-panel="forecast-site"] thead button').filter({ hasText: '13' }).click();
+    await page.locator('[data-panel="forecast-time"] [data-hour]').filter({ hasText: '13' }).click();
     await expect.poll(() => [...layers]).toContain('thermals_oct_07');
     await page.locator('[data-panel="forecast-layers"]').getByRole('button', { name: /Коридоры|Skyways/ }).click();
     await expect.poll(() => [...layers]).toContain('skyways_oct_07');
@@ -90,7 +97,7 @@ test.describe('анимация карты (задача П.5)', () => {
   test('«Проиграть день» идёт по часам сам; пауза останавливает; частицы ветра — поверх карты', async ({ page }) => {
     await openMap(page);
     await expect(page.locator('[data-panel="wind-flow"]')).toBeAttached();
-    const selected = page.locator('[data-panel="forecast-site"] thead button[aria-pressed="true"]');
+    const selected = page.locator('[data-panel="forecast-time"] [data-hour][aria-pressed="true"]');
     await expect(selected).toContainText('09');
     await page.locator('[data-panel="forecast-play"]').click();
     await expect(selected).toContainText('10', { timeout: 5000 });
