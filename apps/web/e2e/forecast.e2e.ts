@@ -63,3 +63,24 @@ for (const viewport of VIEWPORTS) {
     });
   });
 }
+
+test.describe('карта термиков kk7', () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test('слой по сезону и времени суток выбранного часа; «Коридоры» — второй слой', async ({ page }) => {
+    const layers = new Set<string>();
+    page.on('request', (request) => {
+      const match = /kk7\.e2e\.invalid\/tiles\/([a-z0-9_]+)\//.exec(request.url());
+      if (match?.[1]) layers.add(match[1]);
+    });
+    await openMap(page);
+    // 30.09, 09:00 по Алматы — 2 ч после восхода: осень, утро.
+    await expect.poll(() => [...layers]).toContain('thermals_oct_04');
+    // 13:00 — 6 ч после восхода: день.
+    await page.locator('[data-panel="forecast-site"] thead button').filter({ hasText: '13' }).click();
+    await expect.poll(() => [...layers]).toContain('thermals_oct_07');
+    await page.locator('[data-panel="forecast-layers"]').getByRole('button', { name: /Коридоры|Skyways/ }).click();
+    await expect.poll(() => [...layers]).toContain('skyways_oct_07');
+  });
+});
+

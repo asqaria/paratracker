@@ -1,7 +1,15 @@
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import type { ForecastMapResponse } from '@skyline/core';
-import { AttributionControl, LngLatBounds, Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl } from 'maplibre-gl';
+import {
+  AttributionControl,
+  LngLatBounds,
+  Map as MapLibreMap,
+  Marker,
+  NavigationControl,
+  setWorkerUrl,
+  type RasterTileSource,
+} from 'maplibre-gl';
 // Воркер MapLibre — отдельный модуль (как в логбуке): Vite собирает его сам.
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { useEffect, useRef } from 'react';
@@ -28,6 +36,11 @@ interface ForecastMapProps {
   onSelect: (slug: string) => void;
   /** Шаблон тайлов прокси Esri; null — без подложки. */
   esriTileUrl: string | null;
+  /**
+   * Слои карты термиков kk7 — готовые адреса тайлов ({z}/{x}/{y}); null — слой
+   * выключен. Смена часа меняет адрес — MapLibre подгружает новые тайлы.
+   */
+  kk7: { thermals: string | null; skyways: string | null };
 }
 
 const ESRI_MAX_ZOOM = 18;
@@ -41,16 +54,29 @@ const CONFIDENCE_OPACITY = { high: 1, medium: 0.8, low: 0.55 } as const;
 const DOWNWIND_DEG = 180;
 /** Дословно по лицензии, не переводится. */
 const ESRI_ATTRIBUTION = 'Powered by Esri | Esri World Imagery — Esri, Maxar, Earthstar Geographics';
+/** Условие лицензии kk7 (CC BY-NC-SA 4.0): автор и ссылка, не переводится. */
+const KK7_ATTRIBUTION = 'Thermals: <a href="https://thermal.kk7.ch" target="_blank" rel="noopener">thermal.kk7.ch</a> (CC BY-NC-SA 4.0)';
+const KK7_TILE_PX = 256;
+/** kk7 рисует термики до z12, коридоры — до z13; ближе — растягивает. */
+const KK7_MAX_ZOOM = { thermals: 12, skyways: 13 } as const;
+/** Слои kk7 поверх спутника, но не глушат его. */
+const KK7_OPACITY = 0.75;
+const KK7_KINDS = ['skyways', 'thermals'] as const;
+/** Пустой адрес-заглушка, пока слой выключен: у источника MapLibre должен быть адрес. */
+const NO_TILES = 'data:,';
 
 setWorkerUrl(maplibreWorkerUrl);
 
-export default function ForecastMap({ sites, time, selected, onSelect, esriTileUrl }: ForecastMapProps) {
+export default function ForecastMap({ sites, time, selected, onSelect, esriTileUrl, kk7 }: ForecastMapProps) {
   const t = useT();
   const locale = useLocaleStore((state) => state.locale);
   const container = useRef<HTMLDivElement>(null);
   const markers = useRef(new Map<string, HTMLButtonElement>());
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const kk7Ref = useRef(kk7);
+  kk7Ref.current = kk7;
 
   // Карта и значки — один раз на набор мест; час и выбор меняют только значки.
   useEffect(() => {
@@ -70,6 +96,28 @@ export default function ForecastMap({ sites, time, selected, onSelect, esriTileU
           ...(esriTileUrl === null ? [] : [{ id: 'imagery', type: 'raster' as const, source: 'imagery' }]),
         ],
       },
+    });
+    mapRef.current = map;
+    // Слои kk7: TMS-нумерация тайлов (как на thermal.kk7.ch).
+    map.on('load', () => {
+      for (const kind of KK7_KINDS) {
+        const url = kk7Ref.current[kind];
+        map.addSource(`kk7-${kind}`, {
+          type: 'raster',
+          tiles: [url ?? NO_TILES],
+          scheme: 'tms',
+          tileSize: KK7_TILE_PX,
+          maxzoom: KK7_MAX_ZOOM[kind],
+          attribution: KK7_ATTRIBUTION,
+        });
+        map.addLayer({
+          id: `kk7-${kind}`,
+          type: 'raster',
+          source: `kk7-${kind}`,
+          paint: { 'raster-opacity': KK7_OPACITY },
+          layout: { visibility: url === null ? 'none' : 'visible' },
+        });
+      }
     });
     map.addControl(new AttributionControl({ compact: false }));
     map.addControl(new NavigationControl({ showCompass: false }));
@@ -93,9 +141,22 @@ export default function ForecastMap({ sites, time, selected, onSelect, esriTileU
     return () => {
       created.forEach((marker) => marker.remove());
       markerMap.clear();
+      mapRef.current = null;
       map.remove();
     };
   }, [sites, esriTileUrl]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.isStyleLoaded()) return;
+    for (const kind of KK7_KINDS) {
+      const url = kk7[kind];
+      const source = map.getSource<RasterTileSource>(`kk7-${kind}`);
+      if (!source) continue;
+      if (url !== null) source.setTiles([url]);
+      map.setLayoutProperty(`kk7-${kind}`, 'visibility', url === null ? 'none' : 'visible');
+    }
+  }, [kk7]);
 
   useEffect(() => {
     for (const site of sites) {
