@@ -18,6 +18,8 @@ const hour = (timeMs: number): ForecastHour => ({
   ceilingRangeM: null,
   surface: { heightM: 1900, temperatureC: 15, speedMs: 2, dirDeg: 0 },
   profile: [],
+  wind: [],
+  windModel: 'ecmwf',
   cloudCoverPct: 10,
   precipitationMm: 0,
 });

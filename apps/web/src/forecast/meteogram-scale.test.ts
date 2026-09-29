@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { instabilityClass, lapseRateAt, meteogramRange, METEOGRAM } from './meteogram-scale';
+import { instabilityClass, lapseRateAt, meteogramRange, METEOGRAM, windAt } from './meteogram-scale';
 
 const point = (heightM: number, temperatureC: number) => ({ heightM, temperatureC, speedMs: 0, dirDeg: 0 });
 
@@ -44,3 +44,26 @@ describe('meteogramRange', () => {
     expect(meteogramRange(1900, [5500]).topM).toBe(METEOGRAM.maxTopM);
   });
 });
+
+describe('windAt — ветер между уровнями модели', () => {
+  const wind = (heightM: number, speedMs: number, dirDeg: number) => ({ heightM, temperatureC: 0, speedMs, dirDeg });
+
+  it('на уровне — ветер уровня; посередине — среднее вектора', () => {
+    const points = [wind(2000, 4, 90), wind(3000, 8, 90)];
+    expect(windAt(points, 2000)).toEqual({ speedMs: 4, dirDeg: 90 });
+    const mid = windAt(points, 2500);
+    expect(mid?.speedMs).toBeCloseTo(6, 9);
+    expect(mid?.dirDeg).toBeCloseTo(90, 9);
+  });
+
+  it('через север — 0°, а не 180°', () => {
+    const mid = windAt([wind(2000, 5, 350), wind(3000, 5, 10)], 2500);
+    expect(Math.min(mid?.dirDeg ?? 99, 360 - (mid?.dirDeg ?? 99))).toBeCloseTo(0, 6);
+  });
+
+  it('вне профиля — null', () => {
+    expect(windAt([wind(2000, 4, 90), wind(3000, 8, 90)], 3500)).toBeNull();
+    expect(windAt([wind(2000, 4, 90)], 2000)).toBeNull();
+  });
+});
+

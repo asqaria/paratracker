@@ -133,6 +133,12 @@ export interface ForecastHour {
    */
   surface: ProfilePoint;
   profile: ProfilePoint[];
+  /**
+   * Ветер по высотам (задача П.7): земля и уровни модели, у которой больше
+   * всего уровней в слое полёта (FORECAST.windBandM), — обычно GFS.
+   */
+  wind: ProfilePoint[];
+  windModel: ForecastModel;
   cloudCoverPct: number;
   precipitationMm: number;
 }
