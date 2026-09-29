@@ -33,6 +33,12 @@ const SMOOTH_ROW_M = 25;
 const SURFACE_ARROW_UP_PX = 10;
 const CEILING_LINE_PX = 2.5;
 const RANGE_ALPHA = 0.25;
+/**
+ * Выше потолка — затемнение: цвет там — неустойчивость воздуха, но термик
+ * туда не дойдёт (у ECMWF над стартом 2–3 уровня давления, «крышку» на
+ * потолке по ним не видно — её видит модель, отсюда и потолок).
+ */
+const ABOVE_CEILING_DIM = 0.6;
 const ARROW_PX = 9;
 const ARROW_HEAD_PX = 3.5;
 const FONT_PX = 11;
@@ -96,7 +102,8 @@ export function Meteogram({ hours, elevationM, time, onTime }: MeteogramProps) {
         if (lapse === null) continue;
         ctx.fillStyle = instabilityColorAt(lapse, CELL_ALPHA);
         const y0 = yOf(Math.min(topM, h + SMOOTH_ROW_M));
-        ctx.fillRect(PAD.left + px, y0, SMOOTH_COLUMN_PX + 0.5, yOf(h) - y0 + 0.5);
+        // Последний столбик не вылезает за правый край.
+        ctx.fillRect(PAD.left + px, y0, Math.min(SMOOTH_COLUMN_PX + 0.5, plotW - px), yOf(h) - y0 + 0.5);
       }
     }
     hours.forEach(({ hour }, k) => {
@@ -104,6 +111,27 @@ export function Meteogram({ hours, elevationM, time, onTime }: MeteogramProps) {
       ctx.fillStyle = VERDICT_COLOR[hour.verdict];
       ctx.fillRect(PAD.left + k * columnW + 1, 2, columnW - 2, VERDICT_STRIP_PX);
     });
+
+    // Выше потолка главной модели — затемнение по той же ломаной, что и линия потолка.
+    const ceilingLine = hours.flatMap(({ hour }, k) => {
+      const ceiling = hour.models[0]?.ceilingM;
+      return ceiling === null || ceiling === undefined
+        ? []
+        : [{ x: PAD.left + (k + 0.5) * columnW, y: yOf(Math.min(topM, Math.max(bottomM, ceiling))) }];
+    });
+    const firstPoint = ceilingLine[0];
+    const lastPoint = ceilingLine.at(-1);
+    if (firstPoint && lastPoint) {
+      ctx.fillStyle = withAlpha(colors.void, ABOVE_CEILING_DIM);
+      ctx.beginPath();
+      ctx.moveTo(PAD.left, PAD.top);
+      ctx.lineTo(PAD.left, firstPoint.y);
+      for (const p of ceilingLine) ctx.lineTo(p.x, p.y);
+      ctx.lineTo(PAD.left + plotW, lastPoint.y);
+      ctx.lineTo(PAD.left + plotW, PAD.top);
+      ctx.closePath();
+      ctx.fill();
+    }
 
     // Разброс потолка по моделям — плавная полоса через центры часов, потолок главной модели — линия.
     const band = hours.flatMap(({ hour }, k) => {
@@ -144,10 +172,12 @@ export function Meteogram({ hours, elevationM, time, onTime }: MeteogramProps) {
         ctx.fillStyle = colors.primary;
         ctx.fillText(CLOUD, cx, yOf(base));
       }
-      ctx.strokeStyle = colors.void;
       ctx.lineWidth = 1.5;
+      const ceiling = hour.models[0]?.ceilingM ?? null;
       for (const level of [hour.surface, ...hour.profile]) {
         if (level.heightM > topM) continue;
+        // Выше потолка фон затемнён — стрелка светлая, иначе её не видно.
+        ctx.strokeStyle = ceiling !== null && level.heightM > ceiling ? colors.primary : colors.void;
         const angle = (level.dirDeg + DOWNWIND_DEG) * RAD;
         const dx = Math.sin(angle) * ARROW_PX;
         const dy = -Math.cos(angle) * ARROW_PX;
