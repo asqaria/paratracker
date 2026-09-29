@@ -119,7 +119,12 @@ export function SitePanel({ slug, dayHours, time, onTime, attribution }: SitePan
             {t('forecast.legend.aboveCeiling')}
           </li>
           <li>☁ {t('forecast.legend.cloudBase')}</li>
-          <li>↗ {t('forecast.legend.wind')}</li>
+          <li>
+            ↗{' '}
+            {shown[0]?.hour.windModel
+              ? fill(t('forecast.legend.windBy'), { model: MODEL_NAME[shown[0].hour.windModel] })
+              : t('forecast.legend.wind')}
+          </li>
         </ul>
       </div>
 

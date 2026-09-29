@@ -196,6 +196,15 @@ describe('evaluateForecast на реальном прогнозе по Уш-Ко
     expect(night?.models.find((m) => m.model === 'gfs')?.thermalMs).toBe(0);
   });
 
+  it('ветер по высотам — у модели с большим числом уровней в слое полёта (у ECMWF нет 800 гПа — берётся GFS)', () => {
+    for (const h of hours) {
+      expect(h.windModel).toBe('gfs');
+      expect(h.wind.length).toBeGreaterThan(h.profile.length + 1);
+      const heights = h.wind.map((p) => p.heightM);
+      expect(heights).toEqual([...heights].sort((a, b) => a - b));
+    }
+  });
+
   it('детерминирован', () => {
     expect(evaluateForecast(all, ush)).toEqual(hours);
   });

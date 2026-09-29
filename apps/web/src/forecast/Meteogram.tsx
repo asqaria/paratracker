@@ -6,7 +6,7 @@ import { useLocaleStore, useT } from '../i18n/locale';
 import { metres } from '../viewer/units';
 import { instabilityColorAt, VERDICT_COLOR } from './forecast-palette';
 import type { LocalHour } from './forecast-time';
-import { lapseRateAt, meteogramRange, METEOGRAM } from './meteogram-scale';
+import { lapseRateAt, meteogramRange, METEOGRAM, windAt } from './meteogram-scale';
 
 /**
  * Диаграмма «время × высота» (задача П.6): по горизонтали — часы дня, по
@@ -29,8 +29,6 @@ const CELL_ALPHA = 0.9;
 /** Сглаживание: столбик 3 px, ряд 25 м — цвет перетекает по часам и высоте. */
 const SMOOTH_COLUMN_PX = 3;
 const SMOOTH_ROW_M = 25;
-/** Ветер у земли — чуть выше нижнего края, чтобы стрелка была видна. */
-const SURFACE_ARROW_UP_PX = 10;
 const CEILING_LINE_PX = 2.5;
 const RANGE_ALPHA = 0.25;
 /**
@@ -39,7 +37,10 @@ const RANGE_ALPHA = 0.25;
  * потолке по ним не видно — её видит модель, отсюда и потолок).
  */
 const ABOVE_CEILING_DIM = 0.6;
-const ARROW_PX = 9;
+/** Длина стрелки ветра по силе: штиль — 6 px, от ~8 м/с (30 км/ч) — 16 px. */
+const ARROW_MIN_PX = 6;
+const ARROW_MAX_PX = 16;
+const ARROW_PX_PER_MS = 1.25;
 const ARROW_HEAD_PX = 3.5;
 const FONT_PX = 11;
 /** Стрелка показывает, куда сносит: «откуда» + 180°. */
@@ -174,15 +175,18 @@ export function Meteogram({ hours, elevationM, time, onTime }: MeteogramProps) {
       }
       ctx.lineWidth = 1.5;
       const ceiling = hour.models[0]?.ceilingM ?? null;
-      for (const level of [hour.surface, ...hour.profile]) {
-        if (level.heightM > topM) continue;
+      // Ветер по высотам (задача П.7): модель с большим числом уровней; у старых прогнозов — профиль.
+      const windPoints = hour.wind ?? [hour.surface, ...hour.profile];
+      for (let h = bottomM + METEOGRAM.windStepM / 2; h <= topM; h += METEOGRAM.windStepM) {
+        const wind = windAt(windPoints, h);
+        if (!wind) continue;
         // Выше потолка фон затемнён — стрелка светлая, иначе её не видно.
-        ctx.strokeStyle = ceiling !== null && level.heightM > ceiling ? colors.primary : colors.void;
-        const angle = (level.dirDeg + DOWNWIND_DEG) * RAD;
-        const dx = Math.sin(angle) * ARROW_PX;
-        const dy = -Math.cos(angle) * ARROW_PX;
-        // Земля модели бывает чуть ниже старта — ветер у земли рисуется у нижнего края.
-        const y = Math.min(yOf(level.heightM), yOf(bottomM) - SURFACE_ARROW_UP_PX);
+        ctx.strokeStyle = ceiling !== null && h > ceiling ? colors.primary : colors.void;
+        const length = Math.min(ARROW_MAX_PX, ARROW_MIN_PX + wind.speedMs * ARROW_PX_PER_MS);
+        const angle = (wind.dirDeg + DOWNWIND_DEG) * RAD;
+        const dx = Math.sin(angle) * length;
+        const dy = -Math.cos(angle) * length;
+        const y = yOf(h);
         ctx.beginPath();
         ctx.moveTo(cx - dx / 2, y - dy / 2);
         ctx.lineTo(cx + dx / 2, y + dy / 2);

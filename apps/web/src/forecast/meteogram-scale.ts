@@ -36,6 +36,8 @@ export const METEOGRAM = {
   cellM: 100,
   /** Подписи высот через 500 м. */
   labelStepM: 500,
+  /** Стрелки ветра каждые 250 м: на высотах полёта видно, как меняется ветер. */
+  windStepM: 250,
 } as const;
 
 const PER_100_M = 100;
@@ -75,4 +77,32 @@ export function meteogramRange(elevationM: number, ceilingsM: readonly (number |
   const highest = Math.max(elevationM, ...ceilingsM.filter((c): c is number => c !== null));
   const topM = Math.min(METEOGRAM.maxTopM, Math.max(elevationM + METEOGRAM.minSpanM, highest + METEOGRAM.aboveCeilingM));
   return { bottomM: elevationM, topM };
+}
+
+const RAD = Math.PI / 180;
+const FULL_TURN_DEG = 360;
+
+/**
+ * Ветер на высоте (задача П.7): между соседними уровнями — линейно как вектор
+ * (восток, север), а не по градусам: иначе между 350° и 10° вышло бы 180°.
+ * Ниже нижней и выше верхней точки — null.
+ */
+export function windAt(points: readonly ProfilePoint[], heightM: number): { speedMs: number; dirDeg: number } | null {
+  for (let k = 1; k < points.length; k++) {
+    const a = points[k - 1];
+    const b = points[k];
+    if (!a || !b || heightM < a.heightM || heightM > b.heightM) continue;
+    const u = b.heightM > a.heightM ? (heightM - a.heightM) / (b.heightM - a.heightM) : 0;
+    // Вектор «откуда»: для интерполяции направление всё равно одно — «откуда».
+    const ax = a.speedMs * Math.sin(a.dirDeg * RAD);
+    const ay = a.speedMs * Math.cos(a.dirDeg * RAD);
+    const bx = b.speedMs * Math.sin(b.dirDeg * RAD);
+    const by = b.speedMs * Math.cos(b.dirDeg * RAD);
+    const x = ax + (bx - ax) * u;
+    const y = ay + (by - ay) * u;
+    const speedMs = Math.hypot(x, y);
+    const dirDeg = ((Math.atan2(x, y) / RAD) % FULL_TURN_DEG + FULL_TURN_DEG) % FULL_TURN_DEG;
+    return { speedMs, dirDeg };
+  }
+  return null;
 }
