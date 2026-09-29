@@ -13,6 +13,8 @@ import {
   SOURCE_FORMATS,
   TURN_DIRECTIONS,
   UNIT_SYSTEMS,
+  type CompassPoint,
+  type ForecastHour,
   type ThermalReviewLabels,
   type WindBand,
   type XcScore,
@@ -29,6 +31,7 @@ import {
   numeric,
   pgTable,
   primaryKey,
+  real,
   text,
   timestamp,
   uniqueIndex,
@@ -143,6 +146,12 @@ export const sites = pgTable(
     sourceRef: text('source_ref').unique(),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: timestamptz('created_at').notNull().defaultNow(),
+    /** Сектор старта — румбы, откуда можно стартовать (ТЗ §6.9); null — не задан. */
+    windSectors: text('wind_sectors').array().$type<CompassPoint[]>(),
+    /** Допустимый ветер на старте, м/с; null — FORECAST.defaultMaxWindMs. */
+    maxWindMs: real('max_wind_ms'),
+    /** Место в прогнозе на /map (задача П.2): загружать прогноз раз в 6 ч. */
+    forecast: boolean('forecast').notNull().default(false),
   },
   (t) => [
     check('sites_type_check', oneOf(t.type, SITE_TYPES)),
@@ -449,3 +458,16 @@ export const comments = pgTable(
     check('comments_timecode_check', sql`${t.timecodeS} IS NULL OR ${t.timecodeS} >= 0`),
   ],
 );
+
+/**
+ * Прогноз места (ТЗ §6.9, задача П.2): последняя загрузка Open-Meteo, уже
+ * оценённая по часам. Одна строка на место — старый прогноз не нужен
+ * (архив прогнозов для калибровки берётся у Open-Meteo, §6.9 этап 2).
+ */
+export const siteForecasts = pgTable('site_forecasts', {
+  siteId: uuid('site_id')
+    .primaryKey()
+    .references(() => sites.id, { onDelete: 'cascade' }),
+  fetchedAt: timestamptz('fetched_at').notNull(),
+  hours: jsonb('hours').$type<ForecastHour[]>().notNull(),
+});

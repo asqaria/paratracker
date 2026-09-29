@@ -21,3 +21,4 @@ export * from './stats-dto.js';
 export * from './track.js';
 export * from './user.js';
 export * from './forecast.js';
+export * from './forecast-dto.js';

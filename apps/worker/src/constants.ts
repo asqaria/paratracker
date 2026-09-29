@@ -29,5 +29,11 @@ export const RETENTION_SWEEP_INTERVAL_S = 3600;
  */
 export const RETENTION_BATCH_SIZE = 100;
 
+/**
+ * Запрос к Open-Meteo (прогноз, ТЗ §6.9): ответ ~20 КБ приходит за доли
+ * секунды; дольше 30 с — сервис лежит, место повторится на следующей проверке.
+ */
+export const FORECAST_FETCH_TIMEOUT_S = 30;
+
 /** Ключ .track в объектном хранилище (ТЗ §5.2 шаг 9). */
 export const trackObjectKey = (flightId: string): string => `tracks/${flightId}.track`;

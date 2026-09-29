@@ -813,9 +813,16 @@ sites по ST_DWithin (радиус 2 км, SITE.matchRadiusM). Не перва�
 ```
 П.1  Ядро: разбор Open-Meteo (packages/parsing), оценка часа и согласие
      моделей (packages/analysis), тесты на реальных ответах по Уш-Коныру
-     (fixtures/forecast)
+     (fixtures/forecast) — сделано (#78)
 П.2  Места в прогнозе (сектор, допустимый ветер, флаг), загрузка прогноза
-     воркером раз в 6 ч, хранение, API /api/v1/forecast
+     воркером раз в 6 ч, хранение, API /api/v1/forecast — сделано:
+     sites.wind_sectors / max_wind_ms / forecast (Уш-Коныр — С/СВ/СЗ),
+     site_forecasts (последний оценённый прогноз, jsonb). Воркер проверяет
+     раз в 10 мин, место — раз в 6 ч: 4 запроса (ecmwf_ifs, ecmwf_ifs025,
+     gfs_seamless, icon_global), высота места — над уровнем моря (h − N).
+     Адрес Open-Meteo — FORECAST_API_URL. API без входа, кэш 10 мин:
+     GET /forecast — места с часами для карты, GET /forecast/{slug} —
+     место по часам со всеми моделями; атрибуция в ответе
 П.3  Страница /map: места цветом по прогнозу, ползунок дня и часа,
      панель места с прогнозом по часам
 ```

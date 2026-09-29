@@ -5,17 +5,21 @@ import {
   deleteFlights,
   FLIGHT_QUEUED_CHANNEL,
   listExpiredAnonymousFlights,
+  listForecastSites,
   listUnfinishedFlights,
   markFlightFailed,
   markFlightProcessing,
   markFlightReady,
   notifyFlightStatus,
   requeueFlightsForBackfill,
+  saveSiteForecast,
 } from '@skyline/db';
+import { FORECAST } from '@skyline/core';
 import { pino } from 'pino';
 
 import { loadConfig } from './config.js';
 import {
+  FORECAST_FETCH_TIMEOUT_S,
   PIPELINE_MEMORY_LIMIT_MB,
   PIPELINE_TIMEOUT_S,
   QUEUE_SWEEP_INTERVAL_S,
@@ -24,6 +28,7 @@ import {
 } from './constants.js';
 import { createPipelinePool } from './pool.js';
 import { esriTileSource } from './esri-tiles.js';
+import { createForecastRefresh } from './forecast-refresh.js';
 import { createFlightProcessor } from './processor.js';
 import { createFlightQueue } from './queue.js';
 import { createRetentionSweep } from './retention.js';
@@ -108,6 +113,28 @@ async function sweepExpired(): Promise<void> {
   if (deleted > 0 || failed > 0) logger.info({ deleted, failed }, 'expired anonymous flights swept');
 }
 
+/** ТЗ §6.9: прогноз по местам — раз в 6 ч на место, проверка — раз в 10 мин. */
+const forecast = createForecastRefresh({
+  repository: {
+    listSites: () => listForecastSites(database.db),
+    save: (siteId, fetchedAt, hours) => saveSiteForecast(database.db, siteId, fetchedAt, hours),
+  },
+  fetchJson: async (url) => {
+    const response = await fetch(url, { signal: AbortSignal.timeout(FORECAST_FETCH_TIMEOUT_S * MS_PER_SECOND) });
+    if (!response.ok) throw new Error(`forecast API HTTP ${response.status}`);
+    return (await response.json());
+  },
+  apiUrl: config.FORECAST_API_URL,
+  now: () => Date.now(),
+  onError: (error, siteId) => logger.error({ err: error, siteId }, 'forecast refresh failed'),
+  onWarnings: (warnings, siteId, model) => logger.warn({ siteId, model, warnings: warnings.length }, 'forecast parse warnings'),
+});
+
+async function refreshForecast(): Promise<void> {
+  const refreshed = await forecast.run();
+  if (refreshed > 0) logger.info({ refreshed }, 'forecast refreshed');
+}
+
 await listener.start();
 // Разово: полёты до задач 2.11 и 2.13 (нет сводки, линии, точки взлёта) — на повторную обработку.
 const backfill = await requeueFlightsForBackfill(database.db);
@@ -123,12 +150,19 @@ const retentionTimer = setInterval(() => {
   void sweepExpired().catch(logSweepFailure);
 }, RETENTION_SWEEP_INTERVAL_S * MS_PER_SECOND);
 
+const logForecastFailure = (error: unknown): void => logger.error({ err: error }, 'forecast check failed');
+void refreshForecast().catch(logForecastFailure);
+const forecastTimer = setInterval(() => {
+  void refreshForecast().catch(logForecastFailure);
+}, FORECAST.checkIntervalS * MS_PER_SECOND);
+
 logger.info({ concurrency: config.WORKER_CONCURRENCY }, 'worker started');
 
 const shutdown = (signal: NodeJS.Signals): void => {
   logger.info({ signal }, 'shutting down');
   clearInterval(sweep);
   clearInterval(retentionTimer);
+  clearInterval(forecastTimer);
   void (async () => {
     try {
       await listener.stop();
