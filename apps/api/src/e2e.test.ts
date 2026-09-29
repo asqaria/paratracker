@@ -51,6 +51,12 @@ const env = process.env;
 /** ТЗ §5.2: health обязан отвечать быстрее 200 мс во время обработки. */
 const MAX_HEALTH_LATENCY_MS = 200;
 const STATUS_TIMEOUT_MS = 30_000;
+/**
+ * Три 4-часовых трека на пуле из двух потоков: локально — 3 с, на раннере CI
+ * (2 vCPU) — 25–35 с, и 30 с стали лотереей. Тест проверяет отклик health под
+ * нагрузкой, а не скорость обработки на CI — ждём с запасом.
+ */
+const HEAVY_STATUS_TIMEOUT_MS = 90_000;
 const POLL_INTERVAL_MS = 25;
 
 describe.runIf(Boolean(env.DATABASE_URL && env.S3_ENDPOINT))('сквозной путь загрузки', () => {
@@ -194,7 +200,7 @@ describe.runIf(Boolean(env.DATABASE_URL && env.S3_ENDPOINT))('сквозной �
     ]);
 
     const latencies: number[] = [];
-    const deadline = Date.now() + STATUS_TIMEOUT_MS;
+    const deadline = Date.now() + HEAVY_STATUS_TIMEOUT_MS;
     let done = false;
     while (!done && Date.now() < deadline) {
       const start = performance.now();
@@ -214,7 +220,7 @@ describe.runIf(Boolean(env.DATABASE_URL && env.S3_ENDPOINT))('сквозной �
       const download = await app.inject({ method: 'GET', url: `/api/v1/flights/${flightId}/track` });
       expect(readTrack(new Uint8Array(download.rawPayload)).pointCount).toBe(14_400);
     }
-  }, 120_000);
+  }, 150_000);
 
   it('перезапуск воркера в середине обработки не теряет полёт', async () => {
     // Полёт загружен и взят в работу, после чего воркер «упал»: строка осталась в parsing.
