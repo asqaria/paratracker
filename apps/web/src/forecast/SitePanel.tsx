@@ -110,6 +110,14 @@ export function SitePanel({ slug, dayHours, time, onTime, attribution }: SitePan
             <span className="inline-block h-0.5 w-3 bg-primary" />
             {t('forecast.legend.ceiling')}
           </li>
+          <li className="flex items-center gap-1">
+            <span className="inline-block h-2.5 w-3 rounded-sm bg-primary/25" />
+            {t('forecast.legend.range')}
+          </li>
+          <li className="flex items-center gap-1">
+            <span className="inline-block h-2.5 w-3 rounded-sm bg-void/60 ring-1 ring-subtle" />
+            {t('forecast.legend.aboveCeiling')}
+          </li>
           <li>☁ {t('forecast.legend.cloudBase')}</li>
           <li>↗ {t('forecast.legend.wind')}</li>
         </ul>
