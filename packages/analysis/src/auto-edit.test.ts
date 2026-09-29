@@ -47,15 +47,20 @@ describe('autoEdit на реальном треке', () => {
     });
   });
 
-  it('лучший термик — с наибольшим набором, орбитальный подъём во весь термик', () => {
+  it('лучший термик — с наибольшим набором, орбитальный подъём, верх набора не быстрее потолка', () => {
     const best = [...analysis.thermals].sort((a, b) => b.gainM - a.gainM)[0];
     if (!best) throw new Error('thermal expected');
+    const maxMs = ms(CINEMA.maxTimeScale * CINEMA.sceneS.bestThermal);
     expect(byKind(scenes, 'bestThermal')).toMatchObject({
       camera: 'orbitClimb',
-      fromMs: best.startTimeMs,
+      fromMs: Math.max(best.startTimeMs, best.endTimeMs - maxMs),
       toMs: best.endTimeMs,
       durationS: CINEMA.sceneS.bestThermal,
     });
+  });
+
+  it('ускорение нигде не выше потолка', () => {
+    for (const s of scenes) expect(s.timeScale).toBeLessThanOrEqual(CINEMA.maxTimeScale + 1e-9);
   });
 
   it('самый длинный глайд — chase внутри этого глайда (подрезан по взлёту и посадке)', () => {
