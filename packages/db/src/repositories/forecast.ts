@@ -1,8 +1,8 @@
 import { COMPASS_POINTS, type CompassPoint, type ForecastHour } from '@skyline/core';
-import { asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, lte, sql } from 'drizzle-orm';
 
 import type { Database } from '../client.js';
-import { siteForecasts, sites } from '../schema.js';
+import { forecastRuns, siteForecasts, sites } from '../schema.js';
 
 /**
  * Прогноз по местам старта (ТЗ §6.9, задача П.2): какие места в прогнозе,
@@ -59,12 +59,32 @@ export async function listForecastSites(db: Database): Promise<ForecastSiteRecor
   return rows.map(toRecord);
 }
 
-/** Записать свежий прогноз места (одна строка на место). */
+/**
+ * Записать свежий прогноз места: последний — для /map (одна строка на место),
+ * и в историю (задача П.8) — для сверки с полётами. Вместе, в одной транзакции.
+ */
 export async function saveSiteForecast(db: Database, siteId: string, fetchedAt: Date, hours: ForecastHour[]): Promise<void> {
-  await db
-    .insert(siteForecasts)
-    .values({ siteId, fetchedAt, hours })
-    .onConflictDoUpdate({ target: siteForecasts.siteId, set: { fetchedAt, hours } });
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(siteForecasts)
+      .values({ siteId, fetchedAt, hours })
+      .onConflictDoUpdate({ target: siteForecasts.siteId, set: { fetchedAt, hours } });
+    await tx.insert(forecastRuns).values({ siteId, fetchedAt, hours });
+  });
+}
+
+export interface ForecastRunRecord {
+  fetchedAt: Date;
+  hours: ForecastHour[];
+}
+
+/** История прогнозов места за период загрузки [from, to] — по времени загрузки. */
+export async function listForecastRuns(db: Database, siteId: string, from: Date, to: Date): Promise<ForecastRunRecord[]> {
+  return db
+    .select({ fetchedAt: forecastRuns.fetchedAt, hours: forecastRuns.hours })
+    .from(forecastRuns)
+    .where(and(eq(forecastRuns.siteId, siteId), gte(forecastRuns.fetchedAt, from), lte(forecastRuns.fetchedAt, to)))
+    .orderBy(asc(forecastRuns.fetchedAt));
 }
 
 /** Места в прогнозе с их прогнозом — для /map. Места без загрузки пропускаются. */
