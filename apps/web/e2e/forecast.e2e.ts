@@ -84,3 +84,21 @@ test.describe('карта термиков kk7', () => {
   });
 });
 
+test.describe('анимация карты (задача П.5)', () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test('«Проиграть день» идёт по часам сам; пауза останавливает; частицы ветра — поверх карты', async ({ page }) => {
+    await openMap(page);
+    await expect(page.locator('[data-panel="wind-flow"]')).toBeAttached();
+    const selected = page.locator('[data-panel="forecast-site"] thead button[aria-pressed="true"]');
+    await expect(selected).toContainText('09');
+    await page.locator('[data-panel="forecast-play"]').click();
+    await expect(selected).toContainText('10', { timeout: 5000 });
+    await expect(selected).toContainText('11', { timeout: 5000 });
+    await page.locator('[data-panel="forecast-play"]').click();
+    const paused = await selected.innerText();
+    await page.waitForTimeout(2000);
+    await expect(selected).toHaveText(paused);
+  });
+});
+

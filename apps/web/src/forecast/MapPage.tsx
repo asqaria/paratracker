@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 
 import { UserMenu } from '../auth/UserMenu';
 import { LocaleSwitch } from '../i18n/LocaleSwitch';
@@ -9,6 +9,7 @@ import { fetchImageryCapabilities } from '../viewer/imagery-capabilities';
 import { FORECAST_QUERY_KEY, fetchForecastMap } from './forecast-api';
 import { defaultHour, forecastDays } from './forecast-time';
 import { kk7Layer, kk7TileUrl, type Kk7Kind } from './kk7';
+import { FLOW, nextTime } from './wind-flow';
 import { SitePanel } from './SitePanel';
 
 const ForecastMap = lazy(() => import('./ForecastMap'));
@@ -61,6 +62,20 @@ export function MapPage({ site }: MapPageProps) {
   const time = chosenTime !== null && allTimes.includes(chosenTime) ? chosenTime : (defaultHour(days)?.time ?? null);
   const dayKey = days.find((day) => day.hours.some((h) => h.time === time))?.dayKey ?? days[0]?.dayKey ?? null;
   const dayHours = days.find((day) => day.dayKey === dayKey)?.hours ?? [];
+
+  // «Проиграть день» (задача П.5): часы идут сами по всем светлым часам, в конце — стоп.
+  const [playing, setPlaying] = useState(false);
+  const playRef = useRef({ times: allTimes, time });
+  playRef.current = { times: allTimes, time };
+  useEffect(() => {
+    if (!playing) return undefined;
+    const timer = setInterval(() => {
+      const next = nextTime(playRef.current.times, playRef.current.time);
+      if (next === null) setPlaying(false);
+      else setChosenTime(next);
+    }, FLOW.playStepMs);
+    return () => clearInterval(timer);
+  }, [playing]);
   // Карта термиков kk7: по умолчанию термики, коридоры — по кнопке.
   const [kk7Shown, setKk7Shown] = useState<Record<Kk7Kind, boolean>>({ thermals: true, skyways: false });
   const template = thermalTileUrl();
@@ -131,6 +146,15 @@ export function MapPage({ site }: MapPageProps) {
           {current && days.length > 0 && (
             <div data-panel="forecast-time" className="absolute bottom-8 left-3 right-3 flex flex-col gap-2 rounded-xl glass p-2 text-sm compact:static compact:m-2 compact:mb-0">
               <div role="tablist" aria-label={t('forecast.day')} className="flex gap-1">
+                <button
+                  type="button"
+                  data-panel="forecast-play"
+                  aria-pressed={playing}
+                  onClick={() => setPlaying((value) => !value)}
+                  className="rounded bg-accent px-3 py-1 font-semibold text-void compact:min-h-11"
+                >
+                  {playing ? t('forecast.pause') : t('forecast.play')}
+                </button>
                 {days.map((day) => (
                   <button
                     key={day.dayKey}
