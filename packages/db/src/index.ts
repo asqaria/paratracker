@@ -109,3 +109,4 @@ export {
   type CommentRecord,
   type CommentRef,
 } from './repositories/comments.js';
+export { listForecastSites, listSiteForecasts, saveSiteForecast, type ForecastSiteRecord, type SiteForecastRecord } from './repositories/forecast.js';

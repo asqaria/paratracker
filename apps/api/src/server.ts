@@ -28,6 +28,7 @@ import {
   insertFlight,
   listGlides,
   listSameDayFlights,
+  listSiteForecasts,
   listLogbook,
   listLogbookMap,
   listGliders,
@@ -144,6 +145,9 @@ const app = buildApp({
     glides: (flightId) => listGlides(database.db, flightId),
     sameDay: (flightId, viewerId) => listSameDayFlights(database.db, flightId, viewerId),
     likedBy: (userId, flightId) => likedBy(database.db, userId, flightId),
+  },
+  forecast: {
+    list: () => listSiteForecasts(database.db),
   },
   profiles: {
     find: (username) => findPublicProfile(database.db, username),

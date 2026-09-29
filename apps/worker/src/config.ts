@@ -23,6 +23,15 @@ export const Config = z.object({
   /** Подложка превью (задача 3.8) — те же ключ и шаблон, что у API; без них превью на тёмном фоне. */
   ARCGIS_API_KEY: optionalText(z.string().min(1)),
   ARCGIS_TILE_URL: optionalText(z.url()),
+
+  /**
+   * Прогноз для пилотов (ТЗ §6.9): /v1/forecast Open-Meteo. Бесплатный доступ —
+   * только некоммерческий; с монетизацией — адрес платного плана (customer-api).
+   */
+  FORECAST_API_URL: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.url().default('https://api.open-meteo.com/v1/forecast'),
+  ),
 });
 export type Config = z.infer<typeof Config>;
 

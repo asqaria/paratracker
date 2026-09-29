@@ -5,6 +5,7 @@ import { registerCommentRoutes, type CommentRoutesDeps } from './comments.js';
 import { registerAuthHook, registerAuthRoutes, type AuthDeps } from './auth/routes.js';
 import { API_V1_PREFIX } from './constants.js';
 import { registerFlightSettingsRoutes, type FlightSettingsDeps } from './flight-settings.js';
+import { registerForecastRoutes, type ForecastRoutesDeps } from './forecast.js';
 import { registerFlightRoutes, type FlightRoutesDeps } from './flights.js';
 import { registerGliderRoutes, type GliderRoutesDeps } from './gliders.js';
 import { registerHealthRoutes, type HealthRouteOptions } from './health.js';
@@ -47,6 +48,8 @@ export interface AppOptions {
   social?: SocialRoutesDeps;
   /** Комментарии к полёту (задача 3.10б). */
   comments?: CommentRoutesDeps;
+  /** Прогноз для пилотов (ТЗ §6.9, задача П.2): без входа. */
+  forecast?: ForecastRoutesDeps;
 }
 
 export function buildApp(options: AppOptions): FastifyInstance {
@@ -71,6 +74,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       if (options.profiles) registerProfileRoutes(v1, options.profiles);
       if (options.social) registerSocialRoutes(v1, options.social);
       if (options.comments) registerCommentRoutes(v1, options.comments);
+      if (options.forecast) registerForecastRoutes(v1, options.forecast);
       done();
     },
     { prefix: API_V1_PREFIX },
