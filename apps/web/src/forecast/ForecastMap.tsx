@@ -14,10 +14,12 @@ import {
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { useEffect, useRef } from 'react';
 
-import { documentColorTokens } from '../design/tokens';
+import { documentColorTokens, withAlpha } from '../design/tokens';
 import { useLocaleStore, useT } from '../i18n/locale';
 import { groundSpeed, metres } from '../viewer/units';
+import { WIND_COLOR } from '../viewer/wind-palette';
 import { VERDICT_COLOR } from './forecast-palette';
+import { FLOW, flowVelocity, spawnParticle, stepParticles, type FlowParticle } from './wind-flow';
 
 /**
  * Карта прогноза (задача П.3, ТЗ §6.9): места старта — значки цветом по
@@ -64,6 +66,13 @@ const KK7_OPACITY = 0.75;
 const KK7_KINDS = ['skyways', 'thermals'] as const;
 /** Пустой адрес-заглушка, пока слой выключен: у источника MapLibre должен быть адрес. */
 const NO_TILES = 'data:,';
+/** Хвосты частиц: каждый кадр прошлое гаснет на 8 % — штрих длиной в полсекунды. */
+const TRAIL_FADE = 0.08;
+const PARTICLE_WIDTH_PX = 1.5;
+/** Потолок шага кадра, с: после фоновой вкладки частицы не прыгают через весь круг. */
+const MAX_FRAME_S = 0.1;
+const METRES_PER_DEGREE_LAT = 111_320;
+const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
 
 setWorkerUrl(maplibreWorkerUrl);
 
@@ -77,6 +86,15 @@ export default function ForecastMap({ sites, time, selected, onSelect, esriTileU
   const mapRef = useRef<MapLibreMap | null>(null);
   const kk7Ref = useRef(kk7);
   kk7Ref.current = kk7;
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  /** Ветер выбранного часа по местам — кадр читает его, не пересоздавая анимацию. */
+  const windRef = useRef(new Map<string, { speedMs: number; dirDeg: number }>());
+  windRef.current = new Map(
+    sites.flatMap((site) => {
+      const hour = site.hours.find((h) => h.time === time);
+      return hour ? [[site.slug, { speedMs: hour.windSpeedMs, dirDeg: hour.windDirDeg }] as const] : [];
+    }),
+  );
 
   // Карта и значки — один раз на набор мест; час и выбор меняют только значки.
   useEffect(() => {
@@ -146,6 +164,72 @@ export default function ForecastMap({ sites, time, selected, onSelect, esriTileU
     };
   }, [sites, esriTileUrl]);
 
+  // Частицы ветра (задача П.5): canvas поверх карты, свой кадр; при сдвиге карты — заново.
+  useEffect(() => {
+    const map = mapRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!map || !canvas || !ctx || window.matchMedia(REDUCED_MOTION).matches) return undefined;
+    const fade = withAlpha(documentColorTokens().void, TRAIL_FADE);
+    const particles = new Map<string, FlowParticle[]>();
+    const areaOf = (site: (typeof sites)[number]) => {
+      const center = map.project([site.lon, site.lat]);
+      const edge = map.project([site.lon, site.lat + FLOW.radiusM / METRES_PER_DEGREE_LAT]);
+      return { cx: center.x, cy: center.y, r: Math.hypot(edge.x - center.x, edge.y - center.y) };
+    };
+    const reset = (): void => {
+      particles.clear();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+    map.on('move', reset);
+    let frame = 0;
+    let last: number | null = null;
+    const tick = (now: number): void => {
+      frame = requestAnimationFrame(tick);
+      const dt = last === null ? 0 : Math.min(MAX_FRAME_S, (now - last) / 1000);
+      last = now;
+      const ratio = window.devicePixelRatio || 1;
+      const { clientWidth: w, clientHeight: h } = canvas;
+      if (canvas.width !== Math.round(w * ratio) || canvas.height !== Math.round(h * ratio)) {
+        canvas.width = Math.round(w * ratio);
+        canvas.height = Math.round(h * ratio);
+        particles.clear();
+      }
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      // Прошлый кадр гаснет, а не стирается — остаётся хвост.
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = fade;
+      ctx.fillRect(0, 0, w, h);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = WIND_COLOR;
+      ctx.lineWidth = PARTICLE_WIDTH_PX;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (const site of sites) {
+        const wind = windRef.current.get(site.slug);
+        if (!wind) continue;
+        const area = areaOf(site);
+        let list = particles.get(site.slug);
+        if (!list) {
+          list = Array.from({ length: FLOW.particlesPerSite }, () => spawnParticle(area, Math.random));
+          particles.set(site.slug, list);
+        }
+        stepParticles(list, dt, flowVelocity(wind.speedMs, wind.dirDeg, map.getBearing()), area, Math.random);
+        for (const p of list) {
+          if (p.prevX === p.x && p.prevY === p.y) continue;
+          ctx.moveTo(p.prevX, p.prevY);
+          ctx.lineTo(p.x, p.y);
+        }
+      }
+      ctx.stroke();
+    };
+    frame = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(frame);
+      map.off('move', reset);
+    };
+  }, [sites, esriTileUrl]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map?.isStyleLoaded()) return;
@@ -196,5 +280,10 @@ export default function ForecastMap({ sites, time, selected, onSelect, esriTileU
     }
   }, [sites, time, selected, locale, t]);
 
-  return <div ref={container} role="region" aria-label={t('forecast.map')} className="h-full w-full" />;
+  return (
+    <div className="relative h-full w-full">
+      <div ref={container} role="region" aria-label={t('forecast.map')} className="h-full w-full" />
+      <canvas ref={canvasRef} aria-hidden data-panel="wind-flow" className="pointer-events-none absolute inset-0 h-full w-full" />
+    </div>
+  );
 }
