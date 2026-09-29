@@ -20,3 +20,4 @@ export * from './site-dto.js';
 export * from './stats-dto.js';
 export * from './track.js';
 export * from './user.js';
+export * from './forecast.js';
