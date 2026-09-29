@@ -17,4 +17,5 @@ export { detectGlides, type GlideColumns } from './glides.js';
 export { estimateWind, fitVelocityCircle, type VelocityCircleFit, type WindColumns } from './wind.js';
 export { analyseFlight } from './flight-analysis.js';
 export { matchOnTrack, raceGaps, type RaceMatch, type RacePilot, type RaceTrack } from './race.js';
+export { autoEdit, type AutoEditInput, type CutCamera, type CutKind, type CutScene } from './auto-edit.js';
 export { cloudBase, evaluateForecast, evaluateModelHour, inSector, stormRisk, thermalCeiling, thermalStrength, thermalTop } from './forecast.js';
