@@ -344,7 +344,7 @@ const ru = {
   'forecast.model': 'Модель',
   'forecast.ceilingRange': 'Потолок по моделям: {from} – {to}',
   'forecast.windAloft': 'Ветер по высотам',
-  'forecast.calibrated': 'Потолок поправлен по реальным полётам с Уш-Коныра ({days} дня, {thermals} термиков); подъём — с учётом снижения крыла.',
+  'forecast.calibrated': 'Потолок поправлен по реальным полётам с Уш-Коныра (дней: {days}, термиков: {thermals}); подъём — с учётом снижения крыла.',
   'forecast.disclaimer': 'Прогноз не заменяет оценку условий на старте.',
   'forecast.attribution': 'Данные: {source}',
   'feed.title': 'Лента',
