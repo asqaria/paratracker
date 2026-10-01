@@ -99,12 +99,15 @@ export function stormRisk(hour: ModelHour): StormRisk {
 /** Оценка часа по одной модели. surfaceM — высота, к которой модель привела приземные поля. */
 export function evaluateModelHour(model: ForecastModel, hour: ModelHour, surfaceM: number, site: ForecastSite): ModelVerdict {
   const maxWind = site.maxWindMs ?? FORECAST.defaultMaxWindMs;
-  const top = thermalCeiling(hour, surfaceM);
+  const rawTop = thermalCeiling(hour, surfaceM);
+  // Сила термика — по слою модели (так она сверена), потолок — с поправкой по реальным полётам.
+  const w = thermalStrength(hour, rawTop === null ? 0 : rawTop - surfaceM);
+  const top = rawTop === null ? null : surfaceM + (rawTop - surfaceM) * FORECAST.ceilingCalibration;
   const base = cloudBase(hour, surfaceM);
   const cumulus = top !== null && base < top;
   const ceilingM = top === null ? null : cumulus ? base : top;
-  const depthM = ceilingM === null ? 0 : ceilingM - surfaceM;
-  const thermalMs = thermalStrength(hour, depthM);
+  // Подъём пилота: поток минус собственное снижение крыла (задача П.9).
+  const thermalMs = w === null ? null : Math.max(0, w - FORECAST.wingSinkMs);
   const storm = stormRisk(hour);
   const bandTopM = Math.max(ceilingM ?? site.elevationM, site.elevationM + FORECAST.upperWindBandM);
   const upperWindMs = hour.levels

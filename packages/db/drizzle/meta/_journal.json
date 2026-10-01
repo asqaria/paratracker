@@ -127,6 +127,13 @@
       "when": 1790720697735,
       "tag": "0017_forecast_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790890685967,
+      "tag": "0018_forecast_recalibrate",
+      "breakpoints": true
     }
   ]
 }

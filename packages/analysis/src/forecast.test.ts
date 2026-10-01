@@ -109,12 +109,21 @@ describe('оценка часа одной модели', () => {
     expect(evaluateModelHour('ecmwf', windyAloft, SURFACE_M, site)).toMatchObject({ verdict: 'marginal', reasons: ['upper_wind'] });
   });
 
-  it('потолок выше 1200 м над стартом и подъём от 1,5 м/с — XC-день', () => {
-    const verdict = judge({});
+  it('потолок с поправкой выше 1200 м над стартом и подъём пилота от 1 м/с — XC-день', () => {
+    // Слой 2,5 км: с поправкой 0,58 — 1450 м над стартом.
+    const verdict = judge({ boundaryLayerM: 2500 });
     expect(verdict.ceilingM).not.toBeNull();
     expect((verdict.ceilingM ?? 0) - SURFACE_M).toBeGreaterThan(FORECAST.xcCeilingM);
     expect(verdict.thermalMs).toBeGreaterThan(FORECAST.xcThermalMs);
     expect(verdict.verdict).toBe('xc');
+  });
+
+  it('поправка по полётам: потолок — земля + слой × калибровка; подъём пилота — w* слоя модели минус снижение крыла', () => {
+    const verdict = judge({ boundaryLayerM: 2500, dewPointC: -20 });
+    expect(verdict.ceilingM).toBeCloseTo(SURFACE_M + 2500 * FORECAST.ceilingCalibration, 9);
+    expect(verdict.thermalMs).toBeCloseTo((thermalStrength(hour({ boundaryLayerM: 2500 }), 2500) ?? 0) - FORECAST.wingSinkMs, 9);
+    // Земля не греет — подъём 0, а не отрицательный.
+    expect(judge({ boundaryLayerM: 2500, sensibleHeatFluxWm2: 5 }).thermalMs).toBe(0);
   });
 
   it('кучёвка ниже сухого потолка — потолок по базе облаков', () => {
@@ -140,7 +149,10 @@ describe('evaluateForecast — согласие моделей', () => {
   });
 
   it('две из трёх против главной — уверенность низкая; разброс потолка по моделям', () => {
-    const [h] = evaluateForecast([series('ecmwf', {}), series('gfs', { precipitationMm: 2 }), series('icon', { precipitationMm: 2 })], site);
+    const [h] = evaluateForecast(
+      [series('ecmwf', { boundaryLayerM: 2500 }), series('gfs', { precipitationMm: 2 }), series('icon', { precipitationMm: 2 })],
+      site,
+    );
     expect(h?.verdict).toBe('xc');
     expect(h?.confidence).toBe('low');
     const [low, high] = h?.ceilingRangeM ?? [0, 0];
