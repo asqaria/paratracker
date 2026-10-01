@@ -471,3 +471,21 @@ export const siteForecasts = pgTable('site_forecasts', {
   fetchedAt: timestamptz('fetched_at').notNull(),
   hours: jsonb('hours').$type<ForecastHour[]>().notNull(),
 });
+
+/**
+ * История прогнозов (задача П.8): каждая загрузка, а не только последняя.
+ * Нужна для сверки с реальными полётами — насколько точен прогноз «за день
+ * вперёд» на этом месте. ~100 КБ на загрузку, 4 в сутки на место.
+ */
+export const forecastRuns = pgTable(
+  'forecast_runs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    siteId: uuid('site_id')
+      .notNull()
+      .references(() => sites.id, { onDelete: 'cascade' }),
+    fetchedAt: timestamptz('fetched_at').notNull(),
+    hours: jsonb('hours').$type<ForecastHour[]>().notNull(),
+  },
+  (t) => [index('forecast_runs_site_fetched_idx').on(t.siteId, t.fetchedAt)],
+);

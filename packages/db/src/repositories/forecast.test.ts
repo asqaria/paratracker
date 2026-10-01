@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createDatabase, type DatabaseConnection } from '../client.js';
 import { sites } from '../schema.js';
-import { listForecastSites, listSiteForecasts, saveSiteForecast } from './forecast.js';
+import { listForecastRuns, listForecastSites, listSiteForecasts, saveSiteForecast } from './forecast.js';
 
 const databaseUrl = process.env.DATABASE_URL;
 const RUN = Date.now().toString(36);
@@ -18,6 +18,8 @@ const hour = (timeMs: number): ForecastHour => ({
   ceilingRangeM: null,
   surface: { heightM: 1900, temperatureC: 15, speedMs: 2, dirDeg: 0 },
   profile: [],
+  wind: [],
+  windModel: 'ecmwf',
   cloudCoverPct: 10,
   precipitationMm: 0,
 });
@@ -69,5 +71,14 @@ describe.runIf(Boolean(databaseUrl))('прогноз по местам (зада
     const saved = (await listSiteForecasts(connection.db)).find((s) => s.id === siteId);
     expect(saved?.fetchedAt).toEqual(new Date(Date.UTC(2026, 8, 29, 12)));
     expect(saved?.hours.map((h) => h.timeMs)).toEqual([2, 3]);
+  });
+
+  it('история (задача П.8): каждая загрузка остаётся — по времени, в пределах периода', async () => {
+    const runs = await listForecastRuns(connection.db, siteId, new Date(Date.UTC(2026, 8, 29)), new Date(Date.UTC(2026, 8, 30)));
+    expect(runs.map((r) => [r.fetchedAt.toISOString(), r.hours.length])).toEqual([
+      ['2026-09-29T06:00:00.000Z', 1],
+      ['2026-09-29T12:00:00.000Z', 2],
+    ]);
+    expect(await listForecastRuns(connection.db, siteId, new Date(Date.UTC(2026, 8, 29, 7)), new Date(Date.UTC(2026, 8, 29, 11)))).toEqual([]);
   });
 });

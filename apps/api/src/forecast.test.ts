@@ -29,6 +29,8 @@ const HOUR: ForecastHour = {
   ceilingRangeM: [3100, 3300],
   surface: { heightM: 1905, temperatureC: 16, speedMs: 3, dirDeg: 350 },
   profile: [{ heightM: 3100, temperatureC: 6, speedMs: 6, dirDeg: 270 }],
+  wind: [{ heightM: 1905, temperatureC: 16, speedMs: 3, dirDeg: 350 }],
+  windModel: 'gfs',
   cloudCoverPct: 20,
   precipitationMm: 0,
 };

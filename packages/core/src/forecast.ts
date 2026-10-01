@@ -102,7 +102,10 @@ export interface ModelVerdict {
   ceilingM: number | null;
   /** База кучёвки, м; null — сухо, облаков не будет. */
   cloudBaseM: number | null;
-  /** Средний подъём в термиках, м/с (w*); null — модель не даёт поток тепла. */
+  /**
+   * Подъём пилота в термиках, м/с: w* минус собственное снижение крыла
+   * (FORECAST.wingSinkMs); null — модель не даёт поток тепла.
+   */
   thermalMs: number | null;
   stormRisk: StormRisk;
   /** Сильнейший ветер в слое полёта, м/с. */
@@ -133,6 +136,12 @@ export interface ForecastHour {
    */
   surface: ProfilePoint;
   profile: ProfilePoint[];
+  /**
+   * Ветер по высотам (задача П.7): земля и уровни модели, у которой больше
+   * всего уровней в слое полёта (FORECAST.windBandM), — обычно GFS.
+   */
+  wind: ProfilePoint[];
+  windModel: ForecastModel;
   cloudCoverPct: number;
   precipitationMm: number;
 }
